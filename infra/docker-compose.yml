@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: some_journey_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: some_journey
+      POSTGRES_USER: somejourney
+      POSTGRES_PASSWORD: somejourney_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - some_journey_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  some_journey_postgres_data:

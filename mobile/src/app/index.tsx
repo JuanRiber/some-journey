@@ -2,19 +2,35 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
+import JourneyHeader from "../components/JourneyHeader";
+import * as api from "../lib/api";
+import { setToken } from "../lib/auth";
 import { colors } from "../theme/colors";
 import { ui } from "../theme/styles";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function onLogin() {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await api.login(email.trim(), password);
+      await setToken(res.access_token);
+      router.replace("/home");
+    } catch (e) {
+      setError(e instanceof api.ApiError ? e.message : "Erro inesperado.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <View style={ui.screen}>
-      <View style={ui.header}>
-        <View style={ui.sun} />
-        <View style={ui.hill} />
-      </View>
+      <JourneyHeader />
 
       <View style={ui.body}>
         <View style={ui.brandRow}>
@@ -49,13 +65,18 @@ export default function LoginScreen() {
           <Text style={ui.forgot}>Esqueci minha senha</Text>
         </Pressable>
 
+        {error ? (
+          <Text style={{ color: "#A32D2D", fontSize: 13, marginTop: 12, textAlign: "center" }}>
+            {error}
+          </Text>
+        ) : null}
+
         <Pressable
           style={({ pressed }) => [ui.button, pressed && ui.buttonPressed]}
-          onPress={() => {
-            // TODO: chamar POST /auth/login, guardar o token e ir para o mapa
-          }}
+          onPress={onLogin}
+          disabled={loading}
         >
-          <Text style={ui.buttonText}>Entrar</Text>
+          <Text style={ui.buttonText}>{loading ? "Entrando..." : "Entrar"}</Text>
         </Pressable>
 
         <View style={ui.footerRow}>

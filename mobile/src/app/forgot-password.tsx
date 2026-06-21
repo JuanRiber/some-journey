@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
+import JourneyHeader from "../components/JourneyHeader";
 import { colors } from "../theme/colors";
 import { ui } from "../theme/styles";
 
@@ -10,10 +11,7 @@ export default function ForgotPasswordScreen() {
 
   return (
     <View style={ui.screen}>
-      <View style={ui.header}>
-        <View style={ui.sun} />
-        <View style={ui.hill} />
-      </View>
+      <JourneyHeader />
 
       <View style={ui.body}>
         <Text style={ui.title}>Recuperar senha</Text>

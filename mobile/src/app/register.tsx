@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
+import JourneyHeader from "../components/JourneyHeader";
+import * as api from "../lib/api";
 import { colors } from "../theme/colors";
 import { ui } from "../theme/styles";
 
@@ -9,13 +11,26 @@ export default function RegisterScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function onRegister() {
+    setError("");
+    setLoading(true);
+    try {
+      await api.register(name.trim(), email.trim(), password);
+      // Cadastro não retorna token: volta para o login (decisão do contrato).
+      router.replace("/");
+    } catch (e) {
+      setError(e instanceof api.ApiError ? e.message : "Erro inesperado.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <View style={ui.screen}>
-      <View style={ui.header}>
-        <View style={ui.sun} />
-        <View style={ui.hill} />
-      </View>
+      <JourneyHeader />
 
       <View style={ui.body}>
         <Text style={ui.title}>Criar conta</Text>
@@ -53,13 +68,18 @@ export default function RegisterScreen() {
         />
         <Text style={ui.hint}>Mínimo de 7 caracteres.</Text>
 
+        {error ? (
+          <Text style={{ color: "#A32D2D", fontSize: 13, marginTop: 12, textAlign: "center" }}>
+            {error}
+          </Text>
+        ) : null}
+
         <Pressable
           style={({ pressed }) => [ui.button, pressed && ui.buttonPressed]}
-          onPress={() => {
-            // TODO: chamar POST /auth/register e voltar para o login
-          }}
+          onPress={onRegister}
+          disabled={loading}
         >
-          <Text style={ui.buttonText}>Criar conta</Text>
+          <Text style={ui.buttonText}>{loading ? "Criando..." : "Criar conta"}</Text>
         </Pressable>
 
         <View style={ui.footerRow}>

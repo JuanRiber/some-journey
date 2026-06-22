@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 import app.models  # noqa: F401 — importa os models para registrá-los no metadata
-from app.api.routes import auth
+from app.api.routes import auth, memory
 from app.db.base import Base
 from app.db.session import engine
 
@@ -35,6 +35,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(memory.router)
 
 
 @app.get("/health")

@@ -5,6 +5,7 @@ from app.schemas.auth import (
     RegisterResponse,
     UserResponse,
 )
+from app.schemas.memory import MemoryCreate, MemoryRead, MemoryUpdate
 
 __all__ = [
     "RegisterRequest",
@@ -12,4 +13,7 @@ __all__ = [
     "LoginRequest",
     "LoginResponse",
     "UserResponse",
+    "MemoryCreate",
+    "MemoryRead",
+    "MemoryUpdate",
 ]

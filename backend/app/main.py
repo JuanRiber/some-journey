@@ -2,17 +2,18 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
-import app.models  # noqa: F401 — importa os models para registrá-los no metadata
+import app.models  # noqa: F401 - register models in SQLAlchemy metadata
 from app.api.routes import auth, memory
+from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # MVP: cria as tabelas no startup (idempotente). Em produção, migrar para
-    # migrations versionadas (Alembic) em vez de create_all.
+    # MVP: create tables on startup. Production should use versioned migrations.
     Base.metadata.create_all(bind=engine)
     yield
 
@@ -23,15 +24,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS: em desenvolvimento liberamos qualquer porta de localhost (Expo web/Metro).
-# Em produção, troque por uma lista EXPLÍCITA das origens reais do app
-# (nunca "*" junto com allow_credentials=True).
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=settings.trusted_hosts,
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"http://localhost:\d+",
+    allow_origins=settings.cors_allowed_origins,
+    allow_origin_regex=settings.CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(auth.router)

@@ -7,6 +7,7 @@ traduz em status (409/401/403). Assim o service é testável sem FastAPI, e a
 mensagem genérica de credencial inválida nasce aqui (anti-enumeração).
 """
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -37,12 +38,15 @@ def register(db: Session, data: RegisterRequest) -> User:
     if user_repository.get_by_email(db, data.email) is not None:
         raise EmailAlreadyRegisteredError()
     password_hash = hash_password(data.password)
-    return user_repository.create(
-        db,
-        name=data.name,
-        email=data.email,
-        password_hash=password_hash,
-    )
+    try:
+        return user_repository.create(
+            db,
+            name=data.name,
+            email=data.email,
+            password_hash=password_hash,
+        )
+    except IntegrityError:
+        raise EmailAlreadyRegisteredError()
 
 
 def login(db: Session, data: LoginRequest) -> LoginResponse:

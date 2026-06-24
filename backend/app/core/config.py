@@ -1,23 +1,46 @@
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Banco de dados
+    # HTTP edge / environment
+    APP_ENV: Literal["development", "production", "test"] = "development"
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:8081,http://127.0.0.1:8081,http://localhost:19006"
+    CORS_ALLOW_ORIGIN_REGEX: str | None = r"http://(localhost|127\.0\.0\.1):\d+"
+    TRUSTED_HOSTS: str = "localhost,127.0.0.1,10.0.2.2"
+
+    # Database
     DATABASE_URL: str
 
-    # Autenticação / JWT
-    # min_length=32: a app NÃO sobe com secret fraco. O HS256 (RFC 7518) exige
-    # uma chave de pelo menos 32 bytes — fail-fast em vez de aviso silencioso.
+    # Auth / JWT
     JWT_SECRET_KEY: str = Field(min_length=32)
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    JWT_ALGORITHM: Literal["HS256"] = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, gt=0, le=1440)
+
+    # Per-process guard for public auth endpoints. In production, keep this and
+    # add an infrastructure-level limiter shared by all workers.
+    AUTH_RATE_LIMIT_ATTEMPTS: int = Field(default=8, gt=0, le=100)
+    AUTH_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=300, ge=30, le=3600)
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @staticmethod
+    def _csv(value: str) -> list[str]:
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+    @property
+    def cors_allowed_origins(self) -> list[str]:
+        return self._csv(self.CORS_ALLOWED_ORIGINS)
+
+    @property
+    def trusted_hosts(self) -> list[str]:
+        return self._csv(self.TRUSTED_HOSTS)
 
 
 settings = Settings()

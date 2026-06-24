@@ -1,15 +1,8 @@
-"""Rotas de autenticação: POST /auth/register, POST /auth/login, GET /auth/me.
-
-Camada HTTP fina: recebe a entrada (schemas validam), chama o auth_service e
-traduz as exceções de domínio do service em status codes (409/401/403). O
-response_model de cada rota garante que a saída segue o contrato — e que
-password_hash NUNCA vaza (o ORM até passa por aqui, mas só os campos do schema
-são serializados).
-"""
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
+from app.core.rate_limit import check_rate_limit
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
@@ -25,13 +18,37 @@ from app.services import auth_service
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _limit_auth(request: Request, scope: str, email: str) -> None:
+    allowed, retry_after = check_rate_limit(
+        scope,
+        [_client_ip(request), email.lower().strip()],
+        max_attempts=settings.AUTH_RATE_LIMIT_ATTEMPTS,
+        window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
+    )
+    if allowed:
+        return
+    raise HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many attempts. Try again later.",
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
 @router.post(
     "/register",
     response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def register(data: RegisterRequest, db: Session = Depends(get_db)) -> User:
-    """Cria uma conta. Não retorna JWT — o app volta para a tela de login."""
+def register(
+    data: RegisterRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> User:
+    _limit_auth(request, "register", data.email)
     try:
         return auth_service.register(db, data)
     except auth_service.EmailAlreadyRegisteredError:
@@ -42,8 +59,12 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)) -> User:
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(data: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
-    """Autentica e devolve o access token (JWT)."""
+def login(
+    data: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> LoginResponse:
+    _limit_auth(request, "login", data.email)
     try:
         return auth_service.login(db, data)
     except auth_service.InvalidCredentialsError:
@@ -60,5 +81,4 @@ def login(data: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
 
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)) -> User:
-    """Devolve o usuário autenticado a partir do Bearer token."""
     return current_user

@@ -38,7 +38,7 @@ class RegisterRequest(BaseModel):
     # email obrigatório e VÁLIDO (EmailStr).
     email: EmailStr
     # password obrigatório, no mínimo 7 caracteres. Só entrada, nunca sai.
-    password: str = Field(min_length=7)
+    password: str = Field(min_length=10, max_length=128)
 
 
 class RegisterResponse(BaseModel):
@@ -64,7 +64,7 @@ class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr
-    password: str
+    password: str = Field(max_length=128)
 
 
 class LoginResponse(BaseModel):

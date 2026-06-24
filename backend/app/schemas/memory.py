@@ -22,7 +22,7 @@ class MemoryCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=120)
-    text: str = Field(min_length=1)
+    text: str = Field(min_length=1, max_length=5000)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     occurred_at: datetime
@@ -34,7 +34,7 @@ class MemoryUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = Field(default=None, min_length=1, max_length=120)
-    text: str | None = Field(default=None, min_length=1)
+    text: str | None = Field(default=None, min_length=1, max_length=5000)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     occurred_at: datetime | None = None

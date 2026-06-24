@@ -14,6 +14,8 @@ export const colors = {
   sage: "#788B4E",
   sky: "#AEC9D2",
   placeholder: "#9C947F",
+  line: "rgba(35,39,47,0.12)",
+  danger: "#A32D2D",
 };
 
 // Serifa editorial (old money). Georgia no web/iOS; "serif" no Android.

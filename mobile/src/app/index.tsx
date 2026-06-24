@@ -20,7 +20,7 @@ export default function LoginScreen() {
     try {
       const res = await api.login(email.trim(), password);
       await setToken(res.access_token);
-      router.replace("/home");
+      router.replace("/atlas");
     } catch (e) {
       setError(e instanceof api.ApiError ? e.message : "Erro inesperado.");
     } finally {

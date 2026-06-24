@@ -1,11 +1,29 @@
+import { ActivityIndicator, Text, View } from "react-native";
 import { Tabs } from "expo-router";
 
 import JourneyTabBar from "../../components/JourneyTabBar";
+import { useRequireAuth } from "../../hooks/use-require-auth";
+import { colors } from "../../theme/colors";
 
-// Área autenticada: abas com a tab bar customizada (Tempo · Criar · Atlas).
-// A proteção real é por API (401 → volta ao login, tratado em cada tela), como
-// já fazia a home. Um guard de token no layout fica para um bloco futuro.
 export default function AppTabsLayout() {
+  const auth = useRequireAuth();
+
+  if (auth.checking) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.paper }}>
+        <ActivityIndicator color={colors.terra} />
+      </View>
+    );
+  }
+
+  if (auth.error) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 28, backgroundColor: colors.paper }}>
+        <Text style={{ color: colors.danger, textAlign: "center", lineHeight: 20 }}>{auth.error}</Text>
+      </View>
+    );
+  }
+
   return (
     <Tabs tabBar={() => <JourneyTabBar />} screenOptions={{ headerShown: false }} initialRouteName="atlas">
       <Tabs.Screen name="atlas" />

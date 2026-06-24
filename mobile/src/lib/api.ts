@@ -1,5 +1,5 @@
 import { getToken } from "./auth";
-import { API_URL } from "./config";
+import { API_TIMEOUT_MS, API_URL } from "./config";
 
 // Erro tipado da API: carrega o status HTTP + a mensagem (detail) do backend.
 export class ApiError extends Error {
@@ -18,15 +18,24 @@ async function request(method: string, path: string, body?: object, authed = fal
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
+  const ctrl = new AbortController();
+  const timeout = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,
+      signal: ctrl.signal,
     });
-  } catch {
-    throw new ApiError(0, "Não foi possível conectar ao servidor. A API está rodando?");
+  } catch (e) {
+    const errorName = e && typeof e === "object" && "name" in e ? String(e.name) : "";
+    if (errorName === "AbortError") {
+      throw new ApiError(0, "Tempo esgotado ao conectar ao servidor.");
+    }
+    throw new ApiError(0, "Nao foi possivel conectar ao servidor. A API esta rodando?");
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (res.status === 204) return null; // sem corpo (ex.: DELETE)

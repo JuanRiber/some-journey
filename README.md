@@ -30,7 +30,7 @@ some-journey/
 |-- backend/
 |   |-- app/
 |   |   |-- main.py
-|   |   |-- api/routes/        # auth, memories, journeys
+|   |   |-- api/routes/        # auth, memories, journeys, map
 |   |   |-- core/              # config, security, rate limit
 |   |   |-- db/                # engine, session, Base
 |   |   |-- dependencies/      # autenticacao atual
@@ -38,7 +38,10 @@ some-journey/
 |   |   |-- repositories/      # acesso a dados
 |   |   |-- schemas/           # contratos Pydantic
 |   |   `-- services/          # regras de negocio
-|   `-- requirements.txt
+|   |-- alembic/               # migrations versionadas
+|   |-- tests/                 # pytest (jornadas, mapa)
+|   |-- requirements.txt
+|   `-- requirements-dev.txt
 |-- mobile/
 |   |-- src/app/               # rotas Expo Router
 |   |-- src/components/
@@ -98,6 +101,16 @@ Criar o `.env` do backend:
 cp ../.env.example .env
 ```
 
+Aplicar as migrations (o schema e gerido por Alembic, nao pelo startup):
+
+```bash
+alembic upgrade head
+```
+
+> Se voce ja tinha um banco criado pela versao antiga (que criava tabelas no
+> startup), rode `alembic stamp 0001_baseline` uma unica vez antes do
+> `upgrade head` para registrar a baseline sem recriar o que ja existe.
+
 Rodar a API:
 
 ```bash
@@ -108,6 +121,13 @@ Endpoints uteis:
 
 - Health check: <http://127.0.0.1:8000/health>
 - Swagger: <http://127.0.0.1:8000/docs>
+
+Rodar os testes (usa um banco dedicado `some_journey_test`, criado se faltar):
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
 ### 3. Mobile
 
@@ -146,17 +166,30 @@ Todas as rotas exigem Bearer token.
 
 ### Journeys
 
-Todas as rotas exigem Bearer token.
+Todas as rotas exigem Bearer token. Ciclo de vida do `status`:
+`draft -> active <-> paused -> finished` (`finished` e terminal; so uma jornada
+`active` por usuario de cada vez — pausar libera o slot).
 
-- `POST /journeys`
-- `GET /journeys`
-- `GET /journeys/{journey_id}`
-- `POST /journeys/{journey_id}/start`
-- `POST /journeys/{journey_id}/finish`
-- `POST /journeys/{journey_id}/points`
-- `POST /journeys/{journey_id}/memories`
-- `PATCH /journeys/{journey_id}/points/reorder`
-- `DELETE /journeys/{journey_id}`
+- `POST /journeys` — cria (nasce `draft`)
+- `GET /journeys` — lista as do usuario
+- `GET /journeys/{journey_id}` — detalhe com pontos ordenados + `route` (LineString; `null` se < 2 pontos)
+- `POST /journeys/{journey_id}/start` — `draft -> active`
+- `POST /journeys/{journey_id}/pause` — `active -> paused`
+- `POST /journeys/{journey_id}/resume` — `paused -> active`
+- `POST /journeys/{journey_id}/finish` — `active|paused -> finished`
+- `POST /journeys/{journey_id}/memories` — cria uma memoria ja vinculada
+- `POST /journeys/{journey_id}/points` — vincula uma memoria existente (um ponto em uma jornada so)
+- `PATCH /journeys/{journey_id}/points/reorder` — reordena os pontos
+- `DELETE /journeys/{journey_id}/points/{memory_id}` — desvincula sem apagar a memoria
+- `DELETE /journeys/{journey_id}` — soft delete da jornada
+
+### Map
+
+Mapa principal do usuario (pins soltos + jornadas com rastro). Bearer token.
+
+- `GET /map` — tudo do usuario: `loose_points` (memorias sem jornada) + `journeys` (pontos + `route`)
+- `GET /map?bbox=min_lng,min_lat,max_lng,max_lat` — recorta pela viewport (mundo/pais/regiao/cidade)
+- `GET /map?journey_id={id}` — foca uma jornada especifica
 
 ---
 
@@ -168,11 +201,12 @@ Todas as rotas exigem Bearer token.
 - [x] Autenticacao com cadastro, login, JWT e `/auth/me`
 - [x] Rate limit simples para auth
 - [x] CRUD de memorias com ownership por usuario
-- [x] Jornadas com inicio, fim, pontos e reordenacao
+- [x] Jornadas com ciclo de vida (draft/active/paused/finished), pontos, reordenacao e desvinculo
+- [x] Endpoint de mapa (`/map`) com pins soltos, jornadas com rastro e filtros por bbox/jornada
+- [x] Migracoes versionadas (Alembic)
+- [x] Testes automatizados (pytest) para jornadas e mapa
 - [x] App Expo com login, cadastro, atlas inicial, timeline, detalhe e criacao de memoria
-- [ ] Testes automatizados
-- [ ] Migracoes versionadas
-- [ ] Mapa interativo principal do atlas
+- [ ] Mapa interativo principal do atlas no mobile (consumindo `/map`)
 - [ ] Upload/storage de imagens
 - [ ] Recuperacao real de senha
 

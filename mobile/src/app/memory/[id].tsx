@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 
 import JourneyHeader from "../../components/JourneyHeader";
@@ -110,6 +111,10 @@ export default function MemoryDetailScreen() {
               </Text>
             </View>
 
+            {memory.image_url ? (
+              <Image source={{ uri: memory.image_url }} style={s.image} contentFit="cover" transition={200} />
+            ) : null}
+
             <Text style={s.text}>{memory.text}</Text>
 
             {/* Os chips de Humor e Trilha dos mockups dependem de campos fora do
@@ -138,9 +143,19 @@ export default function MemoryDetailScreen() {
                 </View>
               </View>
             ) : (
-              <Pressable style={s.deleteBtn} onPress={() => setConfirmDelete(true)} accessibilityRole="button" accessibilityLabel="Apagar memória">
-                <Text style={s.deleteText}>Apagar memória</Text>
-              </Pressable>
+              <>
+                <Pressable
+                  style={({ pressed }) => [s.editBtn, pressed && { opacity: 0.9 }]}
+                  onPress={() => router.push(`/memory-edit/${id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Editar memória"
+                >
+                  <Text style={s.editText}>Editar memória</Text>
+                </Pressable>
+                <Pressable style={s.deleteBtn} onPress={() => setConfirmDelete(true)} accessibilityRole="button" accessibilityLabel="Apagar memória">
+                  <Text style={s.deleteText}>Apagar memória</Text>
+                </Pressable>
+              </>
             )}
           </>
         )}
@@ -183,10 +198,24 @@ const s = StyleSheet.create({
   metaRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 8 },
   pin: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.terra },
   meta: { color: colors.terraDeep, fontSize: 13, fontWeight: "600" },
+  image: { width: "100%", height: 220, borderRadius: 14, marginTop: 16, backgroundColor: colors.sky, borderWidth: 1, borderColor: colors.line },
   text: { color: colors.ink, fontSize: 16, lineHeight: 25, marginTop: 18 },
   divider: { height: 1, backgroundColor: colors.line, marginTop: 28 },
   quote: { fontFamily: serif, fontStyle: "italic", fontSize: 16, color: colors.inkSoft, textAlign: "center", marginTop: 18 },
-  deleteBtn: { marginTop: 36, alignItems: "center", paddingVertical: 12 },
+  editBtn: {
+    marginTop: 30,
+    backgroundColor: colors.terra,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+    shadowColor: colors.terraDeep,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  editText: { color: "#FBF6E8", fontSize: 15, fontWeight: "600", letterSpacing: 0.3 },
+  deleteBtn: { marginTop: 14, alignItems: "center", paddingVertical: 12 },
   deleteText: { color: colors.danger, fontSize: 14, fontWeight: "500" },
   confirmRow: { marginTop: 32, alignItems: "center", gap: 14 },
   confirmText: { color: colors.ink, fontSize: 15, fontWeight: "600" },

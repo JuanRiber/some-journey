@@ -35,7 +35,19 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Some Journey usa sua localização para marcar onde uma memória aconteceu."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O Some Journey acessa suas fotos para anexar uma imagem à memória."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import * as Location from "expo-location";
 
-import { searchPlaces, type GeoResult } from "../lib/geo";
+import { reverseGeocode, searchPlaces, type GeoResult } from "../lib/geo";
 import { colors } from "../theme/colors";
 
 type Props = {
@@ -11,9 +12,9 @@ type Props = {
   onChange: (latitude: number, longitude: number, label?: string) => void;
 };
 
-// Fallback nativo (iOS/Android): busca de lugar por nome (Nominatim funciona via
-// fetch também no nativo). O mapa interativo e o GPS ("minha localização" via
-// expo-location) entram quando houver um build nativo — por ora o web é o alvo.
+// Nativo (iOS/Android): busca de lugar por nome (Nominatim via fetch) + GPS
+// ("usar minha localização" via expo-location, com permissão em runtime). O
+// mapa interativo de tocar/arrastar é a variante web (LocationPicker.web.tsx).
 export default function LocationPicker({ latitude, longitude, label, onChange }: Props) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeoResult[]>([]);
@@ -21,6 +22,8 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
   const [searched, setSearched] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const [placeLabel, setPlaceLabel] = useState(label ?? "");
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState("");
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -72,13 +75,40 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
     onChange(r.latitude, r.longitude, r.label);
   }
 
+  async function useMyLocation() {
+    setGeoError("");
+    setLocating(true);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (!perm.granted) {
+        setGeoError("Permissão de localização negada.");
+        return;
+      }
+      const pos = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      if (!mountedRef.current) return;
+      const { latitude: lat, longitude: lng } = pos.coords;
+      setPlaceLabel("");
+      onChange(lat, lng);
+      // Nome do lugar é best-effort (não bloqueia a seleção).
+      reverseGeocode(lat, lng).then((nm) => {
+        if (mountedRef.current && nm) setPlaceLabel(nm);
+      });
+    } catch {
+      if (mountedRef.current) setGeoError("Não foi possível obter sua localização. Tente de novo.");
+    } finally {
+      if (mountedRef.current) setLocating(false);
+    }
+  }
+
   const q = query.trim();
   const showNoResults = searched && !searching && !searchError && results.length === 0 && q.length >= 3;
   const hasPoint = latitude != null && longitude != null;
 
   return (
     <View>
-      <Text style={s.hint}>Por aqui, encontre o lugar pelo nome (no app, dá pra tocar no mapa).</Text>
+      <Text style={s.hint}>Busque pelo nome ou use sua localização (tocar no mapa é na versão web).</Text>
 
       <View style={s.searchWrap}>
         <TextInput
@@ -116,6 +146,19 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
       ) : showNoResults ? (
         <Text style={s.searchNote}>Nenhum lugar encontrado. Tente outro nome.</Text>
       ) : null}
+
+      <Pressable
+        style={({ pressed }) => [s.locBtn, pressed && { opacity: 0.9 }]}
+        onPress={useMyLocation}
+        disabled={locating}
+        accessibilityRole="button"
+        accessibilityLabel="Usar minha localização atual"
+      >
+        <View style={s.locDot} />
+        <Text style={s.locText}>{locating ? "Localizando…" : "Usar minha localização"}</Text>
+      </Pressable>
+
+      {geoError ? <Text style={s.geoError}>{geoError}</Text> : null}
 
       {hasPoint ? (
         <View style={s.readout}>
@@ -161,6 +204,20 @@ const s = StyleSheet.create({
   resultItemPressed: { backgroundColor: "rgba(206,90,44,0.08)" },
   resultText: { color: colors.ink, fontSize: 13, lineHeight: 18 },
   searchNote: { color: colors.inkSoft, fontSize: 12, marginTop: 8, fontStyle: "italic" },
+  locBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(61,138,152,0.12)",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginTop: 12,
+  },
+  locDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.teal, borderWidth: 2, borderColor: "#FBF6E8" },
+  locText: { color: colors.teal, fontSize: 14, fontWeight: "600" },
+  geoError: { color: colors.danger, fontSize: 12, marginTop: 8 },
   readout: {
     marginTop: 12,
     backgroundColor: colors.card,

@@ -37,7 +37,7 @@ class RegisterRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     # email obrigatório e VÁLIDO (EmailStr).
     email: EmailStr
-    # password obrigatório, no mínimo 7 caracteres. Só entrada, nunca sai.
+    # password obrigatório, no mínimo 10 caracteres. Só entrada, nunca sai.
     password: str = Field(min_length=10, max_length=128)
 
 

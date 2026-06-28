@@ -96,7 +96,7 @@ export default function MemoryEditScreen() {
         text: text.trim(),
         latitude: coords.latitude,
         longitude: coords.longitude,
-        occurred_at: `${date}T12:00:00Z`,
+        occurred_at: `${date.trim()}T12:00:00Z`,
       });
       // Se o usuário escolheu uma nova foto, sobe (precisa do Storage configurado).
       if (image) await api.uploadMemoryImage(id, image);

@@ -58,7 +58,7 @@ class Memory(Base):
 
     # Quando a memória ACONTECEU (alimenta a timeline) — pode ser no passado.
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # Quando foi cadastrada e editada pela última vez.
+    # Quando a memória foi cadastrada (não muda em edições; ver updated_at).
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

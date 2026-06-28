@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.journey import Journey, JourneyMemory
@@ -207,5 +207,18 @@ def reorder(
 
 
 def soft_delete(db: Session, *, journey: Journey) -> None:
+    # Soft-delete a jornada E seus vínculos ativos no mesmo commit (atômico).
+    # Sem isso os links ficariam vivos: a memória continuaria "ocupando o slot"
+    # (índice único parcial uq_journey_memories_memory_active) — não entraria em
+    # outra jornada (409) e sumiria dos pontos soltos do mapa, embora a jornada
+    # já não exista. Excluir a jornada não apaga as memórias, só os vínculos.
     journey.deleted_at = func.now()
+    db.execute(
+        update(JourneyMemory)
+        .where(
+            JourneyMemory.journey_id == journey.id,
+            JourneyMemory.deleted_at.is_(None),
+        )
+        .values(deleted_at=func.now())
+    )
     db.commit()

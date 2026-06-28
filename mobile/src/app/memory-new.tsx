@@ -56,7 +56,7 @@ export default function MemoryNewScreen() {
       text: text.trim(),
       latitude: coords.latitude,
       longitude: coords.longitude,
-      occurred_at: `${date}T12:00:00Z`,
+      occurred_at: `${date.trim()}T12:00:00Z`,
     };
     try {
       let memId: string | null = null;

@@ -66,7 +66,7 @@ export default function RegisterScreen() {
           placeholderTextColor={colors.placeholder}
           secureTextEntry
         />
-        <Text style={ui.hint}>Mínimo de 7 caracteres.</Text>
+        <Text style={ui.hint}>Mínimo de 10 caracteres.</Text>
 
         {error ? (
           <Text style={{ color: "#A32D2D", fontSize: 13, marginTop: 12, textAlign: "center" }}>

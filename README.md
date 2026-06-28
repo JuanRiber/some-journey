@@ -1,161 +1,202 @@
 # Some Journey
 
-> Uma plataforma de **cartografia humana** — transforma deslocamentos, memórias e conexões em **jornadas visuais vivas**.
+Uma plataforma de cartografia humana: transforma deslocamentos, memorias e conexoes em jornadas visuais vivas.
 
-A vida deixa rastros. O Some Journey registra esses rastros e une **lugar, tempo, atmosfera, pessoas, música, memória e narrativa** numa experiência visual coerente, baseada em mapa.
+A vida deixa rastros. O Some Journey registra esses rastros e une lugar, tempo, atmosfera, pessoas, musica, memoria e narrativa em uma experiencia visual baseada em mapa.
 
-**É:** um atlas pessoal, um sistema de memória, uma forma de preservar jornadas reais.
-**Não é:** rede social, app de viagem comum, diário simples, feed de likes.
+**E:** um atlas pessoal, um sistema de memoria, uma forma de preservar jornadas reais.
+**Nao e:** rede social, app de viagem comum, diario simples, feed de likes.
 
 ---
 
-## 🧱 Stack
+## Stack
 
 | Camada | Tecnologias |
-|---|---|
-| **Backend** | Python · FastAPI · SQLAlchemy · Pydantic · JWT |
-| **Banco** | PostgreSQL + PostGIS |
-| **Mobile** *(futuro)* | React Native · Expo · TypeScript · Mapbox |
-| **Storage** *(futuro)* | Supabase Storage |
-| **Infra** | Docker Compose (apenas PostgreSQL no início) |
+| --- | --- |
+| Backend | Python, FastAPI, SQLAlchemy, Pydantic, JWT |
+| Banco | PostgreSQL + PostGIS |
+| Mobile | React Native, Expo, Expo Router, TypeScript |
+| Mapa | Leaflet no web picker; Mapbox planejado para o atlas principal |
+| Infra | Docker Compose para PostgreSQL/PostGIS |
 
-Decisões técnicas iniciais: SQLAlchemy **síncrono** (sem async no MVP), UUID **nativo** do PostgreSQL, imagens **fora** do banco (apenas o caminho é guardado), secrets via **variáveis de ambiente**.
+Decisoes tecnicas atuais: SQLAlchemy sincrono, UUID nativo do PostgreSQL, tabelas criadas no startup no MVP, imagens fora do banco, secrets por variaveis de ambiente.
 
 ---
 
-## 📁 Estrutura
+## Estrutura
 
-```
+```text
 some-journey/
-├── backend/
-│   ├── app/
-│   │   ├── main.py            # cria a app FastAPI e registra rotas
-│   │   ├── core/
-│   │   │   ├── config.py      # lê/valida variáveis de ambiente
-│   │   │   └── security.py    # (futuro) hash de senha, JWT
-│   │   ├── db/
-│   │   │   ├── session.py     # engine + SessionLocal + get_db
-│   │   │   └── base.py        # base declarativa dos models
-│   │   ├── models/            # (futuro) models ORM (User, Memory...)
-│   │   ├── schemas/           # (futuro) schemas Pydantic (entrada/saída)
-│   │   ├── repositories/      # (futuro) acesso a dados
-│   │   ├── services/          # (futuro) regras de negócio
-│   │   ├── api/routes/        # (futuro) endpoints
-│   │   └── dependencies/      # (futuro) dependencies (ex.: get_current_user)
-│   ├── requirements.txt
-│   └── .env                   # NÃO versionado — crie a partir do .env.example
-├── mobile/                    # (futuro) app React Native / Expo
-├── infra/
-│   └── docker-compose.yml     # PostgreSQL + PostGIS
-├── .env.example
-├── .gitignore
-└── README.md
+|-- backend/
+|   |-- app/
+|   |   |-- main.py
+|   |   |-- api/routes/        # auth, memories, journeys
+|   |   |-- core/              # config, security, rate limit
+|   |   |-- db/                # engine, session, Base
+|   |   |-- dependencies/      # autenticacao atual
+|   |   |-- models/            # User, Memory, Journey
+|   |   |-- repositories/      # acesso a dados
+|   |   |-- schemas/           # contratos Pydantic
+|   |   `-- services/          # regras de negocio
+|   `-- requirements.txt
+|-- mobile/
+|   |-- src/app/               # rotas Expo Router
+|   |-- src/components/
+|   |-- src/lib/               # API, auth, geo, config
+|   |-- src/theme/
+|   `-- package.json
+|-- infra/
+|   `-- docker-compose.yml
+|-- .env.example
+`-- README.md
 ```
-
-> Pastas marcadas como *(futuro)* podem ainda não existir no repositório — o Git não versiona pastas vazias; elas surgem conforme cada etapa avança.
 
 ---
 
-## ✅ Pré-requisitos
+## Pre-requisitos
 
-- **Python 3.11+** (o ambiente de desenvolvimento usa 3.14)
-- **Docker** + Docker Compose
-- **Git**
+- Python 3.11+
+- Node.js 20+
+- Docker + Docker Compose
+- Git
 
 ---
 
-## 🚀 Setup local
+## Setup local
 
-### 1. Clonar
-```bash
-git clone https://github.com/JuanRiber/some-journey.git
-cd some-journey
-```
+### 1. Banco
 
-### 2. Subir o banco (PostgreSQL + PostGIS)
+Na raiz do repositorio:
+
 ```bash
 docker compose -f infra/docker-compose.yml up -d
-docker ps   # confirme que o container some_journey_db está "Up"
 ```
-O banco fica exposto em `localhost:5433`.
 
-### 3. Criar o ambiente virtual e instalar dependências
+O PostgreSQL/PostGIS fica exposto em `localhost:5433`.
+
+### 2. Backend
+
 ```bash
 cd backend
 python -m venv .venv
 ```
-Ativar:
-- **Windows (PowerShell):** `.\.venv\Scripts\Activate.ps1`
-  - Se aparecer erro de política de execução: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` e ative novamente.
-- **Git Bash / Linux / macOS:** `source .venv/Scripts/activate` (ou `.venv/bin/activate`)
+
+Ativar o ambiente:
+
+- Windows PowerShell: `.\.venv\Scripts\Activate.ps1`
+- Git Bash, Linux ou macOS: `source .venv/Scripts/activate` ou `source .venv/bin/activate`
+
+Instalar dependencias:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Criar o `.env`
-Copie o exemplo para `backend/.env` (este caminho exato — o backend lê o `.env` da pasta `backend/`):
+Criar o `.env` do backend:
+
 ```bash
-# a partir de backend/
 cp ../.env.example .env
 ```
-> O `.env` real **nunca** é versionado. Em produção, as variáveis vêm do ambiente do servidor, não de um arquivo.
 
-### 5. Rodar a API
-A partir de `backend/` (com o venv ativo):
+Rodar a API:
+
 ```bash
 uvicorn app.main:app --reload
 ```
 
----
+Endpoints uteis:
 
-## 🧪 Testar
+- Health check: <http://127.0.0.1:8000/health>
+- Swagger: <http://127.0.0.1:8000/docs>
 
-Com a API rodando:
-- Health check: <http://127.0.0.1:8000/health> → `{"status": "ok"}`
-- Documentação interativa (Swagger): <http://127.0.0.1:8000/docs>
+### 3. Mobile
 
----
+```bash
+cd mobile
+npm install
+npm run web
+```
 
-## 📌 Status atual
+Por padrao, o app usa:
 
-Fundação do backend concluída:
+- Android emulator: `http://10.0.2.2:8000`
+- Web, iOS e outros: `http://127.0.0.1:8000`
 
-- [x] Estrutura do projeto + Docker (PostgreSQL/PostGIS)
-- [x] Health check (`/health`)
-- [x] Configuração via variáveis de ambiente (`core/config.py`)
-- [x] Conexão com o banco (`db/session.py`)
-- [x] Base declarativa do ORM (`db/base.py`)
-- [ ] **Autenticação** (model User, schemas, repository, security, service, rotas) ← próximo
-- [ ] Memórias + pins no mapa
-- [ ] Timeline
-- [ ] App mobile (Expo)
+Para apontar para outra API, ajuste `expo.extra.apiUrl` em `mobile/app.json`.
 
 ---
 
-## 🎯 Escopo do MVP
+## API atual
 
-**Entra:** login (e-mail/senha + JWT), mapa interativo, criação de memórias, pins no mapa, timeline simples.
+### Auth
 
-**Fica para depois:** feed social, likes, comentários, IA, realtime, gamificação, refresh token, confirmação de e-mail, admin, impressão física, exportação premium.
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /auth/me`
+
+### Memories
+
+Todas as rotas exigem Bearer token.
+
+- `POST /memories`
+- `GET /memories`
+- `GET /memories/{memory_id}`
+- `PATCH /memories/{memory_id}`
+- `DELETE /memories/{memory_id}`
+
+### Journeys
+
+Todas as rotas exigem Bearer token.
+
+- `POST /journeys`
+- `GET /journeys`
+- `GET /journeys/{journey_id}`
+- `POST /journeys/{journey_id}/start`
+- `POST /journeys/{journey_id}/finish`
+- `POST /journeys/{journey_id}/points`
+- `POST /journeys/{journey_id}/memories`
+- `PATCH /journeys/{journey_id}/points/reorder`
+- `DELETE /journeys/{journey_id}`
 
 ---
 
-## 🔒 Segurança (princípios do projeto)
+## Status atual
 
-- Senha sempre como **hash** (nunca em texto puro); `password_hash` **nunca** é retornado pela API.
-- Secrets (`JWT_SECRET_KEY`, credenciais de banco) **apenas** em variáveis de ambiente — nunca no código nem no Git.
-- UUID **nativo** do PostgreSQL (sem IDs sequenciais previsíveis).
-- Imagens **fora** do banco (apenas o caminho é armazenado).
-- Cada usuário acessa **somente** os próprios dados (ownership validado).
-- Senha, token e dados sensíveis **nunca** em logs.
+- [x] Estrutura backend + Docker/PostGIS
+- [x] Health check
+- [x] Configuracao por variaveis de ambiente
+- [x] Autenticacao com cadastro, login, JWT e `/auth/me`
+- [x] Rate limit simples para auth
+- [x] CRUD de memorias com ownership por usuario
+- [x] Jornadas com inicio, fim, pontos e reordenacao
+- [x] App Expo com login, cadastro, atlas inicial, timeline, detalhe e criacao de memoria
+- [ ] Testes automatizados
+- [ ] Migracoes versionadas
+- [ ] Mapa interativo principal do atlas
+- [ ] Upload/storage de imagens
+- [ ] Recuperacao real de senha
 
 ---
 
-## 📝 Convenção de commits
+## Seguranca
 
-[Conventional Commits](https://www.conventionalcommits.org/): `tipo(escopo): mensagem no imperativo`.
+- Senhas sempre como hash; `password_hash` nunca retorna pela API.
+- Secrets (`JWT_SECRET_KEY`, credenciais de banco) ficam em variaveis de ambiente.
+- UUID nativo do PostgreSQL evita IDs sequenciais previsiveis.
+- Cada usuario acessa somente os proprios dados.
+- IDs inexistentes e IDs de outro usuario retornam o mesmo 404 nas rotas protegidas.
+- Senhas, tokens e dados sensiveis nao devem ir para logs.
 
-Tipos: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`, `infra`, `security`.
+---
 
-Exemplos: `feat(auth): add user model` · `chore(deps): pin dependency versions` · `docs(readme): add local setup guide`.
+## Convencao de commits
+
+Use Conventional Commits: `tipo(escopo): mensagem no imperativo`.
+
+Tipos sugeridos: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`, `infra`, `security`.
+
+Exemplos:
+
+- `feat(auth): add user model`
+- `chore(deps): pin dependency versions`
+- `docs(readme): update local setup guide`

@@ -47,6 +47,34 @@ def create(
     return memory
 
 
+def create_pending(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    title: str,
+    text: str,
+    latitude: float,
+    longitude: float,
+    occurred_at: datetime,
+) -> Memory:
+    """Cria uma memoria na sessao atual sem commit.
+
+    Usado por fluxos compostos que precisam persistir memory + outro vinculo de
+    forma atomica, com um unico commit no service.
+    """
+    memory = Memory(
+        user_id=user_id,
+        title=title,
+        text=text,
+        location=_point(latitude, longitude),
+        occurred_at=occurred_at,
+    )
+    db.add(memory)
+    db.flush()
+    db.refresh(memory)
+    return memory
+
+
 def get_by_id(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> Memory | None:
     """Memória do usuário, não apagada. None se não existe ou não é dele — o
     endpoint traduz None em 404 (sem revelar a existência de dado de outro)."""

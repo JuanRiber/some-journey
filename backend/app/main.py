@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 import app.models  # noqa: F401 - register models in SQLAlchemy metadata
-from app.api.routes import auth, memory
+from app.api.routes import auth, journey, memory
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
@@ -40,6 +40,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(memory.router)
+app.include_router(journey.router)
 
 
 @app.get("/health")

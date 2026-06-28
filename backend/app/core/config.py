@@ -24,6 +24,17 @@ class Settings(BaseSettings):
     AUTH_RATE_LIMIT_ATTEMPTS: int = Field(default=8, gt=0, le=100)
     AUTH_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=300, ge=30, le=3600)
 
+    # Storage de imagens (Supabase). OPCIONAL: sem SUPABASE_URL +
+    # SUPABASE_SERVICE_KEY o upload fica desabilitado (o endpoint responde 503) e
+    # image_url volta None. Bucket PRIVADO: o backend gera URLs assinadas de
+    # curta duração na leitura; o service key NUNCA chega ao cliente.
+    SUPABASE_URL: str | None = None
+    SUPABASE_SERVICE_KEY: str | None = None
+    SUPABASE_BUCKET: str = "memories"
+    # Validade da URL assinada (s) e teto do upload (bytes).
+    IMAGE_SIGNED_URL_TTL: int = Field(default=3600, ge=60, le=604800)
+    MAX_IMAGE_BYTES: int = Field(default=5 * 1024 * 1024, gt=0, le=52428800)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -41,6 +52,11 @@ class Settings(BaseSettings):
     @property
     def trusted_hosts(self) -> list[str]:
         return self._csv(self.TRUSTED_HOSTS)
+
+    @property
+    def storage_enabled(self) -> bool:
+        """True só quando o Supabase Storage está configurado."""
+        return bool(self.SUPABASE_URL and self.SUPABASE_SERVICE_KEY)
 
 
 settings = Settings()

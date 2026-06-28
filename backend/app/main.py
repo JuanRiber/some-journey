@@ -5,16 +5,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 import app.models  # noqa: F401 - register models in SQLAlchemy metadata
-from app.api.routes import auth, journey, memory
+from app.api.routes import auth, journey, map, memory
 from app.core.config import settings
-from app.db.base import Base
-from app.db.session import engine
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # MVP: create tables on startup. Production should use versioned migrations.
-    Base.metadata.create_all(bind=engine)
+    # O schema é gerido por migrations versionadas (Alembic): rode
+    # `alembic upgrade head` antes de subir a API. Não criamos tabelas no
+    # startup — isso mascarava drift (create_all nunca altera tabelas existentes).
     yield
 
 
@@ -41,6 +40,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(memory.router)
 app.include_router(journey.router)
+app.include_router(map.router)
 
 
 @app.get("/health")

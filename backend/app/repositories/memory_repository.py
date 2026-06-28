@@ -11,10 +11,23 @@ Regras de ouro aplicadas aqui:
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select
+from geoalchemy2 import Geometry
+from sqlalchemy import cast, func, select
 from sqlalchemy.orm import Session
 
+from app.models.journey import JourneyMemory
 from app.models.memory import Memory
+
+# bbox geográfico no formato (min_lng, min_lat, max_lng, max_lat) em WGS84.
+Bbox = tuple[float, float, float, float]
+
+
+def _bbox_filter(bbox: Bbox):
+    """Recorta por uma janela retangular (viewport do mapa). Casta a coluna
+    GEOGRAPHY para GEOMETRY e usa ST_Intersects com um envelope SRID 4326."""
+    min_lng, min_lat, max_lng, max_lat = bbox
+    envelope = func.ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
+    return func.ST_Intersects(cast(Memory.location, Geometry), envelope)
 
 
 def _point(latitude: float, longitude: float):
@@ -98,6 +111,33 @@ def list_by_user(db: Session, *, user_id: uuid.UUID) -> list[Memory]:
     )
 
 
+def list_loose(
+    db: Session, *, user_id: uuid.UUID, bbox: Bbox | None = None
+) -> list[Memory]:
+    """Memórias "soltas": ativas e SEM vínculo ativo em nenhuma jornada — os pins
+    isolados do mapa. bbox opcional recorta pela viewport."""
+    has_active_link = (
+        select(JourneyMemory.id)
+        .where(
+            JourneyMemory.memory_id == Memory.id,
+            JourneyMemory.deleted_at.is_(None),
+        )
+        .exists()
+    )
+    stmt = (
+        select(Memory)
+        .where(
+            Memory.user_id == user_id,
+            Memory.deleted_at.is_(None),
+            ~has_active_link,
+        )
+        .order_by(Memory.occurred_at.desc())
+    )
+    if bbox is not None:
+        stmt = stmt.where(_bbox_filter(bbox))
+    return list(db.scalars(stmt))
+
+
 def update(
     db: Session,
     *,
@@ -118,6 +158,14 @@ def update(
         memory.occurred_at = occurred_at
     if latitude is not None and longitude is not None:
         memory.location = _point(latitude, longitude)
+    db.commit()
+    db.refresh(memory)
+    return memory
+
+
+def set_image_path(db: Session, *, memory: Memory, image_path: str) -> Memory:
+    """Grava o caminho da imagem no Storage (após o upload pelo service)."""
+    memory.image_path = image_path
     db.commit()
     db.refresh(memory)
     return memory

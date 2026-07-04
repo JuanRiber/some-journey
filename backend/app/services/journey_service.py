@@ -18,6 +18,7 @@ from app.schemas.journey import (
     JourneyRead,
     JourneyReorder,
     JourneyRoute,
+    JourneyUpdate,
 )
 
 
@@ -126,6 +127,20 @@ def create(db: Session, *, user_id: uuid.UUID, data: JourneyCreate) -> JourneyRe
         started_at=data.started_at,
     )
     return _journey_to_read(journey, 0)
+
+
+def update(
+    db: Session, *, user_id: uuid.UUID, journey_id: uuid.UUID, data: JourneyUpdate
+) -> JourneyRead:
+    """Edita título/descrição da jornada (metadados). Permitido em qualquer
+    status — não é uma transição de ciclo de vida. 404 se não é do usuário."""
+    journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
+    if journey is None:
+        raise JourneyNotFoundError()
+    updated = journey_repository.update_journey(
+        db, journey=journey, **data.model_dump(exclude_unset=True)
+    )
+    return _read_with_count(db, user_id=user_id, journey=updated)
 
 
 def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[JourneyRead]:

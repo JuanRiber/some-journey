@@ -28,6 +28,24 @@ def create_journey(
     return journey
 
 
+def update_journey(
+    db: Session,
+    *,
+    journey: Journey,
+    title: str | None = None,
+    description: str | None = None,
+) -> Journey:
+    """Atualização parcial dos metadados de uma jornada já carregada (e do dono).
+    Só altera os campos passados; não mexe no ciclo de vida (status/datas)."""
+    if title is not None:
+        journey.title = title
+    if description is not None:
+        journey.description = description
+    db.commit()
+    db.refresh(journey)
+    return journey
+
+
 def list_journeys(db: Session, *, user_id: uuid.UUID) -> list[tuple[Journey, int]]:
     rows = db.execute(
         select(Journey, func.count(Memory.id))

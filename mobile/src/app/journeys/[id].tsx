@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import * as api from "../../lib/api";
@@ -23,6 +23,10 @@ export default function JourneyDetailScreen() {
   const [error, setError] = useState("");
   const [action, setAction] = useState(""); // texto da ação em curso (desabilita botões)
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
 
   const [showAdd, setShowAdd] = useState(false);
   const [loose, setLoose] = useState<api.MapPoint[] | null>(null);
@@ -79,6 +83,30 @@ export default function JourneyDetailScreen() {
   function goBack() {
     if (router.canGoBack()) router.back();
     else router.replace("/journeys");
+  }
+
+  function openEdit() {
+    if (!journey) return;
+    setEditTitle(journey.title);
+    setEditDesc(journey.description ?? "");
+    setError("");
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    if (!journey) return;
+    if (!editTitle.trim()) {
+      setError("O título não pode ficar vazio.");
+      return;
+    }
+    run(
+      "edit",
+      () => api.updateJourney(journey.id, { title: editTitle.trim(), description: editDesc.trim() }),
+      () => {
+        setEditing(false);
+        load();
+      },
+    );
   }
 
   function reorder(index: number, dir: -1 | 1) {
@@ -151,18 +179,54 @@ export default function JourneyDetailScreen() {
           <Text style={s.back}>← Voltar</Text>
         </Pressable>
 
-        <View style={s.titleRow}>
-          <Text style={s.title}>{journey.title}</Text>
-          <View style={[s.badge, { backgroundColor: STATUS_COLOR[st] }]}>
-            <Text style={s.badgeText}>{STATUS_LABEL[st]}</Text>
+        {editing ? (
+          <View style={s.editBox}>
+            <Text style={s.sectionLabel}>TÍTULO</Text>
+            <TextInput
+              style={s.editInput}
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="Título da jornada"
+              placeholderTextColor={colors.placeholder}
+            />
+            <Text style={s.sectionLabel}>DESCRIÇÃO (OPCIONAL)</Text>
+            <TextInput
+              style={[s.editInput, { height: 90, textAlignVertical: "top" }]}
+              value={editDesc}
+              onChangeText={setEditDesc}
+              placeholder="Sobre esta jornada..."
+              placeholderTextColor={colors.placeholder}
+              multiline
+            />
+            {error ? <Text style={s.inlineError}>{error}</Text> : null}
+            <View style={s.editActions}>
+              <Pressable style={[s.primary, busy && s.disabled]} disabled={busy} onPress={saveEdit} accessibilityRole="button" accessibilityLabel="Salvar título e descrição">
+                <Text style={s.primaryText}>{action === "edit" ? "Salvando..." : "Salvar"}</Text>
+              </Pressable>
+              <Pressable disabled={busy} onPress={() => { setEditing(false); setError(""); }} hitSlop={6} accessibilityRole="button" accessibilityLabel="Cancelar edição">
+                <Text style={s.confirmNo}>Cancelar</Text>
+              </Pressable>
+            </View>
           </View>
-        </View>
-        {journey.description ? <Text style={s.desc}>{journey.description}</Text> : null}
-        <Text style={s.meta}>
-          {journey.points_count} {journey.points_count === 1 ? "ponto" : "pontos"}
-          {journey.started_at ? ` • início ${formatDate(journey.started_at)}` : ""}
-          {journey.ended_at ? ` • fim ${formatDate(journey.ended_at)}` : ""}
-        </Text>
+        ) : (
+          <>
+            <View style={s.titleRow}>
+              <Text style={s.title}>{journey.title}</Text>
+              <View style={[s.badge, { backgroundColor: STATUS_COLOR[st] }]}>
+                <Text style={s.badgeText}>{STATUS_LABEL[st]}</Text>
+              </View>
+            </View>
+            {journey.description ? <Text style={s.desc}>{journey.description}</Text> : null}
+            <Text style={s.meta}>
+              {journey.points_count} {journey.points_count === 1 ? "ponto" : "pontos"}
+              {journey.started_at ? ` • início ${formatDate(journey.started_at)}` : ""}
+              {journey.ended_at ? ` • fim ${formatDate(journey.ended_at)}` : ""}
+            </Text>
+            <Pressable onPress={openEdit} hitSlop={6} accessibilityRole="button" accessibilityLabel="Editar título e descrição">
+              <Text style={s.editLink}>Editar título/descrição</Text>
+            </Pressable>
+          </>
+        )}
 
         {/* Ações de ciclo de vida conforme o status */}
         <View style={s.actions}>
@@ -194,7 +258,7 @@ export default function JourneyDetailScreen() {
           {st === "finished" && <Text style={s.finishedNote}>Jornada concluída.</Text>}
         </View>
 
-        {error ? <Text style={s.inlineError}>{error}</Text> : null}
+        {error && !editing ? <Text style={s.inlineError}>{error}</Text> : null}
 
         {/* Pontos ordenados */}
         <Text style={s.sectionLabel}>PONTOS (NA ORDEM DO RASTRO)</Text>
@@ -348,4 +412,18 @@ const s = StyleSheet.create({
   confirmNo: { color: colors.inkSoft, fontSize: 14 },
   deleteBtn: { marginTop: 32, alignItems: "center", paddingVertical: 12 },
   deleteText: { color: colors.danger, fontSize: 14, fontWeight: "500" },
+  editBox: { marginTop: 16 },
+  editInput: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: colors.ink,
+    marginBottom: 6,
+  },
+  editActions: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 8 },
+  editLink: { color: colors.teal, fontSize: 13, fontWeight: "600", marginTop: 10 },
 });

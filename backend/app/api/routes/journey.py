@@ -14,6 +14,7 @@ from app.schemas.journey import (
     JourneyMemoryCreate,
     JourneyRead,
     JourneyReorder,
+    JourneyUpdate,
 )
 from app.services import journey_service
 from app.services.journey_service import (
@@ -64,6 +65,22 @@ def get_journey(
 ) -> JourneyDetailRead:
     try:
         return journey_service.get(db, user_id=current_user.id, journey_id=journey_id)
+    except JourneyNotFoundError:
+        raise _not_found
+
+
+@router.patch("/{journey_id}", response_model=JourneyRead)
+def update_journey(
+    journey_id: uuid.UUID,
+    data: JourneyUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> JourneyRead:
+    """Edita título/descrição da jornada (não mexe no status/ciclo de vida)."""
+    try:
+        return journey_service.update(
+            db, user_id=current_user.id, journey_id=journey_id, data=data
+        )
     except JourneyNotFoundError:
         raise _not_found
 

@@ -1,5 +1,7 @@
 """Testes de fluxo das jornadas: ciclo de vida, pontos, reordenação,
-um-ponto-por-jornada, desvínculo e ownership."""
+um-ponto-por-jornada, desvínculo, edição de metadados e ownership."""
+
+import uuid
 
 
 def _journey(client, headers, title="Viagem"):
@@ -139,6 +141,46 @@ def test_ownership_isolation(client, auth_headers):
     assert client.delete(f"/journeys/{jid}/points/{mem}", headers=h2).status_code == 404
     assert client.post(f"/journeys/{jid}/start", headers=h2).status_code == 404
     assert client.post(f"/journeys/{jid}/points", json={"memory_id": mem}, headers=h2).status_code == 404
+
+
+def test_update_journey_title_and_description(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h, "Antiga")
+    r = client.patch(f"/journeys/{jid}", json={"title": "Nova", "description": "desc"}, headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["title"] == "Nova"
+    assert body["description"] == "desc"
+    # persistiu
+    assert client.get(f"/journeys/{jid}", headers=h).json()["title"] == "Nova"
+
+
+def test_update_journey_partial_keeps_other_fields(client, auth_headers):
+    h = auth_headers()
+    jid = client.post("/journeys", json={"title": "T", "description": "D"}, headers=h).json()["id"]
+    r = client.patch(f"/journeys/{jid}", json={"title": "T2"}, headers=h)
+    assert r.status_code == 200
+    assert r.json()["title"] == "T2"
+    assert r.json()["description"] == "D"  # não enviado -> inalterado
+
+
+def test_update_journey_rejects_unknown_field(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h)
+    # extra="forbid": mexer no status por aqui é 422 (o ciclo tem endpoints próprios)
+    assert client.patch(f"/journeys/{jid}", json={"status": "active"}, headers=h).status_code == 422
+
+
+def test_update_journey_missing_returns_404(client, auth_headers):
+    h = auth_headers()
+    assert client.patch(f"/journeys/{uuid.uuid4()}", json={"title": "X"}, headers=h).status_code == 404
+
+
+def test_update_journey_other_user_returns_404(client, auth_headers):
+    h1 = auth_headers()
+    h2 = auth_headers()
+    jid = _journey(client, h1)
+    assert client.patch(f"/journeys/{jid}", json={"title": "X"}, headers=h2).status_code == 404
 
 
 def test_single_point_route_is_null(client, auth_headers):

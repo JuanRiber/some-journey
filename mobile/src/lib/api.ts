@@ -224,6 +224,14 @@ export function createJourney(input: JourneyCreateInput): Promise<Journey> {
   return request("POST", "/journeys", input, true);
 }
 
+// Edita os metadados da jornada (título/descrição). Só os campos enviados mudam;
+// não mexe no ciclo de vida (que tem endpoints próprios de start/pause/etc.).
+export type JourneyUpdateInput = { title?: string; description?: string };
+
+export function updateJourney(id: string, patch: JourneyUpdateInput): Promise<Journey> {
+  return request("PATCH", `/journeys/${id}`, patch, true);
+}
+
 export function startJourney(id: string): Promise<Journey> {
   return request("POST", `/journeys/${id}/start`, undefined, true);
 }

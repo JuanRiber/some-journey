@@ -10,11 +10,12 @@ type Props = {
   value: PickedImage | null; // imagem recém-escolhida (ainda não enviada)
   existingUrl?: string | null; // imagem já salva (URL assinada) na edição
   onChange: (img: PickedImage | null) => void;
+  onRemoveExisting?: () => void; // remover a foto JÁ salva (só na edição)
 };
 
 // Campo de foto opcional: escolhe da galeria (expo-image-picker, funciona em web
 // e nativo) e mostra o preview. A escolha sobe junto ao salvar a memória.
-export default function ImagePickerField({ value, existingUrl, onChange }: Props) {
+export default function ImagePickerField({ value, existingUrl, onChange, onRemoveExisting }: Props) {
   const [error, setError] = useState("");
   const previewUri = value?.uri ?? existingUrl ?? null;
 
@@ -46,6 +47,10 @@ export default function ImagePickerField({ value, existingUrl, onChange }: Props
             </Pressable>
             {value ? (
               <Pressable onPress={() => onChange(null)} hitSlop={6} accessibilityRole="button" accessibilityLabel="Remover foto escolhida">
+                <Text style={[s.action, { color: colors.danger }]}>Remover</Text>
+              </Pressable>
+            ) : existingUrl && onRemoveExisting ? (
+              <Pressable onPress={onRemoveExisting} hitSlop={6} accessibilityRole="button" accessibilityLabel="Remover foto salva">
                 <Text style={[s.action, { color: colors.danger }]}>Remover</Text>
               </Pressable>
             ) : null}

@@ -122,3 +122,18 @@ def attach_image(
     storage.upload(path, data, content_type)
     updated = memory_repository.set_image_path(db, memory=memory, image_path=path)
     return _to_read(updated, image_url=storage.sign_url(path))
+
+
+def remove_image(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> MemoryRead:
+    """Remove a imagem da memória (do dono): limpa o image_path no banco e apaga o
+    arquivo no Storage (best-effort). Idempotente — sem imagem, é no-op. NÃO
+    depende do Storage estar configurado: o banco é a fonte da verdade do vínculo
+    e storage.delete é silencioso quando desligado. Pode levantar MemoryNotFoundError."""
+    memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
+    if memory is None:
+        raise MemoryNotFoundError()
+    old_path = memory.image_path
+    if old_path:
+        memory_repository.set_image_path(db, memory=memory, image_path=None)
+        storage.delete(old_path)
+    return _to_read(memory)

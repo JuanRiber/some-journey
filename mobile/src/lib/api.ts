@@ -166,6 +166,12 @@ export function deleteMemory(id: string): Promise<null> {
   return request("DELETE", `/memories/${id}`, undefined, true);
 }
 
+// Remove a imagem salva de uma memória (limpa o vínculo e apaga o arquivo no
+// backend). Devolve a memória atualizada (image_url = null).
+export function deleteMemoryImage(id: string): Promise<Memory> {
+  return request("DELETE", `/memories/${id}/image`, undefined, true);
+}
+
 // --- Jornadas (fases) ---
 
 export type JourneyStatus = "draft" | "active" | "paused" | "finished";

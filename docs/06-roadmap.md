@@ -20,7 +20,7 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ a fazer. (Progresso detalhado no [`cha
 - Estilos visuais de jornadas.
 - Exportação simples de jornada.
 - Mapa nativo (Mapbox ou provedor nativo) consumindo `GET /map`.
-- `PATCH /journeys/{id}` e `DELETE /memories/{id}/image`.
+- `PATCH /journeys/{id}` (editar título/descrição da jornada).
 
 ## V3
 - Jornadas compartilhadas.

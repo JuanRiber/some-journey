@@ -129,3 +129,19 @@ def upload_memory_image(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not store the image. Try again.",
         )
+
+
+@router.delete("/{memory_id}/image", response_model=MemoryRead)
+def delete_memory_image(
+    memory_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MemoryRead:
+    """Remove a imagem da memória: limpa o vínculo e apaga o arquivo (best-effort).
+    Funciona mesmo sem Storage configurado e é idempotente (sem imagem, no-op)."""
+    try:
+        return memory_service.remove_image(
+            db, user_id=current_user.id, memory_id=memory_id
+        )
+    except MemoryNotFoundError:
+        raise _not_found

@@ -163,8 +163,8 @@ def update(
     return memory
 
 
-def set_image_path(db: Session, *, memory: Memory, image_path: str) -> Memory:
-    """Grava o caminho da imagem no Storage (após o upload pelo service)."""
+def set_image_path(db: Session, *, memory: Memory, image_path: str | None) -> Memory:
+    """Grava (após o upload) ou LIMPA (com None, na remoção) o caminho da imagem."""
     memory.image_path = image_path
     db.commit()
     db.refresh(memory)

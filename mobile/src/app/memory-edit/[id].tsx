@@ -20,6 +20,7 @@ export default function MemoryEditScreen() {
   const [placeLabel, setPlaceLabel] = useState("");
   const [image, setImage] = useState<api.PickedImage | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
+  const [removeExisting, setRemoveExisting] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -98,8 +99,9 @@ export default function MemoryEditScreen() {
         longitude: coords.longitude,
         occurred_at: `${date.trim()}T12:00:00Z`,
       });
-      // Se o usuário escolheu uma nova foto, sobe (precisa do Storage configurado).
+      // Foto: nova escolha sobe (substitui); senão, se removeu a salva, apaga.
       if (image) await api.uploadMemoryImage(id, image);
+      else if (removeExisting) await api.deleteMemoryImage(id);
       // Volta ao detalhe, que recarrega no mount e mostra os dados atualizados.
       router.replace(`/memory/${id}`);
     } catch (e) {
@@ -176,7 +178,15 @@ export default function MemoryEditScreen() {
             />
 
             <Text style={ui.label}>FOTO (OPCIONAL)</Text>
-            <ImagePickerField value={image} existingUrl={existingImageUrl} onChange={setImage} />
+            <ImagePickerField
+              value={image}
+              existingUrl={existingImageUrl}
+              onChange={setImage}
+              onRemoveExisting={() => {
+                setExistingImageUrl(null);
+                setRemoveExisting(true);
+              }}
+            />
 
             {error ? (
               <Text style={{ color: colors.danger, fontSize: 13, marginTop: 12, textAlign: "center" }}>

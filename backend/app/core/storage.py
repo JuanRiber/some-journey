@@ -34,7 +34,11 @@ def _base() -> str:
 
 
 def _auth_headers() -> dict[str, str]:
-    return {"Authorization": f"Bearer {settings.SUPABASE_SERVICE_KEY}"}
+    # O gateway do Supabase exige o header `apikey` em TODA requisição, além do
+    # Authorization: Bearer. Sem o `apikey` a API responde 401 ("No API key
+    # found in request"). Usamos o service key nos dois (é o que autentica).
+    key = settings.SUPABASE_SERVICE_KEY or ""
+    return {"Authorization": f"Bearer {key}", "apikey": key}
 
 
 def upload(path: str, data: bytes, content_type: str) -> None:

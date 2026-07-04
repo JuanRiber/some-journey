@@ -1,8 +1,8 @@
 """Testes do upload de imagem (POST /memories/{id}/image).
 
-No ambiente de teste o Supabase NÃO está configurado, então o caminho feliz
-termina em 503 (storage desabilitado) — o suficiente para cobrir wiring,
-validação de tipo/tamanho e ownership sem depender de um bucket real.
+Cobrem wiring, validação de tipo/tamanho e ownership sem depender de um bucket
+real. O caminho "storage desabilitado → 503" força as credenciais Supabase a
+None no próprio teste, para não depender do que estiver no .env do dev.
 """
 
 import uuid
@@ -60,7 +60,13 @@ def test_upload_too_large_returns_413(client, auth_headers, monkeypatch):
     assert r.status_code == 413
 
 
-def test_upload_valid_type_but_storage_disabled_returns_503(client, auth_headers):
+def test_upload_valid_type_but_storage_disabled_returns_503(client, auth_headers, monkeypatch):
+    from app.core.config import settings
+
+    # Força o storage desabilitado independentemente do .env do dev: sem
+    # SUPABASE_URL/SERVICE_KEY, storage_enabled=False e o upload responde 503.
+    monkeypatch.setattr(settings, "SUPABASE_URL", None)
+    monkeypatch.setattr(settings, "SUPABASE_SERVICE_KEY", None)
     h = auth_headers()
     mid = _memory(client, h)
     r = client.post(f"/memories/{mid}/image", files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")}, headers=h)

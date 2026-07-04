@@ -147,3 +147,26 @@ def test_single_point_route_is_null(client, auth_headers):
     r = _add_point(client, h, jid, 0, 1.0, 2.0)
     assert r.status_code == 201
     assert r.json()["route"] is None
+
+
+def test_deleting_journey_frees_and_keeps_its_memories(client, auth_headers):
+    # Regressão: excluir a jornada precisa soft-deletar os vínculos junto. Sem
+    # isso a memória fica presa — não entra em outra jornada (409) e some dos
+    # pontos soltos do mapa — mesmo com a jornada já inexistente. Excluir uma
+    # jornada nunca apaga as memórias.
+    h = auth_headers()
+    jid = _journey(client, h)
+    mem = _memory(client, h)
+    assert client.post(f"/journeys/{jid}/points", json={"memory_id": mem}, headers=h).status_code == 200
+    # enquanto vinculada, não aparece nos pontos soltos
+    assert all(p["memory_id"] != mem for p in client.get("/map", headers=h).json()["loose_points"])
+    # excluir a jornada
+    assert client.delete(f"/journeys/{jid}", headers=h).status_code == 204
+    # a memória continua existindo
+    assert client.get(f"/memories/{mem}", headers=h).status_code == 200
+    # e reaparece como ponto solto no mapa (o vínculo foi liberado)
+    loose = [p["memory_id"] for p in client.get("/map", headers=h).json()["loose_points"]]
+    assert mem in loose
+    # e pode ser vinculada a outra jornada (o slot único foi liberado)
+    jid2 = _journey(client, h, "Outra")
+    assert client.post(f"/journeys/{jid2}/points", json={"memory_id": mem}, headers=h).status_code == 200

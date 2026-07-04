@@ -1,78 +1,161 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import type { MapResponse } from "../lib/api";
-import { colors, serif } from "../theme/colors";
+import { colors } from "../theme/colors";
 
 type Props = {
   data: MapResponse | null;
   onSelect: (memoryId: string) => void;
 };
 
-type Row = { memory_id: string; title: string; latitude: number; longitude: number; journey?: string };
+// Mapa principal do Atlas (nativo): o MESMO mapa Leaflet/OSM do web, só que
+// hospedado num WebView (o nativo não roda Leaflet direto). Desenha pins soltos
+// (teal), pins de jornada (terra) e os rastros a partir de GET /map; tocar num
+// pin manda uma mensagem que abre o detalhe da memória. Leaflet vem do CDN
+// (o mapa já depende de rede pelas tiles do OSM). Substitui a antiga lista.
+const HTML = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html, body, #map { height: 100%; margin: 0; padding: 0; }
+  body { background: ${colors.sky}; }
+  .leaflet-container { background: ${colors.sky}; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+  var map, layer;
+  var TERRA = '${colors.terra}', TEAL = '${colors.teal}', BORDER = '${colors.card}';
 
-// Fallback nativo do mapa: sem biblioteca de mapa no nativo (o mapa interativo
-// roda no web, com Leaflet), aqui listamos os pontos de forma tocável para não
-// perder o acesso aos dados. Mantém a filosofia de placeholder honesto.
-export default function AtlasMap({ data, onSelect }: Props) {
-  if (!data) return null;
-
-  const rows: Row[] = [];
-  for (const j of data.journeys) {
-    for (const p of j.points) {
-      rows.push({ memory_id: p.memory_id, title: p.title, latitude: p.latitude, longitude: p.longitude, journey: j.title });
-    }
+  function post(o) {
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(o));
   }
-  for (const m of data.loose_points) {
-    rows.push({ memory_id: m.memory_id, title: m.title, latitude: m.latitude, longitude: m.longitude });
+  function pin(color) {
+    return L.divIcon({
+      className: 'sj-pin',
+      html: '<div style="width:20px;height:20px;border-radius:50%;background:' + color +
+            ';border:2px solid ' + BORDER + ';box-shadow:0 2px 5px rgba(0,0,0,.4)"></div>',
+      iconSize: [20, 20], iconAnchor: [10, 10]
+    });
+  }
+  function addPin(lat, lng, title, id, color, all) {
+    all.push([lat, lng]);
+    var m = L.marker([lat, lng], { icon: pin(color), title: title });
+    m.on('click', function () { post({ type: 'select', memoryId: id }); });
+    m.addTo(layer);
+  }
+  window.__render = function (data) {
+    if (!map || !layer || !data) return;
+    layer.clearLayers();
+    var all = [];
+    (data.journeys || []).forEach(function (j) {
+      if (j.route && j.route.coordinates && j.route.coordinates.length >= 2) {
+        // GeoJSON é [lng, lat]; Leaflet quer [lat, lng].
+        var line = j.route.coordinates.map(function (c) { return [c[1], c[0]]; });
+        L.polyline(line, { color: TERRA, weight: 3, opacity: 0.75 }).addTo(layer);
+      }
+      (j.points || []).forEach(function (p) { addPin(p.latitude, p.longitude, p.title, p.memory_id, TERRA, all); });
+    });
+    (data.loose_points || []).forEach(function (m) { addPin(m.latitude, m.longitude, m.title, m.memory_id, TEAL, all); });
+    if (all.length === 1) map.setView(all[0], 13);
+    else if (all.length > 1) map.fitBounds(all, { padding: [40, 40] });
+  };
+  function init() {
+    map = L.map('map', { center: [-14.235, -51.925], zoom: 4 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    }).addTo(map);
+    layer = L.layerGroup().addTo(map);
+    post({ type: 'ready' });
+  }
+  if (window.L) { try { init(); } catch (e) { post({ type: 'error' }); } }
+  else { post({ type: 'error' }); }
+</script>
+</body>
+</html>`;
+
+export default function AtlasMap({ data, onSelect }: Props) {
+  const webRef = useRef<WebView>(null);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
+  const [ready, setReady] = useState(false);
+  const [mapError, setMapError] = useState(false);
+
+  const json = useMemo(
+    () => JSON.stringify(data ?? { loose_points: [], journeys: [] }),
+    [data],
+  );
+
+  // Injeta os dados quando o mapa está pronto e sempre que os dados mudam.
+  useEffect(() => {
+    if (ready && webRef.current) {
+      webRef.current.injectJavaScript(`window.__render(${json}); true;`);
+    }
+  }, [json, ready]);
+
+  function onMessage(e: WebViewMessageEvent) {
+    try {
+      const msg = JSON.parse(e.nativeEvent.data);
+      if (msg?.type === "select" && msg.memoryId) onSelectRef.current(msg.memoryId);
+      else if (msg?.type === "ready") setReady(true);
+      else if (msg?.type === "error") setMapError(true);
+    } catch {
+      // mensagem inesperada: ignora
+    }
   }
 
   return (
-    <View>
-      <View style={s.note}>
-        <Text style={s.noteTitle}>Mapa interativo no app web</Text>
-        <Text style={s.noteText}>
-          No celular, o mapa com pins e rastros chega com um provedor nativo. Por aqui, seus locais
-          ficam tocáveis abaixo.
-        </Text>
-      </View>
-
-      {rows.length === 0 ? (
-        <Text style={s.empty}>Nenhum ponto no mapa ainda.</Text>
-      ) : (
-        <View style={{ gap: 8, marginTop: 12 }}>
-          {rows.map((r) => (
-            <Pressable
-              key={r.memory_id}
-              style={({ pressed }) => [s.row, pressed && { opacity: 0.9 }]}
-              onPress={() => onSelect(r.memory_id)}
-              accessibilityRole="button"
-              accessibilityLabel={`Ver memória: ${r.title}`}
-            >
-              <View style={[s.pin, { backgroundColor: r.journey ? colors.terra : colors.teal }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.rowTitle} numberOfLines={1}>
-                  {r.title}
-                </Text>
-                <Text style={s.rowMeta}>
-                  {r.latitude.toFixed(3)}, {r.longitude.toFixed(3)}
-                  {r.journey ? ` • ${r.journey}` : ""}
-                </Text>
-              </View>
-            </Pressable>
-          ))}
+    <View style={s.shell}>
+      {!mapError ? (
+        <WebView
+          ref={webRef}
+          style={s.web}
+          originWhitelist={["*"]}
+          source={{ html: HTML }}
+          onMessage={onMessage}
+          javaScriptEnabled
+          domStorageEnabled
+          nestedScrollEnabled
+          onError={() => setMapError(true)}
+          onHttpError={() => setMapError(true)}
+        />
+      ) : null}
+      {mapError ? (
+        <View style={s.overlay}>
+          <Text style={s.errText}>Não foi possível carregar o mapa.</Text>
+          <Text style={s.hint}>Veja suas memórias pela aba Tempo.</Text>
         </View>
-      )}
+      ) : !ready ? (
+        <View style={s.overlay}>
+          <ActivityIndicator color={colors.terra} />
+          <Text style={s.hint}>Carregando mapa…</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  note: { backgroundColor: "rgba(61,138,152,0.10)", borderRadius: 14, padding: 14 },
-  noteTitle: { fontFamily: serif, fontSize: 15, color: colors.teal },
-  noteText: { color: colors.inkSoft, fontSize: 13, lineHeight: 19, marginTop: 4 },
-  empty: { color: colors.inkSoft, fontSize: 14, marginTop: 18, textAlign: "center" },
-  row: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12 },
-  pin: { width: 10, height: 10, borderRadius: 5 },
-  rowTitle: { fontFamily: serif, fontSize: 16, color: colors.ink },
-  rowMeta: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
+  shell: {
+    position: "relative",
+    width: "100%",
+    height: 380,
+    borderRadius: 18,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.sky,
+  },
+  web: { flex: 1, backgroundColor: colors.sky },
+  overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", gap: 6 },
+  hint: { color: colors.inkSoft, fontSize: 13, textAlign: "center" },
+  errText: { color: colors.danger, fontSize: 14, fontWeight: "600", textAlign: "center" },
 });

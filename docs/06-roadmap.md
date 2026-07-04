@@ -4,14 +4,14 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ a fazer. (Progresso detalhado no [`cha
 
 ## MVP
 - ✅ Login / cadastro (JWT).
-- 🟡 Mapa interativo — Leaflet/OSM no **web**; nativo por lista/busca (mapa nativo a fazer).
+- 🟡 Mapa nativo interativo — Leaflet/OSM no **web** (pronto); no **nativo**, implementado via WebView + Leaflet, aguardando validação em device (Expo Go).
 - ✅ Criar memória geolocalizada.
 - ✅ Visualizar pins (`GET /map`).
 - ✅ Timeline simples.
 - ✅ Criar jornada simples (com ciclo `draft/active/paused/finished`).
 - ✅ Associar pontos a jornadas (existentes e novos) + reordenar.
 - ✅ Desenhar rastro no mapa (LineString).
-- 🟡 Upload de uma foto por memória — backend + mobile prontos; **exige configurar o Supabase** para ativar.
+- ✅ Upload de uma foto por memória — funcional com Supabase Storage (upload, URL assinada e delete validados de ponta a ponta).
 
 ## V2
 - Múltiplas fotos por memória.

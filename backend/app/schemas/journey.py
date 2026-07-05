@@ -78,7 +78,8 @@ class JourneyMemoryCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1, max_length=120)
-    text: str = Field(min_length=1, max_length=5000)
+    # Descrição OPCIONAL (mesmo critério da memória avulsa).
+    text: str = Field(default="", max_length=5000)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     occurred_at: datetime

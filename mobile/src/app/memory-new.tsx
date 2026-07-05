@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
+import DateField from "../components/DateField";
 import ImagePickerField from "../components/ImagePickerField";
 import LocationPicker from "../components/LocationPicker";
 import * as api from "../lib/api";
@@ -27,27 +28,16 @@ export default function MemoryNewScreen() {
 
   async function onSave() {
     setError("");
-    if (!title.trim() || !text.trim()) {
-      setError("Dê um título e conte a memória.");
+    if (!title.trim()) {
+      setError("Dê um título à memória.");
       return;
     }
     if (!coords) {
       setError("Escolha um local: busque, use sua localização ou toque no mapa.");
       return;
     }
-    // Valida a data (campo livre AAAA-MM-DD) antes de montar o occurred_at —
-    // inclusive datas impossíveis como 2023-02-31 (que o Date "rolaria").
-    const dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date.trim());
-    const dt = dm ? new Date(`${date.trim()}T12:00:00Z`) : null;
-    if (
-      !dm ||
-      !dt ||
-      Number.isNaN(dt.getTime()) ||
-      dt.getUTCFullYear() !== +dm[1] ||
-      dt.getUTCMonth() + 1 !== +dm[2] ||
-      dt.getUTCDate() !== +dm[3]
-    ) {
-      setError("Use uma data válida no formato AAAA-MM-DD.");
+    if (!date) {
+      setError("Escolha a data.");
       return;
     }
     setLoading(true);
@@ -116,7 +106,7 @@ export default function MemoryNewScreen() {
           placeholderTextColor={colors.placeholder}
         />
 
-        <Text style={ui.label}>O QUE ACONTECEU</Text>
+        <Text style={ui.label}>O QUE ACONTECEU (OPCIONAL)</Text>
         <TextInput
           style={[ui.input, { height: 110, textAlignVertical: "top" }]}
           value={text}
@@ -126,15 +116,8 @@ export default function MemoryNewScreen() {
           multiline
         />
 
-        <Text style={ui.label}>QUANDO (AAAA-MM-DD)</Text>
-        <TextInput
-          style={ui.input}
-          value={date}
-          onChangeText={setDate}
-          placeholder="2023-07-15"
-          placeholderTextColor={colors.placeholder}
-          autoCapitalize="none"
-        />
+        <Text style={ui.label}>QUANDO</Text>
+        <DateField value={date} onChange={setDate} />
 
         <Text style={ui.label}>LOCALIZAÇÃO</Text>
         <LocationPicker

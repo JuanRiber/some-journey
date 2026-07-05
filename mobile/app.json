@@ -47,7 +47,8 @@
         {
           "photosPermission": "O Some Journey acessa suas fotos para anexar uma imagem à memória."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

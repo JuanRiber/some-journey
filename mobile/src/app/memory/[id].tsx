@@ -198,7 +198,7 @@ const s = StyleSheet.create({
   metaRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 8 },
   pin: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.terra },
   meta: { color: colors.terraDeep, fontSize: 13, fontWeight: "600" },
-  image: { width: "100%", height: 220, borderRadius: 14, marginTop: 16, backgroundColor: colors.sky, borderWidth: 1, borderColor: colors.line },
+  image: { width: "100%", maxWidth: 560, alignSelf: "center", aspectRatio: 4 / 3, borderRadius: 14, marginTop: 16, backgroundColor: colors.sky, borderWidth: 1, borderColor: colors.line },
   text: { color: colors.ink, fontSize: 16, lineHeight: 25, marginTop: 18 },
   divider: { height: 1, backgroundColor: colors.line, marginTop: 28 },
   quote: { fontFamily: serif, fontStyle: "italic", fontSize: 16, color: colors.inkSoft, textAlign: "center", marginTop: 18 },

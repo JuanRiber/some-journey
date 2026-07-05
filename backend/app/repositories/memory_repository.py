@@ -16,7 +16,7 @@ from sqlalchemy import cast, func, select
 from sqlalchemy.orm import Session
 
 from app.models.journey import JourneyMemory
-from app.models.memory import Memory
+from app.models.memory import Memory, MemoryImage
 
 # bbox geográfico no formato (min_lng, min_lat, max_lng, max_lat) em WGS84.
 Bbox = tuple[float, float, float, float]
@@ -164,11 +164,93 @@ def update(
 
 
 def set_image_path(db: Session, *, memory: Memory, image_path: str | None) -> Memory:
-    """Grava (após o upload) ou LIMPA (com None, na remoção) o caminho da imagem."""
+    """Grava (após o upload) ou LIMPA (com None, na remoção) o caminho da imagem.
+    LEGADO: fotos novas vivem em memory_images; mantido para compatibilidade."""
     memory.image_path = image_path
     db.commit()
     db.refresh(memory)
     return memory
+
+
+# --- Fotos da memória (memory_images) --------------------------------------
+
+
+def add_image(
+    db: Session, *, memory_id: uuid.UUID, image_path: str, position: int
+) -> MemoryImage:
+    image = MemoryImage(memory_id=memory_id, image_path=image_path, position=position)
+    db.add(image)
+    db.commit()
+    db.refresh(image)
+    return image
+
+
+def list_images(db: Session, *, memory_id: uuid.UUID) -> list[MemoryImage]:
+    """Fotos ativas de uma memória, na ordem (position, depois created_at)."""
+    return list(
+        db.scalars(
+            select(MemoryImage)
+            .where(MemoryImage.memory_id == memory_id, MemoryImage.deleted_at.is_(None))
+            .order_by(MemoryImage.position, MemoryImage.created_at)
+        )
+    )
+
+
+def list_images_for(
+    db: Session, *, memory_ids: list[uuid.UUID]
+) -> list[MemoryImage]:
+    """Fotos ativas de VÁRIAS memórias (para assinar em lote na listagem)."""
+    if not memory_ids:
+        return []
+    return list(
+        db.scalars(
+            select(MemoryImage)
+            .where(
+                MemoryImage.memory_id.in_(memory_ids),
+                MemoryImage.deleted_at.is_(None),
+            )
+            .order_by(MemoryImage.position, MemoryImage.created_at)
+        )
+    )
+
+
+def get_image(
+    db: Session, *, memory_id: uuid.UUID, image_id: uuid.UUID
+) -> MemoryImage | None:
+    return db.scalar(
+        select(MemoryImage).where(
+            MemoryImage.id == image_id,
+            MemoryImage.memory_id == memory_id,
+            MemoryImage.deleted_at.is_(None),
+        )
+    )
+
+
+def count_images(db: Session, *, memory_id: uuid.UUID) -> int:
+    return (
+        db.scalar(
+            select(func.count(MemoryImage.id)).where(
+                MemoryImage.memory_id == memory_id,
+                MemoryImage.deleted_at.is_(None),
+            )
+        )
+        or 0
+    )
+
+
+def next_image_position(db: Session, *, memory_id: uuid.UUID) -> int:
+    highest = db.scalar(
+        select(func.max(MemoryImage.position)).where(
+            MemoryImage.memory_id == memory_id,
+            MemoryImage.deleted_at.is_(None),
+        )
+    )
+    return (highest or 0) + 1
+
+
+def soft_delete_image(db: Session, *, image: MemoryImage) -> None:
+    image.deleted_at = func.now()
+    db.commit()
 
 
 def soft_delete(db: Session, *, memory: Memory) -> None:

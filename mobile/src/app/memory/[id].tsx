@@ -111,9 +111,9 @@ export default function MemoryDetailScreen() {
               </Text>
             </View>
 
-            {memory.image_url ? (
-              <Image source={{ uri: memory.image_url }} style={s.image} contentFit="cover" transition={200} />
-            ) : null}
+            {memory.images.map((img) => (
+              <Image key={img.id} source={{ uri: img.url }} style={s.image} contentFit="cover" transition={200} />
+            ))}
 
             <Text style={s.text}>{memory.text}</Text>
 

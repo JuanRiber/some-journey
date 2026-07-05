@@ -48,6 +48,13 @@ class MemoryUpdate(BaseModel):
         return self
 
 
+class MemoryImageRead(BaseModel):
+    """Uma foto da memória: id (para remover) + URL assinada temporária."""
+
+    id: uuid.UUID
+    url: str
+
+
 class MemoryRead(BaseModel):
     """Saída: o que a API devolve de uma memória. Sem user_id, sem location
     crua, sem image_path — o service constrói este DTO a partir do model."""
@@ -59,4 +66,7 @@ class MemoryRead(BaseModel):
     longitude: float
     occurred_at: datetime
     created_at: datetime
+    # Fotos (URLs assinadas), na ordem. image_url = a primeira (capa), mantido
+    # por compatibilidade com o cliente atual.
+    images: list[MemoryImageRead] = []
     image_url: str | None = None

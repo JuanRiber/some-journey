@@ -18,7 +18,12 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.schemas.memory import MemoryCreate, MemoryRead, MemoryUpdate
 from app.services import memory_service
-from app.services.memory_service import InvalidImageError, MemoryNotFoundError
+from app.services.memory_service import (
+    InvalidImageError,
+    MemoryImageNotFoundError,
+    MemoryNotFoundError,
+    TooManyImagesError,
+)
 
 router = APIRouter(prefix="/memories", tags=["memories"])
 
@@ -84,20 +89,17 @@ def delete_memory(
         raise _not_found
 
 
-@router.post("/{memory_id}/image", response_model=MemoryRead)
-def upload_memory_image(
+@router.post("/{memory_id}/images", response_model=MemoryRead)
+def add_memory_image(
     memory_id: uuid.UUID,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MemoryRead:
-    """Anexa/atualiza a imagem de uma memória do usuário (multipart).
+    """Adiciona uma foto à memória do usuário (multipart), até o teto por memória.
 
-    O backend repassa o arquivo ao Storage privado e guarda só o caminho; a
-    resposta traz uma image_url assinada de curta duração. Rota síncrona: lê o
-    arquivo via file.file (roda em threadpool, sem travar o event loop)."""
-    # Lê em blocos e corta assim que passar do limite — nunca materializa um
-    # buffer maior que MAX_IMAGE_BYTES (+1 bloco) na RAM.
+    Lê o arquivo em blocos e corta no limite antes de materializar tudo na RAM.
+    Rota síncrona: file.file.read roda em threadpool, sem travar o event loop."""
     max_bytes = settings.MAX_IMAGE_BYTES
     chunks: list[bytes] = []
     total = 0
@@ -116,7 +118,7 @@ def upload_memory_image(
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
     try:
-        return memory_service.attach_image(
+        return memory_service.add_image(
             db,
             user_id=current_user.id,
             memory_id=memory_id,
@@ -130,6 +132,11 @@ def upload_memory_image(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Unsupported image type. Use JPEG, PNG or WebP.",
         )
+    except TooManyImagesError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This memory already has the maximum number of photos.",
+        )
     except storage.StorageNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -142,17 +149,21 @@ def upload_memory_image(
         )
 
 
-@router.delete("/{memory_id}/image", response_model=MemoryRead)
+@router.delete("/{memory_id}/images/{image_id}", response_model=MemoryRead)
 def delete_memory_image(
     memory_id: uuid.UUID,
+    image_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MemoryRead:
-    """Remove a imagem da memória: limpa o vínculo e apaga o arquivo (best-effort).
-    Funciona mesmo sem Storage configurado e é idempotente (sem imagem, no-op)."""
+    """Remove UMA foto da memória (apaga o arquivo, best-effort). 404 se a
+    memória ou a foto não são do usuário."""
     try:
         return memory_service.remove_image(
-            db, user_id=current_user.id, memory_id=memory_id
+            db,
+            user_id=current_user.id,
+            memory_id=memory_id,
+            image_id=image_id,
         )
-    except MemoryNotFoundError:
+    except (MemoryNotFoundError, MemoryImageNotFoundError):
         raise _not_found

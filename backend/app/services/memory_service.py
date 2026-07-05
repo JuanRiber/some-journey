@@ -1,10 +1,9 @@
 """Serviço de Memórias: orquestra as regras de negócio e converte o model
 (geográfico) no schema de saída (lat/long).
 
-Não conhece HTTP: sinaliza ausência com a exceção de domínio
-MemoryNotFoundError, que a camada de rotas traduz em 404 (sem revelar se a
-memória existe e é de outro — anti-enumeração). Todo acesso passa pelo
-repository, que já filtra por user_id (ownership) e deleted_at (soft delete).
+Não conhece HTTP: sinaliza ausência com exceções de domínio, que a camada de
+rotas traduz em status (404/400/409). Todo acesso passa pelo repository, que já
+filtra por user_id (ownership) e deleted_at (soft delete).
 """
 
 import uuid
@@ -13,30 +12,52 @@ from geoalchemy2.shape import to_shape
 from sqlalchemy.orm import Session
 
 from app.core import storage
-from app.models.memory import Memory
+from app.models.memory import Memory, MemoryImage
 from app.repositories import memory_repository
-from app.schemas.memory import MemoryCreate, MemoryRead, MemoryUpdate
+from app.schemas.memory import (
+    MemoryCreate,
+    MemoryImageRead,
+    MemoryRead,
+    MemoryUpdate,
+)
 
 # Tipos de imagem aceitos no upload -> extensão usada no path do Storage.
 _IMAGE_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+# Teto de fotos por memória.
+_MAX_IMAGES = 5
 
 
 class MemoryNotFoundError(Exception):
     """Memória inexistente ou de outro usuário — a rota traduz em 404."""
 
 
+class MemoryImageNotFoundError(Exception):
+    """Foto inexistente ou de memória de outro usuário — a rota traduz em 404."""
+
+
 class InvalidImageError(Exception):
     """Tipo de imagem não suportado — a rota traduz em 400."""
 
 
-def _to_read(memory: Memory, *, image_url: str | None = None) -> MemoryRead:
+class TooManyImagesError(Exception):
+    """Excedeu o teto de fotos por memória — a rota traduz em 409."""
+
+
+def _to_read(
+    memory: Memory, images: list[MemoryImage], signed: dict[str, str]
+) -> MemoryRead:
     """Converte o model (location = POINT(long, lat)) no DTO de saída (lat/long).
 
-    to_shape devolve um Point do shapely: x = longitude, y = latitude. É aqui
-    que o GEOGRAPHY volta a virar linguagem humana pra API. `image_url` é uma URL
-    assinada de curta duração (None se não há imagem ou o Storage está desligado).
+    `images` são as fotos ativas ordenadas; `signed` mapeia image_path -> URL
+    assinada temporária. Fotos sem URL (Storage desligado/erro) ficam de fora.
+    image_url = a primeira (capa), por compatibilidade com o cliente atual.
     """
     point = to_shape(memory.location)
+    image_reads = [
+        MemoryImageRead(id=img.id, url=signed[img.image_path])
+        for img in images
+        if img.image_path in signed
+    ]
     return MemoryRead(
         id=memory.id,
         title=memory.title,
@@ -45,8 +66,16 @@ def _to_read(memory: Memory, *, image_url: str | None = None) -> MemoryRead:
         longitude=point.x,
         occurred_at=memory.occurred_at,
         created_at=memory.created_at,
-        image_url=image_url,
+        images=image_reads,
+        image_url=image_reads[0].url if image_reads else None,
     )
+
+
+def _read_with_images(db: Session, memory: Memory) -> MemoryRead:
+    """Lê as fotos da memória, assina-as e monta o DTO."""
+    images = memory_repository.list_images(db, memory_id=memory.id)
+    signed = storage.sign_urls([img.image_path for img in images])
+    return _to_read(memory, images, signed)
 
 
 def create(db: Session, *, user_id: uuid.UUID, data: MemoryCreate) -> MemoryRead:
@@ -59,24 +88,27 @@ def create(db: Session, *, user_id: uuid.UUID, data: MemoryCreate) -> MemoryRead
         longitude=data.longitude,
         occurred_at=data.occurred_at,
     )
-    return _to_read(memory)
+    return _to_read(memory, [], {})  # nasce sem fotos
 
 
 def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[MemoryRead]:
     memories = memory_repository.list_by_user(db, user_id=user_id)
-    # Assina todas as imagens em UMA chamada (evita N round-trips ao Storage).
-    signed = storage.sign_urls([m.image_path for m in memories if m.image_path])
-    return [
-        _to_read(m, image_url=signed.get(m.image_path) if m.image_path else None)
-        for m in memories
-    ]
+    images = memory_repository.list_images_for(
+        db, memory_ids=[m.id for m in memories]
+    )
+    # Assina TODAS as fotos em UMA chamada (evita N round-trips ao Storage).
+    signed = storage.sign_urls([img.image_path for img in images])
+    by_memory: dict[uuid.UUID, list[MemoryImage]] = {}
+    for img in images:
+        by_memory.setdefault(img.memory_id, []).append(img)
+    return [_to_read(m, by_memory.get(m.id, []), signed) for m in memories]
 
 
 def get(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> MemoryRead:
     memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
     if memory is None:
         raise MemoryNotFoundError()
-    return _to_read(memory, image_url=storage.sign_url(memory.image_path) if memory.image_path else None)
+    return _read_with_images(db, memory)
 
 
 def update(
@@ -89,7 +121,7 @@ def update(
     updated = memory_repository.update(
         db, memory=memory, **data.model_dump(exclude_unset=True)
     )
-    return _to_read(updated)
+    return _read_with_images(db, updated)
 
 
 def delete(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> None:
@@ -99,7 +131,7 @@ def delete(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> None:
     memory_repository.soft_delete(db, memory=memory)
 
 
-def attach_image(
+def add_image(
     db: Session,
     *,
     user_id: uuid.UUID,
@@ -107,10 +139,10 @@ def attach_image(
     data: bytes,
     content_type: str,
 ) -> MemoryRead:
-    """Sobe a imagem ao Storage e guarda o caminho na memória (do dono).
+    """Adiciona uma foto à memória (do dono), respeitando o teto _MAX_IMAGES.
 
-    Caminho isolado por usuário+memória: `${user_id}/${memory_id}/${rand}.${ext}`.
-    Pode levantar InvalidImageError (tipo), MemoryNotFoundError (404),
+    Caminho isolado: `${user_id}/${memory_id}/${rand}.${ext}`. Pode levantar
+    InvalidImageError (tipo), MemoryNotFoundError (404), TooManyImagesError (409),
     StorageNotConfigured/StorageError (propagam para a rota)."""
     ext = _IMAGE_EXT.get(content_type)
     if ext is None:
@@ -118,22 +150,33 @@ def attach_image(
     memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
     if memory is None:
         raise MemoryNotFoundError()
+    if memory_repository.count_images(db, memory_id=memory.id) >= _MAX_IMAGES:
+        raise TooManyImagesError()
+    position = memory_repository.next_image_position(db, memory_id=memory.id)
     path = f"{user_id}/{memory_id}/{uuid.uuid4().hex}.{ext}"
     storage.upload(path, data, content_type)
-    updated = memory_repository.set_image_path(db, memory=memory, image_path=path)
-    return _to_read(updated, image_url=storage.sign_url(path))
+    memory_repository.add_image(
+        db, memory_id=memory.id, image_path=path, position=position
+    )
+    return _read_with_images(db, memory)
 
 
-def remove_image(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> MemoryRead:
-    """Remove a imagem da memória (do dono): limpa o image_path no banco e apaga o
-    arquivo no Storage (best-effort). Idempotente — sem imagem, é no-op. NÃO
-    depende do Storage estar configurado: o banco é a fonte da verdade do vínculo
-    e storage.delete é silencioso quando desligado. Pode levantar MemoryNotFoundError."""
+def remove_image(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    memory_id: uuid.UUID,
+    image_id: uuid.UUID,
+) -> MemoryRead:
+    """Remove UMA foto da memória (do dono): soft-delete do registro + apaga o
+    arquivo (best-effort). 404 se a memória ou a foto não são do usuário."""
     memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
     if memory is None:
         raise MemoryNotFoundError()
-    old_path = memory.image_path
-    if old_path:
-        memory_repository.set_image_path(db, memory=memory, image_path=None)
-        storage.delete(old_path)
-    return _to_read(memory)
+    image = memory_repository.get_image(db, memory_id=memory.id, image_id=image_id)
+    if image is None:
+        raise MemoryImageNotFoundError()
+    path = image.image_path
+    memory_repository.soft_delete_image(db, image=image)
+    storage.delete(path)
+    return _read_with_images(db, memory)

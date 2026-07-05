@@ -81,7 +81,7 @@ def test_upload_over_limit_returns_413(client, auth_headers, monkeypatch):
     ).json()["id"]
     payload = b"\xff\xd8\xff\xe0" + b"0" * 500  # > 16 bytes
     r = client.post(
-        f"/memories/{mid}/image",
+        f"/memories/{mid}/images",
         files={"file": ("x.jpg", payload, "image/jpeg")},
         headers=h,
     )
@@ -94,7 +94,7 @@ def test_valid_upload_still_works(client, auth_headers, monkeypatch):
 
     monkeypatch.setattr(storage, "enabled", lambda: True)
     monkeypatch.setattr(storage, "upload", lambda *a, **k: None)
-    monkeypatch.setattr(storage, "sign_url", lambda *a, **k: "https://signed.example/x")
+    monkeypatch.setattr(storage, "sign_urls", lambda paths, ttl=None: {p: "https://signed.example/x" for p in paths})
     h = auth_headers()
     mid = client.post(
         "/memories",
@@ -103,7 +103,7 @@ def test_valid_upload_still_works(client, auth_headers, monkeypatch):
     ).json()["id"]
     payload = b"\xff\xd8\xff\xe0" + b"0" * 64
     r = client.post(
-        f"/memories/{mid}/image",
+        f"/memories/{mid}/images",
         files={"file": ("x.jpg", payload, "image/jpeg")},
         headers=h,
     )

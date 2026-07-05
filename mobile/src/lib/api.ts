@@ -83,10 +83,15 @@ export type MemoryInput = {
   occurred_at: string;
 };
 
-// Memória como a API devolve (MemoryRead). `image_url` é null até o upload existir.
+// Foto de uma memória: id (para remover) + URL assinada temporária.
+export type MemoryImage = { id: string; url: string };
+
+// Memória como a API devolve (MemoryRead). `images` = todas as fotos, na ordem;
+// `image_url` = a primeira (capa), null se não houver.
 export type Memory = MemoryInput & {
   id: string;
   created_at: string;
+  images: MemoryImage[];
   image_url: string | null;
 };
 
@@ -119,7 +124,7 @@ export type PickedImage = { uri: string; mimeType?: string | null; fileName?: st
 // Upload da imagem (multipart). NÃO setamos Content-Type — o fetch monta o
 // boundary. No web convertemos a uri em Blob; no nativo o objeto {uri,name,type}
 // é o formato aceito pelo FormData do React Native.
-export async function uploadMemoryImage(id: string, asset: PickedImage): Promise<Memory> {
+export async function addMemoryImage(id: string, asset: PickedImage): Promise<Memory> {
   const token = await getToken();
   const type = asset.mimeType || "image/jpeg";
   const name = asset.fileName || `photo.${type.split("/")[1] || "jpg"}`;
@@ -135,7 +140,7 @@ export async function uploadMemoryImage(id: string, asset: PickedImage): Promise
   const timeout = setTimeout(() => ctrl.abort(), API_TIMEOUT_MS * 3); // upload pode demorar mais
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/memories/${id}/image`, {
+    res = await fetch(`${API_URL}/memories/${id}/images`, {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: form,
@@ -166,10 +171,9 @@ export function deleteMemory(id: string): Promise<null> {
   return request("DELETE", `/memories/${id}`, undefined, true);
 }
 
-// Remove a imagem salva de uma memória (limpa o vínculo e apaga o arquivo no
-// backend). Devolve a memória atualizada (image_url = null).
-export function deleteMemoryImage(id: string): Promise<Memory> {
-  return request("DELETE", `/memories/${id}/image`, undefined, true);
+// Remove UMA foto da memória (por id da foto). Devolve a memória atualizada.
+export function deleteMemoryImage(id: string, imageId: string): Promise<Memory> {
+  return request("DELETE", `/memories/${id}/images/${imageId}`, undefined, true);
 }
 
 // --- Jornadas (fases) ---

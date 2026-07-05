@@ -3,8 +3,8 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 import { router, useLocalSearchParams } from "expo-router";
 
 import DateField from "../../components/DateField";
-import ImagePickerField from "../../components/ImagePickerField";
 import LocationPicker from "../../components/LocationPicker";
+import PhotoGallery from "../../components/PhotoGallery";
 import * as api from "../../lib/api";
 import { colors } from "../../theme/colors";
 import { ui } from "../../theme/styles";
@@ -19,9 +19,8 @@ export default function MemoryEditScreen() {
   const [date, setDate] = useState("");
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [placeLabel, setPlaceLabel] = useState("");
-  const [image, setImage] = useState<api.PickedImage | null>(null);
-  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
-  const [removeExisting, setRemoveExisting] = useState(false);
+  const [savedImages, setSavedImages] = useState<api.MemoryImage[]>([]);
+  const [picks, setPicks] = useState<api.PickedImage[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -41,7 +40,7 @@ export default function MemoryEditScreen() {
         setText(m.text);
         setDate(m.occurred_at.slice(0, 10)); // ISO -> AAAA-MM-DD
         setCoords({ latitude: m.latitude, longitude: m.longitude });
-        setExistingImageUrl(m.image_url);
+        setSavedImages(m.images);
         setLoaded(true);
       })
       .catch((e) => {
@@ -64,6 +63,20 @@ export default function MemoryEditScreen() {
   function goBack() {
     if (router.canGoBack()) router.back();
     else router.replace(`/memory/${id}`);
+  }
+
+  async function removeSavedPhoto(imageId: string) {
+    if (!id) return;
+    try {
+      await api.deleteMemoryImage(id, imageId);
+      setSavedImages((cur) => cur.filter((img) => img.id !== imageId));
+    } catch (e) {
+      if (api.isUnauthorized(e)) {
+        router.replace("/");
+        return;
+      }
+      setError(e instanceof api.ApiError ? e.message : "Erro ao remover foto.");
+    }
   }
 
   async function onSave() {
@@ -90,9 +103,8 @@ export default function MemoryEditScreen() {
         longitude: coords.longitude,
         occurred_at: `${date.trim()}T12:00:00Z`,
       });
-      // Foto: nova escolha sobe (substitui); senão, se removeu a salva, apaga.
-      if (image) await api.uploadMemoryImage(id, image);
-      else if (removeExisting) await api.deleteMemoryImage(id);
+      // Novas fotos sobem (remoções de fotos salvas já foram via API na hora).
+      for (const p of picks) await api.addMemoryImage(id, p);
       // Volta ao detalhe, que recarrega no mount e mostra os dados atualizados.
       router.replace(`/memory/${id}`);
     } catch (e) {
@@ -161,15 +173,13 @@ export default function MemoryEditScreen() {
               }}
             />
 
-            <Text style={ui.label}>FOTO (OPCIONAL)</Text>
-            <ImagePickerField
-              value={image}
-              existingUrl={existingImageUrl}
-              onChange={setImage}
-              onRemoveExisting={() => {
-                setExistingImageUrl(null);
-                setRemoveExisting(true);
-              }}
+            <Text style={ui.label}>FOTOS (OPCIONAL, ATÉ 5)</Text>
+            <PhotoGallery
+              saved={savedImages}
+              picks={picks}
+              onAddPicks={(imgs) => setPicks((cur) => [...cur, ...imgs])}
+              onRemovePick={(i) => setPicks((cur) => cur.filter((_, idx) => idx !== i))}
+              onRemoveSaved={removeSavedPhoto}
             />
 
             {error ? (

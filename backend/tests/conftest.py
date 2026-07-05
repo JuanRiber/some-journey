@@ -31,7 +31,7 @@ from sqlalchemy import create_engine, text  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
 
 _engine = create_engine(TEST_DATABASE_URL)
-_TABLES = "journey_memories, journeys, memories, users"
+_TABLES = "journey_memories, memory_images, journeys, memories, users"
 
 
 def _ensure_database() -> None:

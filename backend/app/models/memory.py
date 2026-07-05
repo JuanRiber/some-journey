@@ -67,3 +67,35 @@ class Memory(Base):
     )
     # Exclusão lógica (soft delete). NULL = ativa.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MemoryImage(Base):
+    """Foto de uma memória. Uma memória tem VÁRIAS (o teto é imposto no service).
+    Guarda só o caminho no Storage privado; soft delete via deleted_at. O legado
+    `memories.image_path` continua para compatibilidade, mas fotos novas vivem aqui."""
+
+    __tablename__ = "memory_images"
+
+    __table_args__ = (
+        Index(
+            "ix_memory_images_memory_active",
+            "memory_id",
+            postgresql_where=sql_text("deleted_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    memory_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("memories.id", ondelete="CASCADE"),
+    )
+    image_path: Mapped[str] = mapped_column(Text)
+    position: Mapped[int] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

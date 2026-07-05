@@ -3,8 +3,8 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
 import DateField from "../components/DateField";
-import ImagePickerField from "../components/ImagePickerField";
 import LocationPicker from "../components/LocationPicker";
+import PhotoGallery from "../components/PhotoGallery";
 import * as api from "../lib/api";
 import { colors } from "../theme/colors";
 import { ui } from "../theme/styles";
@@ -22,7 +22,7 @@ export default function MemoryNewScreen() {
   const [date, setDate] = useState(todayISODate());
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [placeLabel, setPlaceLabel] = useState("");
-  const [image, setImage] = useState<api.PickedImage | null>(null);
+  const [picks, setPicks] = useState<api.PickedImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -58,9 +58,11 @@ export default function MemoryNewScreen() {
         const mem = await api.createMemory(payload);
         memId = mem.id;
       }
-      // Foto opcional: sobe após criar a memória (precisa do id). Se o Storage
-      // não estiver configurado, isto retorna 503 e a mensagem é exibida.
-      if (image && memId) await api.uploadMemoryImage(memId, image);
+      // Fotos opcionais: sobem após criar a memória (precisa do id). Sem Storage
+      // configurado, o backend retorna 503 e a mensagem é exibida.
+      if (memId) {
+        for (const p of picks) await api.addMemoryImage(memId, p);
+      }
       router.replace(journeyId ? `/journeys/${journeyId}` : "/timeline");
     } catch (e) {
       if (api.isUnauthorized(e)) {
@@ -130,8 +132,12 @@ export default function MemoryNewScreen() {
           }}
         />
 
-        <Text style={ui.label}>FOTO (OPCIONAL)</Text>
-        <ImagePickerField value={image} onChange={setImage} />
+        <Text style={ui.label}>FOTOS (OPCIONAL, ATÉ 5)</Text>
+        <PhotoGallery
+          picks={picks}
+          onAddPicks={(imgs) => setPicks((cur) => [...cur, ...imgs])}
+          onRemovePick={(i) => setPicks((cur) => cur.filter((_, idx) => idx !== i))}
+        />
 
         {error ? (
           <Text style={{ color: "#A32D2D", fontSize: 13, marginTop: 12, textAlign: "center" }}>

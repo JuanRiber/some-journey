@@ -1,14 +1,13 @@
-"""Testes do upload de imagem (POST /memories/{id}/image).
+"""Testes das fotos da memória (POST /memories/{id}/images e
+DELETE /memories/{id}/images/{image_id}).
 
-Cobrem wiring, validação de tipo/tamanho e ownership sem depender de um bucket
-real. O caminho "storage desabilitado → 503" força as credenciais Supabase a
-None no próprio teste, para não depender do que estiver no .env do dev.
+Cobrem validação de tipo/tamanho, ownership, o teto de fotos e a remoção. O
+caminho "storage desabilitado -> 503" força as credenciais Supabase a None.
 """
 
 import uuid
 
-# 1x1 JPEG-ish header bytes (conteúdo não precisa ser uma imagem válida: o
-# backend não decodifica — valida pelo content-type e repassa ao Storage).
+# 1x1 JPEG-ish header (o backend não decodifica: valida pelo content-type).
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"0" * 64
 
 
@@ -22,97 +21,114 @@ def _memory(client, headers):
     return r.json()["id"]
 
 
-def test_upload_unsupported_type_returns_400(client, auth_headers):
+def _stub_storage(monkeypatch):
+    """Stuba o Storage (sem rede): upload no-op, assinatura fake, delete no-op."""
+    from app.core import storage
+
+    monkeypatch.setattr(storage, "enabled", lambda: True)
+    monkeypatch.setattr(storage, "upload", lambda *a, **k: None)
+    monkeypatch.setattr(storage, "sign_urls", lambda paths, ttl=None: {p: f"https://signed/{p}" for p in paths})
+    monkeypatch.setattr(storage, "delete", lambda *a, **k: None)
+
+
+def _add(client, headers, mid):
+    return client.post(
+        f"/memories/{mid}/images",
+        files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")},
+        headers=headers,
+    )
+
+
+# --- validação (antes de tocar no storage) ---------------------------------
+def test_add_unsupported_type_returns_400(client, auth_headers):
     h = auth_headers()
     mid = _memory(client, h)
-    r = client.post(f"/memories/{mid}/image", files={"file": ("x.txt", b"hello", "text/plain")}, headers=h)
+    r = client.post(f"/memories/{mid}/images", files={"file": ("x.txt", b"hello", "text/plain")}, headers=h)
     assert r.status_code == 400
 
 
-def test_upload_empty_file_returns_400(client, auth_headers):
+def test_add_empty_file_returns_400(client, auth_headers):
     h = auth_headers()
     mid = _memory(client, h)
-    r = client.post(f"/memories/{mid}/image", files={"file": ("x.jpg", b"", "image/jpeg")}, headers=h)
+    r = client.post(f"/memories/{mid}/images", files={"file": ("x.jpg", b"", "image/jpeg")}, headers=h)
     assert r.status_code == 400
 
 
-def test_upload_missing_memory_returns_404(client, auth_headers):
+def test_add_missing_memory_returns_404(client, auth_headers):
     h = auth_headers()
-    r = client.post(f"/memories/{uuid.uuid4()}/image", files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")}, headers=h)
+    r = client.post(f"/memories/{uuid.uuid4()}/images", files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")}, headers=h)
     assert r.status_code == 404
 
 
-def test_upload_other_users_memory_returns_404(client, auth_headers):
+def test_add_other_users_memory_returns_404(client, auth_headers):
     h1 = auth_headers()
     h2 = auth_headers()
     mid = _memory(client, h1)
-    r = client.post(f"/memories/{mid}/image", files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")}, headers=h2)
+    r = client.post(f"/memories/{mid}/images", files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")}, headers=h2)
     assert r.status_code == 404
 
 
-def test_upload_too_large_returns_413(client, auth_headers, monkeypatch):
+def test_add_too_large_returns_413(client, auth_headers, monkeypatch):
     from app.core.config import settings
 
     monkeypatch.setattr(settings, "MAX_IMAGE_BYTES", 16)
     h = auth_headers()
     mid = _memory(client, h)
-    r = client.post(f"/memories/{mid}/image", files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")}, headers=h)
+    r = _add(client, h, mid)
     assert r.status_code == 413
 
 
-def test_upload_valid_type_but_storage_disabled_returns_503(client, auth_headers, monkeypatch):
+def test_add_storage_disabled_returns_503(client, auth_headers, monkeypatch):
     from app.core.config import settings
 
-    # Força o storage desabilitado independentemente do .env do dev: sem
-    # SUPABASE_URL/SERVICE_KEY, storage_enabled=False e o upload responde 503.
     monkeypatch.setattr(settings, "SUPABASE_URL", None)
     monkeypatch.setattr(settings, "SUPABASE_SERVICE_KEY", None)
     h = auth_headers()
     mid = _memory(client, h)
-    r = client.post(f"/memories/{mid}/image", files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")}, headers=h)
+    r = _add(client, h, mid)
     assert r.status_code == 503
 
 
-def _stub_storage(monkeypatch):
-    """Stuba o Storage (sem rede) para exercitar o upload e a remoção felizes."""
-    from app.core import storage
-
-    monkeypatch.setattr(storage, "enabled", lambda: True)
-    monkeypatch.setattr(storage, "upload", lambda *a, **k: None)
-    monkeypatch.setattr(storage, "sign_url", lambda *a, **k: "https://signed.example/x")
-    monkeypatch.setattr(storage, "delete", lambda *a, **k: None)
-
-
-def test_delete_image_clears_a_set_image(client, auth_headers, monkeypatch):
+# --- múltiplas fotos --------------------------------------------------------
+def test_add_up_to_five_then_reject_sixth(client, auth_headers, monkeypatch):
     _stub_storage(monkeypatch)
     h = auth_headers()
     mid = _memory(client, h)
-    up = client.post(f"/memories/{mid}/image", files={"file": ("x.jpg", JPEG_BYTES, "image/jpeg")}, headers=h)
-    assert up.status_code == 200, up.text
-    assert up.json()["image_url"] is not None
-    # remover a foto salva
-    r = client.delete(f"/memories/{mid}/image", headers=h)
-    assert r.status_code == 200, r.text
-    assert r.json()["image_url"] is None
-    # persistiu: o GET não traz mais imagem
-    assert client.get(f"/memories/{mid}", headers=h).json()["image_url"] is None
+    for i in range(5):
+        r = _add(client, h, mid)
+        assert r.status_code == 200, r.text
+        assert len(r.json()["images"]) == i + 1
+    # a sexta estoura o teto -> 409
+    assert _add(client, h, mid).status_code == 409
 
 
-def test_delete_image_is_idempotent_without_image(client, auth_headers):
+def test_remove_one_image(client, auth_headers, monkeypatch):
+    _stub_storage(monkeypatch)
     h = auth_headers()
     mid = _memory(client, h)
-    r = client.delete(f"/memories/{mid}/image", headers=h)
-    assert r.status_code == 200
-    assert r.json()["image_url"] is None
+    _add(client, h, mid)
+    body = _add(client, h, mid).json()
+    assert len(body["images"]) == 2
+    img_id = body["images"][0]["id"]
+    r = client.delete(f"/memories/{mid}/images/{img_id}", headers=h)
+    assert r.status_code == 200, r.text
+    remaining = [i["id"] for i in r.json()["images"]]
+    assert img_id not in remaining
+    assert len(remaining) == 1
 
 
-def test_delete_image_missing_memory_returns_404(client, auth_headers):
+def test_remove_missing_image_returns_404(client, auth_headers):
     h = auth_headers()
-    assert client.delete(f"/memories/{uuid.uuid4()}/image", headers=h).status_code == 404
+    mid = _memory(client, h)
+    r = client.delete(f"/memories/{mid}/images/{uuid.uuid4()}", headers=h)
+    assert r.status_code == 404
 
 
-def test_delete_image_other_users_memory_returns_404(client, auth_headers):
+def test_remove_other_users_image_returns_404(client, auth_headers, monkeypatch):
+    _stub_storage(monkeypatch)
     h1 = auth_headers()
     h2 = auth_headers()
     mid = _memory(client, h1)
-    assert client.delete(f"/memories/{mid}/image", headers=h2).status_code == 404
+    img_id = _add(client, h1, mid).json()["images"][0]["id"]
+    r = client.delete(f"/memories/{mid}/images/{img_id}", headers=h2)
+    assert r.status_code == 404

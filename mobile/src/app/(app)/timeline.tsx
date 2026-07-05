@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 
+import MemoryCover from "../../components/MemoryCover";
 import NotebookTop from "../../components/NotebookTop";
 import * as api from "../../lib/api";
 import { colors, serif } from "../../theme/colors";
@@ -125,7 +126,7 @@ export default function TimelineScreen() {
                 <View style={s.cardWrap}>
                   <Text style={s.date}>{dayMonth(m.occurred_at)}</Text>
                   <View style={s.card}>
-                    <View style={s.thumb} />
+                    <MemoryCover url={m.image_url} size={54} />
                     <View style={{ flex: 1 }}>
                       <Text style={s.cardTitle} numberOfLines={1}>
                         {m.title}

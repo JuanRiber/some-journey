@@ -7,6 +7,8 @@ traduz em status (409/401/403). Assim o service é testável sem FastAPI, e a
 mensagem genérica de credencial inválida nasce aqui (anti-enumeração).
 """
 
+import secrets
+
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,6 +17,12 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.models.user import User
 from app.repositories import user_repository
 from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest
+
+# Hash Argon2 "dummy" calculado UMA vez no import. No login, quando o e-mail não
+# existe, verificamos a senha contra ele: roda o mesmo custo do argon2 e a
+# resposta leva ~o mesmo tempo de uma senha errada — sem oráculo de timing que
+# revele se o e-mail está cadastrado (anti-enumeração).
+_DUMMY_PASSWORD_HASH = hash_password(secrets.token_urlsafe(32))
 
 
 class EmailAlreadyRegisteredError(Exception):
@@ -58,7 +66,12 @@ def login(db: Session, data: LoginRequest) -> LoginResponse:
     que a conta está inativa.
     """
     user = user_repository.get_by_email(db, data.email)
-    if user is None or not verify_password(data.password, user.password_hash):
+    if user is None:
+        # E-mail inexistente: roda argon2 contra o hash dummy para que o tempo de
+        # resposta seja ~igual ao de uma senha errada (não vaza se o e-mail existe).
+        verify_password(data.password, _DUMMY_PASSWORD_HASH)
+        raise InvalidCredentialsError()
+    if not verify_password(data.password, user.password_hash):
         raise InvalidCredentialsError()
     if not user.is_active:
         raise InactiveUserError()

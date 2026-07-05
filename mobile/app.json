@@ -54,7 +54,8 @@
       "reactCompiler": true
     },
     "extra": {
-      "apiUrl": ""
+      "apiUrl": "",
+      "apiTimeoutMs": 20000
     }
   }
 }

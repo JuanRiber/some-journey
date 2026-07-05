@@ -1,0 +1,30 @@
+# Blueprint do Render para o backend (deploy via Docker).
+# Segredos ficam como sync:false — você os define no painel do Render, NÃO aqui.
+services:
+  - type: web
+    name: some-journey-api
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: REGISTRATION_OPEN
+        value: "false"
+      - key: SUPABASE_BUCKET
+        value: memories
+      # --- definir no painel (Environment) ---
+      - key: DATABASE_URL          # Postgres do Supabase (connection string do pooler)
+        sync: false
+      - key: JWT_SECRET_KEY        # gere um forte, novo (não o de dev)
+        sync: false
+      - key: SUPABASE_URL          # https://<ref>.supabase.co
+        sync: false
+      - key: SUPABASE_SERVICE_KEY  # service_role key
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS  # a URL do Cloudflare Pages, ex.: https://some-journey.pages.dev
+        sync: false
+      - key: TRUSTED_HOSTS         # o host do Render, ex.: some-journey-api.onrender.com
+        sync: false

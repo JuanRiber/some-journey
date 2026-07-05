@@ -96,14 +96,25 @@ def upload_memory_image(
     O backend repassa o arquivo ao Storage privado e guarda só o caminho; a
     resposta traz uma image_url assinada de curta duração. Rota síncrona: lê o
     arquivo via file.file (roda em threadpool, sem travar o event loop)."""
-    data = file.file.read()
+    # Lê em blocos e corta assim que passar do limite — nunca materializa um
+    # buffer maior que MAX_IMAGE_BYTES (+1 bloco) na RAM.
+    max_bytes = settings.MAX_IMAGE_BYTES
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = file.file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Image too large.",
+            )
+        chunks.append(chunk)
+    data = b"".join(chunks)
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
-    if len(data) > settings.MAX_IMAGE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Image too large.",
-        )
     try:
         return memory_service.attach_image(
             db,

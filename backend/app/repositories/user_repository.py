@@ -107,3 +107,12 @@ def create(db: Session, *, name: str, email: str, password_hash: str) -> User:
     # refresh recarrega a linha gravada -> popula id, created_at, is_active etc.
     db.refresh(user)
     return user
+
+
+def set_password_hash(db: Session, *, user: User, password_hash: str) -> User:
+    """Atualiza o hash da senha de um usuário já carregado (usado pelo script de
+    reset). Recebe o hash JÁ pronto — quem gera é o service/security."""
+    user.password_hash = password_hash
+    db.commit()
+    db.refresh(user)
+    return user

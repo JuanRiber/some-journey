@@ -9,7 +9,7 @@ importado para que os tipos espaciais sejam resolvíveis nas migrations.
 from logging.config import fileConfig
 
 import geoalchemy2  # noqa: F401 - registra os tipos espaciais p/ as migrations
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 from alembic import context
 
@@ -18,7 +18,9 @@ from app.core.config import settings
 from app.db.base import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# NÃO passamos a URL via config.set_main_option: o configparser do Alembic trata
+# '%' como interpolação e quebra em senhas URL-encoded (ex.: '%40' para '@'). O
+# create_engine recebe a URL direto do settings — como o app faz em db/session.py.
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -39,11 +41,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    connectable = create_engine(settings.DATABASE_URL, poolclass=pool.NullPool)
     with connectable.connect() as connection:
         context.configure(
             connection=connection,

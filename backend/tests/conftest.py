@@ -75,6 +75,17 @@ def _clean_tables(_schema):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limit():
+    """Zera os baldes do rate limiter (in-memory, por processo) a cada teste —
+    o TestClient compartilha o mesmo IP, então o limite por-IP acumularia entre
+    testes sem isso."""
+    from app.core import rate_limit
+
+    rate_limit._buckets.clear()
+    yield
+
+
 @pytest.fixture()
 def client(_schema) -> TestClient:
     from app.main import app

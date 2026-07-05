@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     # add an infrastructure-level limiter shared by all workers.
     AUTH_RATE_LIMIT_ATTEMPTS: int = Field(default=8, gt=0, le=100)
     AUTH_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=300, ge=30, le=3600)
+    # Teto por IP (independe do email) na mesma janela — trava password spraying
+    # (uma senha testada contra muitos e-mails do mesmo IP). Maior que o por-conta.
+    AUTH_RATE_LIMIT_IP_ATTEMPTS: int = Field(default=40, gt=0, le=1000)
+
+    # Cadastro público. Se não definido, herda do ambiente: aberto em dev/test e
+    # FECHADO em produção (as contas dos testers vêm do seed). Force com
+    # REGISTRATION_OPEN=true/false para sobrepor.
+    REGISTRATION_OPEN: bool | None = None
 
     # Storage de imagens (Supabase). OPCIONAL: sem SUPABASE_URL +
     # SUPABASE_SERVICE_KEY o upload fica desabilitado (o endpoint responde 503) e
@@ -34,6 +42,10 @@ class Settings(BaseSettings):
     # Validade da URL assinada (s) e teto do upload (bytes).
     IMAGE_SIGNED_URL_TTL: int = Field(default=3600, ge=60, le=604800)
     MAX_IMAGE_BYTES: int = Field(default=5 * 1024 * 1024, gt=0, le=52428800)
+    # Teto do corpo de requests JSON/comuns. O middleware de limite rejeita
+    # (413) antes de o corpo ser bufferizado. Uploads de imagem usam um teto
+    # próprio derivado de MAX_IMAGE_BYTES (ver app/main.py).
+    MAX_JSON_BODY_BYTES: int = Field(default=1 * 1024 * 1024, gt=0, le=52428800)
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -57,6 +69,19 @@ class Settings(BaseSettings):
     def storage_enabled(self) -> bool:
         """True só quando o Supabase Storage está configurado."""
         return bool(self.SUPABASE_URL and self.SUPABASE_SERVICE_KEY)
+
+    @property
+    def is_production(self) -> bool:
+        """True em produção — usado para desabilitar docs/openapi, etc."""
+        return self.APP_ENV == "production"
+
+    @property
+    def registration_open(self) -> bool:
+        """Cadastro liberado? Explícito via REGISTRATION_OPEN; senão, fechado em
+        produção e aberto fora dela."""
+        if self.REGISTRATION_OPEN is not None:
+            return self.REGISTRATION_OPEN
+        return not self.is_production
 
 
 settings = Settings()

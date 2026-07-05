@@ -1,0 +1,11 @@
+# Não copiar para a imagem: ambiente local, caches, segredos e testes.
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.env
+*.env
+tests/

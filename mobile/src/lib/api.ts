@@ -75,6 +75,16 @@ export function me() {
   return request("GET", "/auth/me", undefined, true);
 }
 
+// Troca de senha do usuário logado (confere a atual no backend). 204 sem corpo.
+export function changePassword(currentPassword: string, newPassword: string): Promise<null> {
+  return request(
+    "POST",
+    "/auth/change-password",
+    { current_password: currentPassword, new_password: newPassword },
+    true,
+  );
+}
+
 export type MemoryInput = {
   title: string;
   text: string;
@@ -184,6 +194,9 @@ export type Journey = {
   id: string;
   title: string;
   description: string | null;
+  mood: string | null;
+  is_private: boolean;
+  cover_image_url: string | null;
   status: JourneyStatus;
   started_at: string | null;
   ended_at: string | null;
@@ -212,7 +225,10 @@ export type JourneyDetail = Journey & {
 export type JourneyCreateInput = {
   title: string;
   description?: string | null;
+  mood?: string | null;
+  is_private?: boolean;
   started_at?: string | null;
+  ended_at?: string | null;
 };
 
 export async function listJourneys(): Promise<Journey[]> {
@@ -230,10 +246,23 @@ export function createJourney(input: JourneyCreateInput): Promise<Journey> {
 
 // Edita os metadados da jornada (título/descrição). Só os campos enviados mudam;
 // não mexe no ciclo de vida (que tem endpoints próprios de start/pause/etc.).
-export type JourneyUpdateInput = { title?: string; description?: string };
+export type JourneyUpdateInput = {
+  title?: string;
+  description?: string;
+  mood?: string | null;
+  is_private?: boolean;
+  started_at?: string | null;
+  ended_at?: string | null;
+};
 
 export function updateJourney(id: string, patch: JourneyUpdateInput): Promise<Journey> {
   return request("PATCH", `/journeys/${id}`, patch, true);
+}
+
+// Memórias da jornada em ordem cronológica (timeline própria da jornada).
+export async function listJourneyMemories(id: string): Promise<Memory[]> {
+  const data = await request("GET", `/journeys/${id}/memories`, undefined, true);
+  return Array.isArray(data) ? data : [];
 }
 
 export function startJourney(id: string): Promise<Journey> {

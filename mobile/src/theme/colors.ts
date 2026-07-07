@@ -16,6 +16,10 @@ export const colors = {
   placeholder: "#9C947F",
   line: "rgba(35,39,47,0.12)",
   danger: "#A32D2D",
+  // Faixa de "capa" de jornada quando não há imagem: areia de mapa desbotado.
+  cover: "#E3D5B4",
+  // Fundo dos chips (atmosfera, período): tinta quente muito leve.
+  chip: "rgba(206,90,44,0.10)",
 };
 
 // Serifa editorial (old money). Georgia no web/iOS; "serif" no Android.

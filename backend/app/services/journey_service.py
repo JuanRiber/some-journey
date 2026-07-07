@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from app.models.journey import Journey
 from app.models.memory import Memory
 from app.repositories import journey_repository, memory_repository
+from app.schemas.memory import MemoryRead
+from app.services import memory_service
 from app.schemas.journey import (
     JourneyCreate,
     JourneyDetailRead,
@@ -77,6 +79,11 @@ def _journey_to_read(journey: Journey, points_count: int) -> JourneyRead:
         id=journey.id,
         title=journey.title,
         description=journey.description,
+        mood=journey.mood,
+        is_private=journey.is_private,
+        # Capa de jornada ainda não tem upload próprio; expomos o contrato como
+        # None para o cliente já poder tratar (placeholder editorial).
+        cover_image_url=None,
         status=journey.status,  # type: ignore[arg-type]
         started_at=journey.started_at,
         ended_at=journey.ended_at,
@@ -124,9 +131,27 @@ def create(db: Session, *, user_id: uuid.UUID, data: JourneyCreate) -> JourneyRe
         user_id=user_id,
         title=data.title,
         description=data.description,
+        mood=data.mood,
+        is_private=data.is_private,
         started_at=data.started_at,
+        ended_at=data.ended_at,
     )
     return _journey_to_read(journey, 0)
+
+
+def list_memories(
+    db: Session, *, user_id: uuid.UUID, journey_id: uuid.UUID
+) -> list[MemoryRead]:
+    """Memórias da jornada em ordem CRONOLÓGICA (por occurred_at) — a timeline
+    da jornada. 404 se a jornada não é do usuário. Reaproveita o builder de
+    memórias (assina as fotos em lote), então cada item já traz image_url."""
+    journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
+    if journey is None:
+        raise JourneyNotFoundError()
+    memories = journey_repository.list_memories_chronological(
+        db, journey_id=journey.id, user_id=user_id
+    )
+    return memory_service.reads_for(db, memories)
 
 
 def update(

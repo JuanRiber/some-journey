@@ -16,6 +16,7 @@ from app.schemas.journey import (
     JourneyReorder,
     JourneyUpdate,
 )
+from app.schemas.memory import MemoryRead
 from app.services import journey_service
 from app.services.journey_service import (
     ActiveJourneyExistsError,
@@ -168,6 +169,22 @@ def add_memory_to_journey(
         raise _conflict("Memory already belongs to a journey. Unlink it first.")
     except JourneyClosedError:
         raise _conflict("Cannot add points to a finished journey.")
+
+
+@router.get("/{journey_id}/memories", response_model=list[MemoryRead])
+def list_journey_memories(
+    journey_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[MemoryRead]:
+    """Memórias da jornada em ordem cronológica (timeline da jornada). 404 se a
+    jornada não é do usuário."""
+    try:
+        return journey_service.list_memories(
+            db, user_id=current_user.id, journey_id=journey_id
+        )
+    except JourneyNotFoundError:
+        raise _not_found
 
 
 @router.post("/{journey_id}/memories", response_model=JourneyDetailRead, status_code=status.HTTP_201_CREATED)

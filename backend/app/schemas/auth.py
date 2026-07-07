@@ -17,8 +17,29 @@ classe (no startup), não por requisição.
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, EmailStr, Field
+
+
+def _normalize_email(value: object) -> object:
+    """Canoniza o e-mail ANTES da validação de formato: remove espaços nas
+    pontas e passa para minúsculo — exatamente o `raw.strip().lower()` que os
+    scripts (seed_users/reset_password) já aplicam. Assim register, login e seed
+    convergem para a MESMA forma canônica: não nasce conta duplicada por case
+    (`A@x.com` vs `a@x.com`) e o login não falha só porque a pessoa digitou o
+    e-mail com maiúsculas diferentes de como foi cadastrado.
+
+    Roda como BeforeValidator (antes do EmailStr), então também salva e-mails com
+    espaço acidental nas pontas, que o EmailStr sozinho rejeitaria. Valores não
+    string passam intactos para o EmailStr levantar o erro de tipo adequado.
+    """
+    return value.strip().lower() if isinstance(value, str) else value
+
+
+# E-mail já normalizado (strip + lowercase) e com formato validado pelo EmailStr.
+# Usado só na ENTRADA (register/login); as saídas leem o valor já canônico do banco.
+NormalizedEmail = Annotated[EmailStr, BeforeValidator(_normalize_email)]
 
 
 # --- POST /auth/register ---------------------------------------------------
@@ -35,8 +56,8 @@ class RegisterRequest(BaseModel):
 
     # name obrigatório; a tabela limita a 120 chars (String(120)).
     name: str = Field(min_length=1, max_length=120)
-    # email obrigatório e VÁLIDO (EmailStr).
-    email: EmailStr
+    # email obrigatório, VÁLIDO e NORMALIZADO (strip + lowercase) na entrada.
+    email: NormalizedEmail
     # password obrigatório, no mínimo 10 caracteres. Só entrada, nunca sai.
     password: str = Field(min_length=10, max_length=128)
 
@@ -63,7 +84,9 @@ class LoginRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    email: EmailStr
+    # Mesma normalização do cadastro: o login precisa achar a conta pela forma
+    # canônica, senão um e-mail com case diferente não casaria com o gravado.
+    email: NormalizedEmail
     password: str = Field(max_length=128)
 
 

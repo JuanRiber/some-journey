@@ -15,12 +15,18 @@ def create_journey(
     title: str,
     description: str | None,
     started_at: datetime | None,
+    ended_at: datetime | None = None,
+    mood: str | None = None,
+    is_private: bool = True,
 ) -> Journey:
     journey = Journey(
         user_id=user_id,
         title=title,
         description=description,
         started_at=started_at,
+        ended_at=ended_at,
+        mood=mood,
+        is_private=is_private,
     )
     db.add(journey)
     db.commit()
@@ -34,13 +40,25 @@ def update_journey(
     journey: Journey,
     title: str | None = None,
     description: str | None = None,
+    mood: str | None = None,
+    is_private: bool | None = None,
+    started_at: datetime | None = None,
+    ended_at: datetime | None = None,
 ) -> Journey:
     """Atualização parcial dos metadados de uma jornada já carregada (e do dono).
-    Só altera os campos passados; não mexe no ciclo de vida (status/datas)."""
+    Só altera os campos passados; o status continua a cargo das transições."""
     if title is not None:
         journey.title = title
     if description is not None:
         journey.description = description
+    if mood is not None:
+        journey.mood = mood
+    if is_private is not None:
+        journey.is_private = is_private
+    if started_at is not None:
+        journey.started_at = started_at
+    if ended_at is not None:
+        journey.ended_at = ended_at
     db.commit()
     db.refresh(journey)
     return journey
@@ -211,6 +229,27 @@ def list_points(
         .order_by(JourneyMemory.position.asc())
     )
     return list(rows)
+
+
+def list_memories_chronological(
+    db: Session, *, journey_id: uuid.UUID, user_id: uuid.UUID
+) -> list[Memory]:
+    """Memórias ativas da jornada (do dono), ordenadas por data do acontecimento
+    (occurred_at asc) — a leitura cronológica da timeline da jornada, diferente da
+    ordem do rastro (position)."""
+    return list(
+        db.scalars(
+            select(Memory)
+            .join(JourneyMemory, JourneyMemory.memory_id == Memory.id)
+            .where(
+                JourneyMemory.journey_id == journey_id,
+                JourneyMemory.deleted_at.is_(None),
+                Memory.user_id == user_id,
+                Memory.deleted_at.is_(None),
+            )
+            .order_by(Memory.occurred_at.asc())
+        )
+    )
 
 
 def reorder(

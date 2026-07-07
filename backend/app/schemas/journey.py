@@ -13,24 +13,40 @@ class JourneyCreate(BaseModel):
 
     title: str = Field(min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=5000)
+    # Atmosfera livre (ex.: "noturno, nostálgico"). Opcional.
+    mood: str | None = Field(default=None, max_length=120)
+    # Nasce privada por padrão (compartilhamento é V3).
+    is_private: bool = True
+    # Período descritivo da jornada. Opcional; o ciclo de vida (start/finish)
+    # também preenche started_at/ended_at por conta própria.
     started_at: datetime | None = None
+    ended_at: datetime | None = None
 
 
 class JourneyUpdate(BaseModel):
-    """Entrada do PATCH /journeys/{id}: edita os METADADOS (título/descrição).
-    O ciclo de vida (status/datas) tem endpoints próprios. Tudo opcional
-    (atualização parcial); só os campos enviados são alterados."""
+    """Entrada do PATCH /journeys/{id}: edita os METADADOS (título, descrição,
+    atmosfera, privacidade e período). As transições de status têm endpoints
+    próprios (start/pause/resume/finish). Tudo opcional (atualização parcial);
+    só os campos enviados são alterados."""
 
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=5000)
+    mood: str | None = Field(default=None, max_length=120)
+    is_private: bool | None = None
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
 
 
 class JourneyRead(BaseModel):
     id: uuid.UUID
     title: str
     description: str | None
+    mood: str | None
+    is_private: bool
+    # URL assinada da capa (por ora sempre None: upload de capa é evolução).
+    cover_image_url: str | None
     status: JourneyStatus
     started_at: datetime | None
     ended_at: datetime | None

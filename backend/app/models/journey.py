@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, Uuid, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, Uuid, func
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,6 +40,10 @@ class Journey(Base):
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), server_default=sql_text("'draft'"))
     cover_image_path: Mapped[str | None] = mapped_column(Text)
+    # Atmosfera/humor livre da jornada (ex.: "noturno, nostálgico, urbano").
+    mood: Mapped[str | None] = mapped_column(Text)
+    # Privacidade: nasce privada. Reservado para compartilhamento futuro (V3).
+    is_private: Mapped[bool] = mapped_column(Boolean, server_default=sql_text("true"))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(

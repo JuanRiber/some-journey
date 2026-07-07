@@ -27,6 +27,8 @@ export default function JourneyDetailScreen() {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
+  const [editMood, setEditMood] = useState("");
+  const [editPrivate, setEditPrivate] = useState(true);
 
   const [showAdd, setShowAdd] = useState(false);
   const [loose, setLoose] = useState<api.MapPoint[] | null>(null);
@@ -89,6 +91,8 @@ export default function JourneyDetailScreen() {
     if (!journey) return;
     setEditTitle(journey.title);
     setEditDesc(journey.description ?? "");
+    setEditMood(journey.mood ?? "");
+    setEditPrivate(journey.is_private);
     setError("");
     setEditing(true);
   }
@@ -101,7 +105,13 @@ export default function JourneyDetailScreen() {
     }
     run(
       "edit",
-      () => api.updateJourney(journey.id, { title: editTitle.trim(), description: editDesc.trim() }),
+      () =>
+        api.updateJourney(journey.id, {
+          title: editTitle.trim(),
+          description: editDesc.trim(),
+          mood: editMood.trim() || null,
+          is_private: editPrivate,
+        }),
       () => {
         setEditing(false);
         load();
@@ -198,6 +208,29 @@ export default function JourneyDetailScreen() {
               placeholderTextColor={colors.placeholder}
               multiline
             />
+            <Text style={s.sectionLabel}>ATMOSFERA (OPCIONAL)</Text>
+            <TextInput
+              style={s.editInput}
+              value={editMood}
+              onChangeText={setEditMood}
+              placeholder="Ex.: noturno, nostálgico"
+              placeholderTextColor={colors.placeholder}
+            />
+            <Text style={s.sectionLabel}>PRIVACIDADE</Text>
+            <Pressable
+              style={s.toggleRow}
+              onPress={() => setEditPrivate((v) => !v)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: editPrivate }}
+              accessibilityLabel="Alternar privacidade"
+            >
+              <View style={[s.track, editPrivate && s.trackOn]}>
+                <View style={[s.knob, editPrivate && s.knobOn]} />
+              </View>
+              <Text style={s.toggleText}>
+                {editPrivate ? "Só você vê esta jornada" : "Pode ser compartilhada"}
+              </Text>
+            </Pressable>
             {error ? <Text style={s.inlineError}>{error}</Text> : null}
             <View style={s.editActions}>
               <Pressable style={[s.primary, busy && s.disabled]} disabled={busy} onPress={saveEdit} accessibilityRole="button" accessibilityLabel="Salvar título e descrição">
@@ -217,13 +250,15 @@ export default function JourneyDetailScreen() {
               </View>
             </View>
             {journey.description ? <Text style={s.desc}>{journey.description}</Text> : null}
+            {journey.mood ? <Text style={s.mood}>{journey.mood}</Text> : null}
             <Text style={s.meta}>
-              {journey.points_count} {journey.points_count === 1 ? "ponto" : "pontos"}
-              {journey.started_at ? ` • início ${formatDate(journey.started_at)}` : ""}
-              {journey.ended_at ? ` • fim ${formatDate(journey.ended_at)}` : ""}
+              {journey.points_count} {journey.points_count === 1 ? "memória" : "memórias"}
+              {journey.started_at ? ` · início ${formatDate(journey.started_at)}` : ""}
+              {journey.ended_at ? ` · fim ${formatDate(journey.ended_at)}` : ""}
+              {!journey.is_private ? " · pública" : ""}
             </Text>
-            <Pressable onPress={openEdit} hitSlop={6} accessibilityRole="button" accessibilityLabel="Editar título e descrição">
-              <Text style={s.editLink}>Editar título/descrição</Text>
+            <Pressable onPress={openEdit} hitSlop={6} accessibilityRole="button" accessibilityLabel="Editar jornada">
+              <Text style={s.editLink}>Editar jornada</Text>
             </Pressable>
           </>
         )}
@@ -261,9 +296,12 @@ export default function JourneyDetailScreen() {
         {error && !editing ? <Text style={s.inlineError}>{error}</Text> : null}
 
         {/* Pontos ordenados */}
-        <Text style={s.sectionLabel}>PONTOS (NA ORDEM DO RASTRO)</Text>
+        <Text style={s.sectionLabel}>MEMÓRIAS (NA ORDEM DO RASTRO)</Text>
         {journey.points.length === 0 ? (
-          <Text style={s.emptyPoints}>Nenhum ponto ainda. Adicione memórias para formar o rastro.</Text>
+          <Text style={s.emptyPoints}>
+            Esta jornada ainda está vazia. Adicione uma memória nova ou traga uma memória que
+            você já registrou para começar a construir este mapa.
+          </Text>
         ) : (
           <View style={{ gap: 10 }}>
             {journey.points.map((p, i) => (
@@ -309,17 +347,17 @@ export default function JourneyDetailScreen() {
             </Pressable>
 
             {!showAdd ? (
-              <Pressable style={s.linkExisting} onPress={openAdd} accessibilityRole="button" accessibilityLabel="Vincular ponto existente">
-                <Text style={s.linkExistingText}>Vincular um ponto solto existente</Text>
+              <Pressable style={s.linkExisting} onPress={openAdd} accessibilityRole="button" accessibilityLabel="Trazer memória existente">
+                <Text style={s.linkExistingText}>Trazer uma memória que já existe</Text>
               </Pressable>
             ) : (
               <View style={s.addBox}>
-                <Text style={s.sectionLabel}>PONTOS SOLTOS</Text>
+                <Text style={s.sectionLabel}>MEMÓRIAS SOLTAS</Text>
                 {addError ? <Text style={s.inlineError}>{addError}</Text> : null}
                 {loose === null ? (
                   <ActivityIndicator color={colors.terra} style={{ marginVertical: 16 }} />
                 ) : loose.length === 0 ? (
-                  <Text style={s.emptyPoints}>Nenhum ponto solto para vincular.</Text>
+                  <Text style={s.emptyPoints}>Nenhuma memória solta para trazer.</Text>
                 ) : (
                   <View style={{ gap: 8 }}>
                     {loose.map((m) => (
@@ -426,4 +464,11 @@ const s = StyleSheet.create({
   },
   editActions: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 8 },
   editLink: { color: colors.teal, fontSize: 13, fontWeight: "600", marginTop: 10 },
+  mood: { fontFamily: serif, fontStyle: "italic", color: colors.inkSoft, fontSize: 14.5, marginTop: 6 },
+  toggleRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 2, marginBottom: 4 },
+  track: { width: 46, height: 27, borderRadius: 14, backgroundColor: "rgba(35,39,47,0.18)", padding: 3, justifyContent: "center" },
+  trackOn: { backgroundColor: colors.sage },
+  knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.card },
+  knobOn: { alignSelf: "flex-end" },
+  toggleText: { color: colors.inkSoft, fontSize: 14, flex: 1 },
 });

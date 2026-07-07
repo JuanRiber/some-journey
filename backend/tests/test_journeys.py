@@ -191,6 +191,60 @@ def test_single_point_route_is_null(client, auth_headers):
     assert r.json()["route"] is None
 
 
+def test_create_with_mood_and_privacy(client, auth_headers):
+    h = auth_headers()
+    r = client.post(
+        "/journeys",
+        json={"title": "Fortaleza Nights", "mood": "noturno, urbano", "is_private": True},
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["mood"] == "noturno, urbano"
+    assert body["is_private"] is True
+    assert body["cover_image_url"] is None
+    # Sem flags: nasce privada e sem atmosfera.
+    plain = client.post("/journeys", json={"title": "Sem flags"}, headers=h).json()
+    assert plain["is_private"] is True
+    assert plain["mood"] is None
+
+
+def test_update_mood_and_privacy(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h)
+    r = client.patch(
+        f"/journeys/{jid}", json={"mood": "nostálgico", "is_private": False}, headers=h
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["mood"] == "nostálgico"
+    assert r.json()["is_private"] is False
+    got = client.get(f"/journeys/{jid}", headers=h).json()
+    assert got["mood"] == "nostálgico"
+    assert got["is_private"] is False
+
+
+def test_journey_memories_are_chronological(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h)
+    client.post(f"/journeys/{jid}/start", headers=h)
+    # Insere fora de ordem de data (i controla o dia): 05, 01, 03 de julho.
+    _add_point(client, h, jid, 4, 1.0, 1.0)
+    _add_point(client, h, jid, 0, 2.0, 2.0)
+    _add_point(client, h, jid, 2, 3.0, 3.0)
+    r = client.get(f"/journeys/{jid}/memories", headers=h)
+    assert r.status_code == 200, r.text
+    dates = [m["occurred_at"] for m in r.json()]
+    assert len(dates) == 3
+    assert dates == sorted(dates)  # cronológico asc, não a ordem de inserção
+
+
+def test_journey_memories_other_user_returns_404(client, auth_headers):
+    h1 = auth_headers()
+    h2 = auth_headers()
+    jid = _journey(client, h1)
+    assert client.get(f"/journeys/{jid}/memories", headers=h2).status_code == 404
+
+
 def test_deleting_journey_frees_and_keeps_its_memories(client, auth_headers):
     # Regressão: excluir a jornada precisa soft-deletar os vínculos junto. Sem
     # isso a memória fica presa — não entra em outra jornada (409) e some dos

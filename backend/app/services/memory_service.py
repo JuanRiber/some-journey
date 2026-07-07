@@ -91,17 +91,22 @@ def create(db: Session, *, user_id: uuid.UUID, data: MemoryCreate) -> MemoryRead
     return _to_read(memory, [], {})  # nasce sem fotos
 
 
-def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[MemoryRead]:
-    memories = memory_repository.list_by_user(db, user_id=user_id)
+def reads_for(db: Session, memories: list[Memory]) -> list[MemoryRead]:
+    """Monta os DTOs de VÁRIAS memórias já carregadas, assinando as fotos em UMA
+    chamada ao Storage (evita N round-trips). Preserva a ordem recebida — quem
+    consulta decide a ordenação (recentes primeiro, cronológica na jornada, ...)."""
     images = memory_repository.list_images_for(
         db, memory_ids=[m.id for m in memories]
     )
-    # Assina TODAS as fotos em UMA chamada (evita N round-trips ao Storage).
     signed = storage.sign_urls([img.image_path for img in images])
     by_memory: dict[uuid.UUID, list[MemoryImage]] = {}
     for img in images:
         by_memory.setdefault(img.memory_id, []).append(img)
     return [_to_read(m, by_memory.get(m.id, []), signed) for m in memories]
+
+
+def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[MemoryRead]:
+    return reads_for(db, memory_repository.list_by_user(db, user_id=user_id))
 
 
 def get(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> MemoryRead:

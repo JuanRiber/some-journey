@@ -80,3 +80,15 @@ def login(db: Session, data: LoginRequest) -> LoginResponse:
         access_token=access_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
+
+
+def change_password(
+    db: Session, *, user: User, current_password: str, new_password: str
+) -> None:
+    """Troca a senha do usuário logado: confere a atual e grava a nova (hash).
+    Levanta InvalidCredentialsError se a senha atual estiver errada."""
+    if not verify_password(current_password, user.password_hash):
+        raise InvalidCredentialsError()
+    user_repository.set_password_hash(
+        db, user=user, password_hash=hash_password(new_password)
+    )

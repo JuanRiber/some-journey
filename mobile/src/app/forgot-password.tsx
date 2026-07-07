@@ -1,47 +1,34 @@
-import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 
 import JourneyHeader from "../components/JourneyHeader";
 import { colors } from "../theme/colors";
 import { ui } from "../theme/styles";
 
+// Recuperação por e-mail ainda não existe (pós-MVP). Tela honesta: em vez de um
+// botão que não faz nada, explica os caminhos reais de hoje.
 export default function ForgotPasswordScreen() {
-  const [email, setEmail] = useState("");
-
   return (
     <View style={ui.screen}>
       <JourneyHeader />
 
       <View style={ui.body}>
         <Text style={ui.title}>Recuperar senha</Text>
-        <Text style={ui.subtitle}>
-          Informe seu e-mail e enviaremos um link para você voltar à sua jornada.
+        <Text style={ui.subtitle}>A recuperação por e-mail ainda não está disponível.</Text>
+
+        <Text style={{ color: colors.inkSoft, fontSize: 14, lineHeight: 22, marginTop: 18 }}>
+          Se você já está logado, troque a senha em “Alterar senha”, no seu Atlas.
+          {"\n\n"}
+          Se esqueceu e não consegue entrar, peça ao desenvolvedor para redefinir a sua senha.
         </Text>
 
-        <Text style={ui.label}>E-MAIL</Text>
-        <TextInput
-          style={ui.input}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="voce@email.com"
-          placeholderTextColor={colors.placeholder}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-        />
-
         <Pressable
-          style={({ pressed }) => [ui.button, pressed && ui.buttonPressed]}
-          onPress={() => {
-            // Recuperação de senha é pós-MVP (envio de e-mail + token).
-          }}
+          style={({ pressed }) => [ui.button, pressed && ui.buttonPressed, { marginTop: 28 }]}
+          onPress={() => router.push("/")}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar ao login"
         >
-          <Text style={ui.buttonText}>Enviar link de recuperação</Text>
-        </Pressable>
-
-        <Pressable style={ui.backWrap} onPress={() => router.push("/")}>
-          <Text style={ui.back}>← Voltar ao login</Text>
+          <Text style={ui.buttonText}>Voltar ao login</Text>
         </Pressable>
       </View>
     </View>

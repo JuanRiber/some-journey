@@ -100,6 +100,20 @@ class LoginResponse(BaseModel):
     expires_in: int
 
 
+# --- POST /auth/change-password --------------------------------------------
+
+
+class ChangePasswordRequest(BaseModel):
+    """Troca de senha do usuário LOGADO: confere a senha atual e grava a nova.
+    A nova segue a mesma regra do cadastro (min 10). `current_password` não tem
+    min_length (só confere a credencial existente)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(max_length=128)
+    new_password: str = Field(min_length=10, max_length=128)
+
+
 # --- GET /auth/me ----------------------------------------------------------
 
 

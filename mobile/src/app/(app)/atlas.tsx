@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, type Href } from "expo-router";
 
 import AtlasMap from "../../components/AtlasMap";
 import JourneyHeader from "../../components/JourneyHeader";
@@ -57,9 +57,14 @@ export default function AtlasScreen() {
               {count} {count === 1 ? "memória registrada" : "memórias registradas"}
             </Text>
           </View>
-          <Pressable onPress={onLogout} hitSlop={8} accessibilityRole="button" accessibilityLabel="Sair da conta">
-            <Text style={s.sair}>Sair</Text>
-          </Pressable>
+          <View style={{ alignItems: "flex-end", gap: 8 }}>
+            <Pressable onPress={() => router.push("/change-password" as unknown as Href)} hitSlop={8} accessibilityRole="button" accessibilityLabel="Alterar senha">
+              <Text style={s.sair}>Alterar senha</Text>
+            </Pressable>
+            <Pressable onPress={onLogout} hitSlop={8} accessibilityRole="button" accessibilityLabel="Sair da conta">
+              <Text style={s.sair}>Sair</Text>
+            </Pressable>
+          </View>
         </View>
 
         <Pressable

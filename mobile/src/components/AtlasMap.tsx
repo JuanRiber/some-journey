@@ -8,6 +8,9 @@ import { colors } from "../theme/colors";
 type Props = {
   data: MapResponse | null;
   onSelect: (memoryId: string) => void;
+  // Percursos reais (GPS): cada item é uma LineString em [lng, lat]. Desenhados
+  // com um traço distinto (mais escuro/grosso) do rastro simbólico.
+  tracks?: number[][][];
 };
 
 // Mapa principal do Atlas (nativo): o MESMO mapa Leaflet/OSM do web, só que
@@ -32,7 +35,7 @@ const HTML = `<!DOCTYPE html>
 <div id="map"></div>
 <script>
   var map, layer;
-  var TERRA = '${colors.terra}', TEAL = '${colors.teal}', BORDER = '${colors.card}';
+  var TERRA = '${colors.terra}', TEAL = '${colors.teal}', BORDER = '${colors.card}', TRACK = '${colors.terraDeep}';
 
   function post(o) {
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(o));
@@ -64,6 +67,14 @@ const HTML = `<!DOCTYPE html>
       (j.points || []).forEach(function (p) { addPin(p.latitude, p.longitude, p.title, p.memory_id, TERRA, all); });
     });
     (data.loose_points || []).forEach(function (m) { addPin(m.latitude, m.longitude, m.title, m.memory_id, TEAL, all); });
+    // Percursos reais (GPS): traço mais escuro e grosso que o rastro simbólico.
+    (data.tracks || []).forEach(function (coords) {
+      if (coords && coords.length >= 2) {
+        var tline = coords.map(function (c) { return [c[1], c[0]]; });
+        L.polyline(tline, { color: TRACK, weight: 4, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }).addTo(layer);
+        tline.forEach(function (pt) { all.push(pt); });
+      }
+    });
     if (all.length === 1) map.setView(all[0], 13);
     else if (all.length > 1) map.fitBounds(all, { padding: [40, 40] });
   };
@@ -81,7 +92,7 @@ const HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-export default function AtlasMap({ data, onSelect }: Props) {
+export default function AtlasMap({ data, onSelect, tracks }: Props) {
   const webRef = useRef<WebView>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -90,8 +101,8 @@ export default function AtlasMap({ data, onSelect }: Props) {
   const [mapError, setMapError] = useState(false);
 
   const json = useMemo(
-    () => JSON.stringify(data ?? { loose_points: [], journeys: [] }),
-    [data],
+    () => JSON.stringify({ ...(data ?? { loose_points: [], journeys: [] }), tracks: tracks ?? [] }),
+    [data, tracks],
   );
 
   // Injeta os dados quando o mapa está pronto e sempre que os dados mudam.

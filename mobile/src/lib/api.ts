@@ -304,6 +304,96 @@ export function deleteJourney(id: string): Promise<null> {
   return request("DELETE", `/journeys/${id}`, undefined, true);
 }
 
+// --- Percurso real (GPS) da jornada ---
+
+// Um trecho de percurso (uma sessão de gravação GPS).
+export type Track = {
+  id: string;
+  journey_id: string;
+  source: string;
+  started_at: string;
+  ended_at: string | null;
+  is_active: boolean;
+  point_count: number;
+  distance_m: number;
+  created_at: string;
+};
+
+// Um ponto GPS enviado ao backend (lote). recorded_at = ISO do momento capturado.
+export type TrackPointInput = {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  altitude?: number | null;
+  speed?: number | null;
+  heading?: number | null;
+  recorded_at: string;
+};
+
+// GeoJSON do mapa da jornada (percurso real + memórias + rastro simbólico).
+export type GeoLineString = { type: "LineString"; coordinates: number[][] };
+export type GeoPoint = { type: "Point"; coordinates: number[] };
+export type TrackFeature = {
+  type: "Feature";
+  properties: {
+    track_id: string;
+    source: string;
+    started_at: string;
+    ended_at: string | null;
+    point_count: number;
+    distance_m: number;
+  };
+  geometry: GeoLineString;
+};
+export type JourneyMemoryFeature = {
+  type: "Feature";
+  properties: { memory_id: string; title: string; image_url: string | null; memory_date: string };
+  geometry: GeoPoint;
+};
+export type JourneyMapResponse = {
+  journey: { id: string; title: string };
+  tracks: { type: "FeatureCollection"; features: TrackFeature[] };
+  memories: { type: "FeatureCollection"; features: JourneyMemoryFeature[] };
+  symbolic_route: JourneyRoute | null;
+  distance_m: number;
+};
+
+export type TrackSource = "gps_live" | "manual" | "imported";
+
+// Abre um trecho de gravação (409 se já houver um aberto na jornada).
+export function startTrack(journeyId: string, source: TrackSource = "gps_live"): Promise<Track> {
+  return request("POST", `/journeys/${journeyId}/tracks/start`, { source }, true);
+}
+
+// Envia pontos GPS em lote ao trecho aberto. Devolve o trecho atualizado.
+export function addTrackPoints(
+  journeyId: string,
+  trackId: string,
+  points: TrackPointInput[],
+): Promise<Track> {
+  return request("POST", `/journeys/${journeyId}/tracks/${trackId}/points`, { points }, true);
+}
+
+// Finaliza o trecho aberto (idempotente).
+export function finishTrack(journeyId: string, trackId: string): Promise<Track> {
+  return request("POST", `/journeys/${journeyId}/tracks/${trackId}/finish`, undefined, true);
+}
+
+export async function listTracks(journeyId: string): Promise<Track[]> {
+  const data = await request("GET", `/journeys/${journeyId}/tracks`, undefined, true);
+  return Array.isArray(data) ? data : [];
+}
+
+// Remove o percurso (não apaga as memórias). 204 sem corpo.
+export function deleteTrack(journeyId: string, trackId: string): Promise<null> {
+  return request("DELETE", `/journeys/${journeyId}/tracks/${trackId}`, undefined, true);
+}
+
+// Mapa da jornada em GeoJSON: percurso real + memórias + rastro simbólico.
+export function getJourneyMap(journeyId: string): Promise<JourneyMapResponse> {
+  return request("GET", `/journeys/${journeyId}/map`, undefined, true);
+}
+
 // --- Mapa principal (pins soltos + jornadas com rastro) ---
 
 export type MapPoint = {

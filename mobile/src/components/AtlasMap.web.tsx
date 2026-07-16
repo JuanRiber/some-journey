@@ -8,6 +8,8 @@ import { colors } from "../theme/colors";
 type Props = {
   data: MapResponse | null;
   onSelect: (memoryId: string) => void;
+  // Percursos reais (GPS): cada item é uma LineString em [lng, lat].
+  tracks?: number[][][];
 };
 
 const DEFAULT_CENTER: [number, number] = [-14.235, -51.925]; // Brasil
@@ -29,7 +31,7 @@ function pinIcon(L: any, color: string) {
 // Mapa principal do Atlas (web): desenha os pins soltos (teal), os pins das
 // jornadas (terra) e os rastros (linhas) a partir de GET /map. Tocar num pin
 // abre o detalhe da memória. Reusa Leaflet/OSM, como o LocationPicker.
-export default function AtlasMap({ data, onSelect }: Props) {
+export default function AtlasMap({ data, onSelect, tracks }: Props) {
   const divRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
   const leafletRef = useRef<any>(null);
@@ -107,9 +109,18 @@ export default function AtlasMap({ data, onSelect }: Props) {
     // Pins soltos (teal).
     for (const m of data.loose_points) addPin(m.latitude, m.longitude, m.title, m.memory_id, colors.teal);
 
+    // Percursos reais (GPS): traço mais escuro e grosso que o rastro simbólico.
+    for (const coords of tracks ?? []) {
+      if (coords.length >= 2) {
+        const line = coords.map(([lng, lat]) => [lat, lng]) as [number, number][];
+        L.polyline(line, { color: colors.terraDeep, weight: 4, opacity: 0.9, lineCap: "round", lineJoin: "round" }).addTo(layer);
+        for (const pt of line) all.push(pt);
+      }
+    }
+
     if (all.length === 1) map.setView(all[0], 13);
     else if (all.length > 1) map.fitBounds(all, { padding: [40, 40] });
-  }, [data, ready]);
+  }, [data, tracks, ready]);
 
   return (
     <View style={s.shell}>

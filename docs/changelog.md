@@ -22,3 +22,13 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
 > a tabela de vínculo se chama `journey_memories` (conceito "journey_points"); existe o status
 > `draft` e a transição `resume`; o mapa usa Leaflet/OSM hoje (Mapbox planejado); `PATCH /journeys/{id}`
 > e `DELETE /memories/{id}/image` ainda não existem; o título da memória hoje é obrigatório.
+
+## 2026-07-08
+
+### Documentação
+- Registrada a distinção entre **linha simbólica** (liga memórias na ordem) e
+  **percurso real por GPS** (`Real Journey Track`).
+- Documentados os endpoints de percurso (`/journeys/{id}/tracks/...`) e o mapa da
+  jornada em GeoJSON (`GET /journeys/{id}/map`) no README.
+- Roadmap: percurso real por GPS marcado como feito no MVP; tracking em segundo
+  plano registrado como evolução (exige `expo-task-manager` + dev build).

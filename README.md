@@ -183,9 +183,25 @@ Todas as rotas exigem Bearer token. Ciclo de vida do `status`:
 - `DELETE /journeys/{journey_id}/points/{memory_id}` — desvincula sem apagar a memoria
 - `DELETE /journeys/{journey_id}` — soft delete da jornada
 
+### Percurso real (GPS)
+
+Cada jornada pode ter um **percurso real** (rastro GPS), distinto da linha
+**simbolica** que liga as memorias na ordem. Bearer token; tudo filtrado por dono
+(dado de localizacao nunca vaza entre usuarios).
+
+- `POST /journeys/{journey_id}/tracks/start` — abre um trecho de gravacao (409 se ja houver um aberto)
+- `POST /journeys/{journey_id}/tracks/{track_id}/points` — envia pontos GPS em lote (ate 1000/lote)
+- `POST /journeys/{journey_id}/tracks/{track_id}/finish` — finaliza o trecho
+- `GET /journeys/{journey_id}/tracks` — lista os trechos (com contagem + distancia)
+- `DELETE /journeys/{journey_id}/tracks/{track_id}` — remove o percurso (nao apaga as memorias)
+- `GET /journeys/{journey_id}/map` — GeoJSON da jornada: percurso real (`tracks`) + memorias + `symbolic_route`
+
+Pausar/retomar gera varios trechos; a visualizacao une todos como uma experiencia.
+
 ### Map
 
-Mapa principal do usuario (pins soltos + jornadas com rastro). Bearer token.
+Mapa principal (global) do usuario (pins soltos + jornadas com rastro). Bearer token.
+Visao macro: mostra so a linha **simbolica** — nao expoe pontos de GPS brutos.
 
 - `GET /map` — tudo do usuario: `loose_points` (memorias sem jornada) + `journeys` (pontos + `route`)
 - `GET /map?bbox=min_lng,min_lat,max_lng,max_lat` — recorta pela viewport (mundo/pais/regiao/cidade)
@@ -203,6 +219,7 @@ Mapa principal do usuario (pins soltos + jornadas com rastro). Bearer token.
 - [x] CRUD de memorias com ownership por usuario
 - [x] Jornadas com ciclo de vida (draft/active/paused/finished), pontos, reordenacao e desvinculo
 - [x] Endpoint de mapa (`/map`) com pins soltos, jornadas com rastro e filtros por bbox/jornada
+- [x] Percurso real por GPS (tracks + pontos) e mapa da jornada em GeoJSON; captura em primeiro plano no app
 - [x] Migracoes versionadas (Alembic)
 - [x] Testes automatizados (pytest) para jornadas e mapa
 - [x] App Expo com login, cadastro, atlas inicial, timeline, detalhe e criacao de memoria

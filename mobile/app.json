@@ -39,7 +39,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "O Some Journey usa sua localização para marcar onde uma memória aconteceu."
+          "locationWhenInUsePermission": "O Some Journey usa sua localização para marcar onde uma memória aconteceu e, quando você inicia um percurso, para registrar o trajeto da jornada. A gravação só acontece quando você inicia e pode ser pausada ou finalizada a qualquer momento."
         }
       ],
       [

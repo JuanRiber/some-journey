@@ -2,8 +2,10 @@ import { useCallback, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 
+import AtlasMap from "../../components/AtlasMap";
 import * as api from "../../lib/api";
 import { STATUS_COLOR, STATUS_LABEL } from "../../lib/journeyStatus";
+import { useTrackRecorder } from "../../lib/useTrackRecorder";
 import { colors, serif } from "../../theme/colors";
 
 function formatDate(iso: string): string {
@@ -34,6 +36,21 @@ export default function JourneyDetailScreen() {
   const [loose, setLoose] = useState<api.MapPoint[] | null>(null);
   const [addError, setAddError] = useState("");
 
+  // Mapa da jornada (percurso real + memórias + rastro simbólico) e o modo de
+  // visualização. mode=null => automático (real quando há percurso; senão simbólico).
+  const [journeyMap, setJourneyMap] = useState<api.JourneyMapResponse | null>(null);
+  const [mode, setMode] = useState<"real" | "symbolic" | null>(null);
+
+  const loadMap = useCallback(() => {
+    if (!id) return;
+    api.getJourneyMap(id).then(setJourneyMap).catch(() => {
+      // mapa é complementar; falha silenciosa não bloqueia a tela
+    });
+  }, [id]);
+
+  // Gravador de percurso em primeiro plano (sem tracking em segundo plano).
+  const recorder = useTrackRecorder(id ?? "", { onFlush: loadMap });
+
   const load = useCallback(() => {
     if (!id) {
       setError("Jornada não encontrada.");
@@ -59,7 +76,8 @@ export default function JourneyDetailScreen() {
     useCallback(() => {
       setError("");
       load();
-    }, [load]),
+      loadMap();
+    }, [load, loadMap]),
   );
 
   // Wrapper das ações: roda fn, trata 401/erro e recarrega/atualiza a jornada.
@@ -70,7 +88,10 @@ export default function JourneyDetailScreen() {
     try {
       const r = await fn();
       if (onResult) onResult(r);
-      else load();
+      else {
+        load();
+        loadMap();
+      }
     } catch (e) {
       if (api.isUnauthorized(e)) {
         router.replace("/");
@@ -181,6 +202,40 @@ export default function JourneyDetailScreen() {
   }
 
   const st = journey.status;
+  const hasTrack = !!journeyMap && journeyMap.tracks.features.length > 0;
+  const hasMemories = journey.points.length > 0;
+  // Modo mostrado: automático quando o usuário não escolheu (real se há percurso).
+  const mapMode: "real" | "symbolic" = mode ?? (hasTrack ? "real" : "symbolic");
+  // MapResponse "de uma jornada só" para reaproveitar o AtlasMap no detalhe.
+  const mapData: api.MapResponse | null = journeyMap
+    ? {
+        loose_points: [],
+        journeys: [
+          {
+            id: journey.id,
+            title: journey.title,
+            status: journey.status,
+            points: journeyMap.memories.features.map((f) => ({
+              memory_id: f.properties.memory_id,
+              title: f.properties.title,
+              latitude: f.geometry.coordinates[1],
+              longitude: f.geometry.coordinates[0],
+              occurred_at: f.properties.memory_date,
+              position: null,
+            })),
+            // Rastro simbólico no modo "Conectar memórias" — e também como
+            // fallback no modo "Percurso real" quando ainda não há GPS, para o
+            // mapa não ficar sem linha (a legenda avisa que é a linha simbólica).
+            route: mapMode === "symbolic" || !hasTrack ? journeyMap.symbolic_route : null,
+          },
+        ],
+      }
+    : null;
+  const trackLines =
+    mapMode === "real" && journeyMap
+      ? journeyMap.tracks.features.map((f) => f.geometry.coordinates)
+      : [];
+  const distanceKm = journeyMap ? journeyMap.distance_m / 1000 : 0;
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: 48 }}>
@@ -294,6 +349,79 @@ export default function JourneyDetailScreen() {
         </View>
 
         {error && !editing ? <Text style={s.inlineError}>{error}</Text> : null}
+
+        {/* Percurso real (GPS): controles de gravação + mapa + distância */}
+        <Text style={s.sectionLabel}>PERCURSO REAL</Text>
+
+        {recorder.recording || recorder.paused ? (
+          <View style={s.recBox}>
+            <View style={s.recRow}>
+              <View style={[s.recDot, recorder.recording && s.recDotOn]} />
+              <Text style={s.recLabel}>
+                {recorder.recording
+                  ? `Percurso ativo · ${recorder.pointCount} ${recorder.pointCount === 1 ? "ponto" : "pontos"}`
+                  : "Percurso pausado"}
+              </Text>
+            </View>
+            <View style={s.recActions}>
+              {recorder.recording ? (
+                <Pressable style={s.secondary} onPress={recorder.pause} accessibilityRole="button" accessibilityLabel="Pausar percurso">
+                  <Text style={s.secondaryText}>Pausar</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={s.primary} onPress={recorder.resume} accessibilityRole="button" accessibilityLabel="Retomar percurso">
+                  <Text style={s.primaryText}>Retomar</Text>
+                </Pressable>
+              )}
+              <Pressable style={s.secondary} onPress={recorder.finish} accessibilityRole="button" accessibilityLabel="Finalizar percurso">
+                <Text style={s.secondaryText}>Finalizar</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : st !== "finished" ? (
+          <Pressable
+            style={({ pressed }) => [s.trackStart, pressed && { opacity: 0.9 }]}
+            onPress={recorder.start}
+            disabled={recorder.busy}
+            accessibilityRole="button"
+            accessibilityLabel="Iniciar percurso"
+          >
+            <Text style={s.trackStartText}>{recorder.busy ? "Preparando…" : "Iniciar percurso"}</Text>
+          </Pressable>
+        ) : null}
+        {recorder.error ? <Text style={s.inlineError}>{recorder.error}</Text> : null}
+
+        {hasMemories || hasTrack ? (
+          <>
+            <View style={s.modeRow}>
+              <Pressable onPress={() => setMode("real")} hitSlop={6} accessibilityRole="button" accessibilityLabel="Ver percurso real">
+                <Text style={[s.modeTab, mapMode === "real" && s.modeTabOn]}>Percurso real</Text>
+              </Pressable>
+              <Pressable onPress={() => setMode("symbolic")} hitSlop={6} accessibilityRole="button" accessibilityLabel="Conectar memórias">
+                <Text style={[s.modeTab, mapMode === "symbolic" && s.modeTabOn]}>Conectar memórias</Text>
+              </Pressable>
+            </View>
+            <View style={{ marginTop: 12 }}>
+              <AtlasMap data={mapData} tracks={trackLines} onSelect={(mid) => router.push(`/memory/${mid}`)} />
+            </View>
+            <Text style={s.trackMeta}>
+              {hasTrack
+                ? `${distanceKm.toFixed(2)} km de percurso real registrado`
+                : "Sem percurso real ainda — mostrando a linha simbólica entre as memórias."}
+            </Text>
+            {hasTrack && !hasMemories ? (
+              <Text style={s.trackHint}>
+                Seu caminho foi registrado. Agora adicione memórias aos lugares que fizeram parte
+                dessa jornada.
+              </Text>
+            ) : null}
+          </>
+        ) : (
+          <Text style={s.emptyPoints}>
+            Esta jornada ainda não tem caminho. Inicie um percurso ou adicione memórias para
+            começar a construir este mapa.
+          </Text>
+        )}
 
         {/* Pontos ordenados */}
         <Text style={s.sectionLabel}>MEMÓRIAS (NA ORDEM DO RASTRO)</Text>
@@ -471,4 +599,18 @@ const s = StyleSheet.create({
   knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.card },
   knobOn: { alignSelf: "flex-end" },
   toggleText: { color: colors.inkSoft, fontSize: 14, flex: 1 },
+  // Percurso real
+  recBox: { marginTop: 4, backgroundColor: "rgba(206,90,44,0.08)", borderRadius: 12, padding: 12, gap: 10 },
+  recRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.inkSoft },
+  recDotOn: { backgroundColor: colors.terra },
+  recLabel: { color: colors.ink, fontSize: 14, fontWeight: "600" },
+  recActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  trackStart: { backgroundColor: colors.ink, borderRadius: 11, paddingVertical: 12, alignItems: "center" },
+  trackStartText: { color: colors.card, fontSize: 14, fontWeight: "600", letterSpacing: 0.3 },
+  modeRow: { flexDirection: "row", gap: 20, marginTop: 18, borderBottomWidth: 1, borderColor: colors.line, paddingBottom: 8 },
+  modeTab: { color: colors.inkSoft, fontSize: 14, fontWeight: "600" },
+  modeTabOn: { color: colors.terra },
+  trackMeta: { color: colors.terraDeep, fontSize: 12, fontWeight: "600", marginTop: 10 },
+  trackHint: { color: colors.inkSoft, fontSize: 13, lineHeight: 19, marginTop: 8 },
 });

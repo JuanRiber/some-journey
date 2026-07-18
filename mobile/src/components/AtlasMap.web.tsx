@@ -22,7 +22,7 @@ function pinIcon(L: any, color: string) {
     className: "sj-atlas-pin",
     html:
       `<div style="width:20px;height:20px;border-radius:50%;background:${color};` +
-      `border:2px solid #FBF6E8;box-shadow:0 2px 5px rgba(0,0,0,.4)"></div>`,
+      `border:2px solid ${colors.ink};box-shadow:0 0 8px rgba(0,0,0,.6)"></div>`,
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
@@ -59,9 +59,10 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
         });
         map.on("focus", () => map.scrollWheelZoom.enable());
         map.on("blur", () => map.scrollWheelZoom.disable());
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: "© OpenStreetMap",
+        // Tiles escuras (CARTO dark matter): o mapa vira o céu noturno do atlas.
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+          maxZoom: 20,
+          attribution: "© OpenStreetMap © CARTO",
         }).addTo(map);
         layerRef.current = L.layerGroup().addTo(map);
         mapRef.current = map;
@@ -102,18 +103,18 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
       if (j.route && j.route.coordinates.length >= 2) {
         // GeoJSON é [lng, lat]; Leaflet quer [lat, lng].
         const line = j.route.coordinates.map(([lng, lat]) => [lat, lng]) as [number, number][];
-        L.polyline(line, { color: colors.terra, weight: 3, opacity: 0.75 }).addTo(layer);
+        L.polyline(line, { color: colors.coral, weight: 3, opacity: 0.75 }).addTo(layer);
       }
-      for (const p of j.points) addPin(p.latitude, p.longitude, p.title, p.memory_id, colors.terra);
+      for (const p of j.points) addPin(p.latitude, p.longitude, p.title, p.memory_id, colors.coral);
     }
     // Pins soltos (teal).
-    for (const m of data.loose_points) addPin(m.latitude, m.longitude, m.title, m.memory_id, colors.teal);
+    for (const m of data.loose_points) addPin(m.latitude, m.longitude, m.title, m.memory_id, colors.mint);
 
-    // Percursos reais (GPS): traço mais escuro e grosso que o rastro simbólico.
+    // Percursos reais (GPS): traço dourado, mais grosso que o rastro simbólico.
     for (const coords of tracks ?? []) {
       if (coords.length >= 2) {
         const line = coords.map(([lng, lat]) => [lat, lng]) as [number, number][];
-        L.polyline(line, { color: colors.terraDeep, weight: 4, opacity: 0.9, lineCap: "round", lineJoin: "round" }).addTo(layer);
+        L.polyline(line, { color: colors.gold, weight: 4, opacity: 0.95, lineCap: "round", lineJoin: "round" }).addTo(layer);
         for (const pt of line) all.push(pt);
       }
     }
@@ -132,7 +133,7 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
         </View>
       ) : !ready ? (
         <View style={s.overlay}>
-          <ActivityIndicator color={colors.terra} />
+          <ActivityIndicator color={colors.coral} />
           <Text style={s.hint}>Carregando mapa…</Text>
         </View>
       ) : null}
@@ -141,15 +142,16 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
 }
 
 const s = StyleSheet.create({
+  // Moldura de "arte de álbum": carvão grosso, canto quase reto.
   shell: {
     position: "relative",
     width: "100%",
     height: 380,
-    borderRadius: 18,
+    borderRadius: 3,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.sky,
+    borderWidth: 3,
+    borderColor: colors.frame,
+    backgroundColor: colors.sand,
   },
   overlay: { position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", gap: 6 } as any,
   hint: { color: colors.inkSoft, fontSize: 13, textAlign: "center" },

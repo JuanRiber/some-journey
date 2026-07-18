@@ -5,7 +5,7 @@ import { router, useFocusEffect } from "expo-router";
 import MemoryCover from "../../components/MemoryCover";
 import NotebookTop from "../../components/NotebookTop";
 import * as api from "../../lib/api";
-import { colors, serif } from "../../theme/colors";
+import { colors, mono, serif } from "../../theme/colors";
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -87,7 +87,7 @@ export default function TimelineScreen() {
         <Text style={s.subtitle}>As memórias do seu atlas em ordem viva.</Text>
 
         {memories === null && !error ? (
-          <ActivityIndicator color={colors.terra} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={colors.coral} style={{ marginTop: 48 }} />
         ) : error ? (
           <Text style={s.error}>{error}</Text>
         ) : memories!.length === 0 ? (
@@ -157,13 +157,13 @@ export default function TimelineScreen() {
   );
 }
 
-const LINE = "rgba(112,108,94,0.35)";
+const LINE = "rgba(242,234,216,0.16)";
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.pageBg },
-  scroll: { flex: 1, backgroundColor: colors.paper, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
-  title: { fontFamily: serif, fontSize: 34, color: colors.ink },
-  subtitle: { color: colors.inkSoft, fontSize: 14, marginTop: 4 },
+  screen: { flex: 1, backgroundColor: colors.paper },
+  scroll: { flex: 1, backgroundColor: colors.paper },
+  title: { fontFamily: serif, fontSize: 32, color: colors.ink },
+  subtitle: { fontFamily: serif, fontStyle: "italic", color: colors.inkSoft, fontSize: 14.5, marginTop: 5 },
   error: { color: colors.danger, textAlign: "center", marginTop: 48 },
   empty: { marginTop: 56, alignItems: "center" },
   emptyText: { fontFamily: serif, fontSize: 18, color: colors.ink, textAlign: "center" },
@@ -174,17 +174,18 @@ const s = StyleSheet.create({
   spineFull: { position: "absolute", left: 13, top: 0, bottom: 0, width: 2, backgroundColor: LINE },
   spineFirst: { position: "absolute", left: 13, top: 26, bottom: 0, width: 2, backgroundColor: LINE },
   spineLast: { position: "absolute", left: 13, top: 0, height: 34, width: 2, backgroundColor: LINE },
-  railDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.terra, marginTop: 22, zIndex: 1 },
+  railDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.coral, marginTop: 22, zIndex: 1 },
   yearRow: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: 22, marginBottom: 4 },
-  year: { fontFamily: serif, fontSize: 46, color: "rgba(112,108,94,0.45)", letterSpacing: 1 },
-  yearNote: { fontFamily: serif, fontStyle: "italic", fontSize: 14, color: colors.inkSoft, marginBottom: 10 },
+  // O ano como numeral mono dourado, ecoando o "01 / 02 / 03" da landing.
+  year: { fontFamily: mono, fontSize: 36, color: colors.gold, letterSpacing: 2 },
+  yearNote: { fontFamily: serif, fontStyle: "italic", fontSize: 14, color: colors.inkSoft, marginBottom: 8 },
   cardWrap: { flex: 1, marginBottom: 16 },
-  date: { color: colors.terraDeep, fontWeight: "700", fontSize: 12, letterSpacing: 0.5, marginTop: 16, marginBottom: 6 },
-  card: { flexDirection: "row", gap: 12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 14, padding: 12 },
-  thumb: { width: 54, height: 54, borderRadius: 10, backgroundColor: colors.sky, borderWidth: 1, borderColor: colors.line },
+  date: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
+  card: { flexDirection: "row", gap: 12, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 8, padding: 12 },
+  thumb: { width: 54, height: 54, borderRadius: 10, backgroundColor: colors.sand, borderWidth: 1, borderColor: colors.line },
   cardTitle: { fontFamily: serif, fontSize: 17, color: colors.ink },
   coordRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  pin: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.terra },
+  pin: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.coral },
   coords: { color: colors.inkSoft, fontSize: 12 },
-  open: { color: colors.terraDeep, fontWeight: "600", fontSize: 13, marginTop: 8 },
+  open: { color: colors.coral, fontWeight: "600", fontSize: 13, marginTop: 8 },
 });

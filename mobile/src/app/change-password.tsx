@@ -46,7 +46,7 @@ export default function ChangePasswordScreen() {
         <Text style={ui.subtitle}>Confirme a senha atual e escolha uma nova.</Text>
 
         {done ? (
-          <Text style={{ color: colors.sage, fontSize: 15, lineHeight: 22, marginTop: 22, textAlign: "center" }}>
+          <Text style={{ color: colors.mint, fontSize: 15, lineHeight: 22, marginTop: 22, textAlign: "center" }}>
             Senha alterada! Use a nova no próximo login.
           </Text>
         ) : (
@@ -73,7 +73,7 @@ export default function ChangePasswordScreen() {
             <Text style={ui.hint}>Mínimo de 10 caracteres.</Text>
 
             {error ? (
-              <Text style={{ color: "#A32D2D", fontSize: 13, marginTop: 12, textAlign: "center" }}>
+              <Text style={{ color: colors.danger, fontSize: 13, marginTop: 12, textAlign: "center" }}>
                 {error}
               </Text>
             ) : null}

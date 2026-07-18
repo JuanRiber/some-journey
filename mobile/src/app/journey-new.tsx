@@ -125,11 +125,11 @@ export default function JourneyNewScreen() {
 const s = StyleSheet.create({
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 4 },
   track: {
-    width: 46, height: 27, borderRadius: 14, backgroundColor: "rgba(35,39,47,0.18)",
+    width: 46, height: 27, borderRadius: 14, backgroundColor: "rgba(242,234,216,0.16)",
     padding: 3, justifyContent: "center",
   },
-  trackOn: { backgroundColor: colors.sage },
-  knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.card },
+  trackOn: { backgroundColor: colors.mint },
+  knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.ink },
   knobOn: { alignSelf: "flex-end" },
   toggleText: { color: colors.inkSoft, fontSize: 14, flex: 1 },
 });

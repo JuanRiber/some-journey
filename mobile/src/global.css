@@ -1,3 +1,28 @@
+/* Atlas noturno: o fundo da página é o navy da landing (evita flash branco). */
+html,
+body {
+  background-color: #0d1524;
+  color-scheme: dark;
+}
+
+/* Controles do Leaflet no tema noturno (zoom e attribution). O !important é
+   necessário: o leaflet.css é importado depois deste arquivo e venceria o
+   empate de especificidade. */
+.leaflet-bar a,
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+  background-color: #141e33 !important;
+  color: #f2ead8 !important;
+  border-bottom-color: rgba(242, 234, 216, 0.15) !important;
+}
+.leaflet-control-attribution {
+  background: rgba(13, 21, 36, 0.75) !important;
+  color: #6b7488;
+}
+.leaflet-control-attribution a {
+  color: #98a0b3;
+}
+
 :root {
   --font-display:
     Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,

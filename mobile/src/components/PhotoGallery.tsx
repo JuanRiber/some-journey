@@ -89,7 +89,7 @@ const THUMB = 84;
 const s = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 6 },
   thumbWrap: { width: THUMB, height: THUMB },
-  thumb: { width: THUMB, height: THUMB, borderRadius: 12, backgroundColor: colors.sky, borderWidth: 1, borderColor: colors.line },
+  thumb: { width: THUMB, height: THUMB, borderRadius: 4, backgroundColor: colors.sand, borderWidth: 1, borderColor: colors.line },
   remove: {
     position: "absolute",
     top: -6,
@@ -101,19 +101,19 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  removeText: { color: "#FBF6E8", fontSize: 15, fontWeight: "700", marginTop: -2 },
+  removeText: { color: colors.card, fontSize: 15, fontWeight: "700", marginTop: -2 },
   addTile: {
     width: THUMB,
     height: THUMB,
-    borderRadius: 12,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: "rgba(35,39,47,0.18)",
+    borderColor: "rgba(242,234,216,0.16)",
     borderStyle: "dashed",
     backgroundColor: colors.card,
     alignItems: "center",
     justifyContent: "center",
   },
-  addPlus: { color: colors.teal, fontSize: 24, fontWeight: "700", marginBottom: -2 },
-  addHint: { color: colors.teal, fontSize: 11, fontWeight: "600" },
+  addPlus: { color: colors.mint, fontSize: 24, fontWeight: "700", marginBottom: -2 },
+  addHint: { color: colors.mint, fontSize: 11, fontWeight: "600" },
   error: { color: colors.danger, fontSize: 12, marginTop: 8 },
 });

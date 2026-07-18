@@ -69,7 +69,7 @@ export default function RegisterScreen() {
         <Text style={ui.hint}>Mínimo de 10 caracteres.</Text>
 
         {error ? (
-          <Text style={{ color: "#A32D2D", fontSize: 13, marginTop: 12, textAlign: "center" }}>
+          <Text style={{ color: colors.danger, fontSize: 13, marginTop: 12, textAlign: "center" }}>
             {error}
           </Text>
         ) : null}

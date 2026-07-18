@@ -43,7 +43,7 @@ export default function JourneyTabBar() {
         accessibilityLabel="Tempo"
         accessibilityState={{ selected: onTimeline }}
       >
-        <ClockIcon color={onTimeline ? colors.terra : colors.inkSoft} />
+        <ClockIcon color={onTimeline ? colors.coral : colors.inkSoft} />
         <Text style={[s.label, onTimeline && s.labelActive]}>Tempo</Text>
       </Pressable>
 
@@ -66,7 +66,7 @@ export default function JourneyTabBar() {
         accessibilityLabel="Atlas"
         accessibilityState={{ selected: onAtlas }}
       >
-        <TargetIcon color={onAtlas ? colors.terra : colors.inkSoft} />
+        <TargetIcon color={onAtlas ? colors.coral : colors.inkSoft} />
         <Text style={[s.label, onAtlas && s.labelActive]}>Atlas</Text>
       </Pressable>
     </View>
@@ -86,24 +86,21 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
   },
   tab: { alignItems: "center", gap: 4, minWidth: 64 },
-  label: { fontSize: 11, color: colors.inkSoft, letterSpacing: 0.3 },
-  labelActive: { color: colors.terra, fontWeight: "600" },
+  label: { fontSize: 10, color: colors.inkSoft, letterSpacing: 1.2, fontWeight: "600", textTransform: "uppercase" },
+  labelActive: { color: colors.coral, fontWeight: "800" },
   criar: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.terra,
+    backgroundColor: colors.gold,
+    borderWidth: 2,
+    borderColor: colors.goldDeep,
     alignItems: "center",
     justifyContent: "center",
     marginTop: -22,
-    shadowColor: colors.terraDeep,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
   },
-  plusV: { position: "absolute", width: 3, height: 20, borderRadius: 2, backgroundColor: colors.card },
-  plusH: { position: "absolute", width: 20, height: 3, borderRadius: 2, backgroundColor: colors.card },
+  plusV: { position: "absolute", width: 3, height: 20, borderRadius: 2, backgroundColor: colors.pageBg },
+  plusH: { position: "absolute", width: 20, height: 3, borderRadius: 2, backgroundColor: colors.pageBg },
 });
 
 const ic = StyleSheet.create({

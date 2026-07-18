@@ -120,7 +120,7 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
           autoCorrect={false}
           accessibilityLabel="Buscar local por nome"
         />
-        {searching ? <ActivityIndicator size="small" color={colors.terra} style={s.spin} /> : null}
+        {searching ? <ActivityIndicator size="small" color={colors.coral} style={s.spin} /> : null}
       </View>
 
       {results.length > 0 ? (
@@ -184,8 +184,8 @@ const s = StyleSheet.create({
   search: {
     backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "rgba(35,39,47,0.18)",
-    borderRadius: 12,
+    borderColor: "rgba(242,234,216,0.16)",
+    borderRadius: 8,
     paddingHorizontal: 15,
     paddingVertical: 13,
     fontSize: 15,
@@ -196,12 +196,12 @@ const s = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
+    borderRadius: 8,
     marginTop: 6,
     overflow: "hidden",
   },
   resultItem: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.line },
-  resultItemPressed: { backgroundColor: "rgba(206,90,44,0.08)" },
+  resultItemPressed: { backgroundColor: "rgba(240,120,74,0.08)" },
   resultText: { color: colors.ink, fontSize: 13, lineHeight: 18 },
   searchNote: { color: colors.inkSoft, fontSize: 12, marginTop: 8, fontStyle: "italic" },
   locBtn: {
@@ -209,21 +209,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 9,
     alignSelf: "flex-start",
-    backgroundColor: "rgba(61,138,152,0.12)",
-    borderRadius: 10,
+    backgroundColor: "rgba(55,195,162,0.12)",
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: 12,
   },
-  locDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.teal, borderWidth: 2, borderColor: "#FBF6E8" },
-  locText: { color: colors.teal, fontSize: 14, fontWeight: "600" },
+  locDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.mint, borderWidth: 2, borderColor: colors.card },
+  locText: { color: colors.mint, fontSize: 14, fontWeight: "600" },
   geoError: { color: colors.danger, fontSize: 12, marginTop: 8 },
   readout: {
     marginTop: 12,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
   },
   readoutLabel: { color: colors.ink, fontSize: 13, lineHeight: 18 },

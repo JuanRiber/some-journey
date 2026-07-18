@@ -137,7 +137,7 @@ export default function MemoryEditScreen() {
             {loadError}
           </Text>
         ) : !loaded ? (
-          <ActivityIndicator color={colors.terra} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={colors.coral} style={{ marginTop: 48 }} />
         ) : (
           <>
             <Text style={ui.label}>TÍTULO</Text>

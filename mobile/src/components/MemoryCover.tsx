@@ -33,7 +33,7 @@ export default function MemoryCover({ url, size = 54 }: Props) {
 
 const s = StyleSheet.create({
   box: {
-    borderRadius: 10,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: colors.line,
     alignItems: "center",
@@ -47,8 +47,8 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#8A5A2B", // capa marrom
-    borderRadius: 3,
+    backgroundColor: "#22304F", // capa navy de diário de viagem
+    borderRadius: 2,
   },
   spine: {
     position: "absolute",
@@ -56,9 +56,9 @@ const s = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 5,
-    backgroundColor: "#5E3A17", // lombada (marrom escuro)
-    borderTopLeftRadius: 3,
-    borderBottomLeftRadius: 3,
+    backgroundColor: "#B88930", // lombada dourada
+    borderTopLeftRadius: 2,
+    borderBottomLeftRadius: 2,
   },
   bookmark: {
     position: "absolute",
@@ -66,7 +66,7 @@ const s = StyleSheet.create({
     right: "22%",
     width: 6,
     height: 15,
-    backgroundColor: colors.danger, // marcador vermelho
+    backgroundColor: colors.coral, // marcador coral
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
   },

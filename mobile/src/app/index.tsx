@@ -32,13 +32,8 @@ export default function LoginScreen() {
     <View style={ui.screen}>
       <JourneyHeader />
 
+      {/* O wordmark e a tagline vivem na própria arte do topo. */}
       <View style={ui.body}>
-        <View style={ui.brandRow}>
-          <View style={ui.pin} />
-          <Text style={ui.wordmark}>Some Journey</Text>
-        </View>
-        <Text style={ui.tagline}>A vida deixa rastros.</Text>
-
         <Text style={ui.label}>E-MAIL</Text>
         <TextInput
           style={ui.input}
@@ -66,7 +61,7 @@ export default function LoginScreen() {
         </Pressable>
 
         {error ? (
-          <Text style={{ color: "#A32D2D", fontSize: 13, marginTop: 12, textAlign: "center" }}>
+          <Text style={{ color: colors.danger, fontSize: 13, marginTop: 12, textAlign: "center" }}>
             {error}
           </Text>
         ) : null}

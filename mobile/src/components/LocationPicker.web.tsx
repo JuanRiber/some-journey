@@ -93,10 +93,10 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
         pinRef.current = L.divIcon({
           className: "sj-pin",
           html:
-            `<div style="width:24px;height:24px;border-radius:50%;background:${colors.terra};` +
-            `border:2px solid ${colors.terraDeep};box-shadow:0 2px 6px rgba(0,0,0,.45);` +
+            `<div style="width:24px;height:24px;border-radius:50%;background:${colors.coral};` +
+            `border:2px solid ${colors.ink};box-shadow:0 0 8px rgba(0,0,0,.6);` +
             `display:flex;align-items:center;justify-content:center">` +
-            `<div style="width:8px;height:8px;border-radius:50%;background:#FBF6E8"></div></div>`,
+            `<div style="width:8px;height:8px;border-radius:50%;background:${colors.ink}"></div></div>`,
           iconSize: [24, 24],
           iconAnchor: [12, 12],
         });
@@ -113,9 +113,9 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
         });
         map.on("focus", () => map.scrollWheelZoom.enable());
         map.on("blur", () => map.scrollWheelZoom.disable());
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: "© OpenStreetMap",
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+          maxZoom: 20,
+          attribution: "© OpenStreetMap © CARTO",
         }).addTo(map);
         map.on("click", (e: any) => {
           place(e.latlng.lat, e.latlng.lng, { reverse: true });
@@ -230,7 +230,7 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
           autoCorrect={false}
           accessibilityLabel="Buscar local por nome"
         />
-        {searching ? <ActivityIndicator size="small" color={colors.terra} style={s.spin} /> : null}
+        {searching ? <ActivityIndicator size="small" color={colors.coral} style={s.spin} /> : null}
       </View>
 
       {results.length > 0 ? (
@@ -268,7 +268,7 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
           </View>
         ) : !mapReady ? (
           <View style={s.mapLoading}>
-            <ActivityIndicator color={colors.terra} />
+            <ActivityIndicator color={colors.coral} />
             <Text style={s.mapLoadingText}>Carregando mapa…</Text>
           </View>
         ) : (
@@ -314,8 +314,8 @@ const s = StyleSheet.create({
   search: {
     backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: "rgba(35,39,47,0.18)",
-    borderRadius: 12,
+    borderColor: "rgba(242,234,216,0.16)",
+    borderRadius: 8,
     paddingHorizontal: 15,
     paddingVertical: 13,
     fontSize: 15,
@@ -326,35 +326,35 @@ const s = StyleSheet.create({
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
+    borderRadius: 8,
     marginTop: 6,
     overflow: "hidden",
   },
   resultItem: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: colors.line },
-  resultItemPressed: { backgroundColor: "rgba(206,90,44,0.08)" },
+  resultItemPressed: { backgroundColor: "rgba(240,120,74,0.08)" },
   resultText: { color: colors.ink, fontSize: 13, lineHeight: 18 },
   searchNote: { color: colors.inkSoft, fontSize: 12, marginTop: 8, fontStyle: "italic" },
   mapShell: {
     position: "relative",
     width: "100%",
     height: 240,
-    borderRadius: 14,
+    borderRadius: 8,
     overflow: "hidden",
     borderWidth: 1,
     borderColor: colors.line,
     marginTop: 10,
-    backgroundColor: colors.sky,
+    backgroundColor: colors.sand,
   },
   mapHint: {
     position: "absolute",
     top: 8,
     alignSelf: "center",
-    backgroundColor: "rgba(35,39,47,0.62)",
+    backgroundColor: "rgba(13,21,36,0.82)",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
-  mapHintText: { color: "#FBF6E8", fontSize: 11, fontWeight: "500" },
+  mapHintText: { color: colors.card, fontSize: 11, fontWeight: "500" },
   mapLoading: { position: "absolute", inset: 0, alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 16 } as any,
   mapLoadingText: { color: colors.inkSoft, fontSize: 13, textAlign: "center" },
   mapErrorText: { color: colors.danger, fontSize: 14, fontWeight: "600", textAlign: "center" },
@@ -363,21 +363,21 @@ const s = StyleSheet.create({
     alignItems: "center",
     gap: 9,
     alignSelf: "flex-start",
-    backgroundColor: "rgba(61,138,152,0.12)",
-    borderRadius: 10,
+    backgroundColor: "rgba(55,195,162,0.12)",
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     marginTop: 12,
   },
-  locDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.teal, borderWidth: 2, borderColor: "#FBF6E8" },
-  locText: { color: colors.teal, fontSize: 14, fontWeight: "600" },
+  locDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.mint, borderWidth: 2, borderColor: colors.card },
+  locText: { color: colors.mint, fontSize: 14, fontWeight: "600" },
   geoError: { color: colors.danger, fontSize: 12, marginTop: 8 },
   readout: {
     marginTop: 12,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
   },
   readoutLabel: { color: colors.ink, fontSize: 13, lineHeight: 18 },

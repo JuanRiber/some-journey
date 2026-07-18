@@ -4,7 +4,7 @@ import { router, useFocusEffect } from "expo-router";
 
 import * as api from "../../lib/api";
 import { STATUS_COLOR, STATUS_LABEL } from "../../lib/journeyStatus";
-import { colors, serif } from "../../theme/colors";
+import { colors, mono, serif } from "../../theme/colors";
 
 // Mês/ano por extenso a partir das partes UTC (a data não "vaza" para outro dia
 // conforme o fuso do aparelho).
@@ -32,6 +32,9 @@ function countLabel(n: number): string {
 function CoverBand({ status }: { status: api.JourneyStatus }) {
   return (
     <View style={s.cover}>
+      <View style={[s.coverArc, { top: -46, right: -30, width: 120, height: 120, borderRadius: 60 }]} />
+      <View style={[s.coverArc, { top: -28, right: -12, width: 84, height: 84, borderRadius: 42 }]} />
+      <View style={[s.coverArc, { top: -12, right: 4, width: 52, height: 52, borderRadius: 26 }]} />
       <View style={s.coverTrail} />
       <View style={s.coverPin} />
       <View style={[s.badge, s.coverBadge, { backgroundColor: STATUS_COLOR[status] }]}>
@@ -96,7 +99,7 @@ export default function JourneysScreen() {
         {error ? (
           <Text style={s.error}>{error}</Text>
         ) : journeys === null ? (
-          <ActivityIndicator color={colors.terra} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={colors.coral} style={{ marginTop: 48 }} />
         ) : journeys.length === 0 ? (
           <View style={s.empty}>
             <Text style={s.emptyText}>Você ainda não criou nenhuma jornada.</Text>
@@ -146,7 +149,8 @@ export default function JourneysScreen() {
                       ) : null}
                       {!j.is_private ? (
                         <View style={[s.chip, s.chipPublic]}>
-                          <Text style={[s.chipText, { color: colors.teal }]}>pública</Text>
+                          <Text style={[s.chipText, { color: colors.mint }]}>pública</Text>
+
                         </View>
                       ) : null}
                     </View>
@@ -166,50 +170,52 @@ const s = StyleSheet.create({
   back: { color: colors.ink, fontSize: 14, fontWeight: "500" },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
   title: { fontFamily: serif, fontSize: 32, color: colors.ink },
-  sub: { fontFamily: serif, fontStyle: "italic", color: colors.inkSoft, fontSize: 14.5, marginTop: 3 },
-  newBtn: { backgroundColor: colors.ink, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 16 },
-  newBtnText: { color: colors.card, fontSize: 14, fontWeight: "600" },
+  sub: { fontFamily: serif, fontStyle: "italic", color: colors.inkSoft, fontSize: 14.5, marginTop: 4 },
+  newBtn: { backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
+  newBtnText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
   error: { color: colors.danger, textAlign: "center", marginTop: 40 },
 
   empty: { marginTop: 60, alignItems: "center", paddingHorizontal: 12 },
   emptyText: { fontFamily: serif, fontSize: 20, color: colors.ink, textAlign: "center", lineHeight: 27 },
   emptyHint: { color: colors.inkSoft, fontSize: 14.5, textAlign: "center", marginTop: 10, lineHeight: 22 },
-  emptyCta: { marginTop: 24, backgroundColor: colors.terra, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 26 },
-  emptyCtaText: { color: colors.card, fontSize: 15, fontWeight: "600", letterSpacing: 0.3 },
+  emptyCta: { marginTop: 24, backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 14, paddingHorizontal: 26 },
+  emptyCtaText: { fontFamily: mono, color: colors.pageBg, fontSize: 13, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
 
-  // Card = entrada de atlas. Sombra muito sutil, cantos suaves, capa no topo.
+  // Card = capa de disco em miniatura: plano, moldura fina, capa dourada no topo.
   card: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
-    borderRadius: 18,
+    borderRadius: 10,
     overflow: "hidden",
-    shadowColor: "#3A2A12",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 2,
   },
   cover: { height: 86, backgroundColor: colors.cover, overflow: "hidden" },
+  // Espirais gravadas sobre o ouro, ecoando a arte do topo.
+  coverArc: {
+    position: "absolute",
+    borderWidth: 1.5,
+    borderColor: "rgba(227,176,75,0.35)",
+    backgroundColor: "transparent",
+  },
   coverTrail: {
     position: "absolute", bottom: 26, left: 22, width: 150,
-    borderTopWidth: 2, borderColor: "rgba(35,39,47,0.28)", borderStyle: "dashed",
+    borderTopWidth: 2, borderColor: "rgba(227,176,75,0.55)", borderStyle: "dashed",
     transform: [{ rotate: "-14deg" }],
   },
   coverPin: {
     position: "absolute", bottom: 22, left: 168, width: 14, height: 14, borderRadius: 7,
-    backgroundColor: colors.terra, borderWidth: 1.5, borderColor: colors.terraDeep,
+    backgroundColor: colors.coral, borderWidth: 1.5, borderColor: colors.coralDeep,
   },
   coverBadge: { position: "absolute", top: 12, right: 12 },
-  badge: { borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10 },
-  badgeText: { color: colors.card, fontSize: 11, fontWeight: "700", letterSpacing: 0.3 },
+  badge: { borderRadius: 3, paddingVertical: 4, paddingHorizontal: 9 },
+  badgeText: { fontFamily: mono, color: colors.pageBg, fontSize: 10, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
 
   body: { padding: 16 },
   cardTitle: { fontFamily: serif, fontSize: 21, color: colors.ink },
   cardDesc: { color: colors.inkSoft, fontSize: 13.5, lineHeight: 20, marginTop: 6 },
-  cardMeta: { color: colors.terraDeep, fontSize: 12.5, fontWeight: "600", marginTop: 10 },
+  cardMeta: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginTop: 10 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-  chip: { backgroundColor: colors.chip, borderRadius: 8, paddingVertical: 5, paddingHorizontal: 10, maxWidth: "100%" },
-  chipPublic: { backgroundColor: "rgba(61,138,152,0.12)" },
-  chipText: { color: colors.terraDeep, fontSize: 12, fontWeight: "500" },
+  chip: { backgroundColor: colors.chip, borderRadius: 4, paddingVertical: 5, paddingHorizontal: 10, maxWidth: "100%" },
+  chipPublic: { backgroundColor: "rgba(55,195,162,0.12)" },
+  chipText: { color: colors.coral, fontSize: 12, fontWeight: "500" },
 });

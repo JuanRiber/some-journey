@@ -3,9 +3,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 
-import JourneyHeader from "../../components/JourneyHeader";
 import * as api from "../../lib/api";
-import { colors, serif } from "../../theme/colors";
+import { colors, mono, serif } from "../../theme/colors";
 
 function formatFull(iso: string): string {
   try {
@@ -84,8 +83,7 @@ export default function MemoryDetailScreen() {
 
   return (
     <View style={s.screen}>
-      <View>
-        <JourneyHeader />
+      <View style={s.topBar}>
         <Pressable style={s.back} onPress={goBack} hitSlop={10} accessibilityRole="button" accessibilityLabel="Voltar">
           <Text style={s.backArrow}>←</Text>
         </Pressable>
@@ -100,7 +98,7 @@ export default function MemoryDetailScreen() {
             </Pressable>
           </View>
         ) : !memory ? (
-          <ActivityIndicator color={colors.terra} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={colors.coral} style={{ marginTop: 48 }} />
         ) : (
           <>
             <Text style={s.title}>{memory.title}</Text>
@@ -165,63 +163,56 @@ export default function MemoryDetailScreen() {
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.sky },
+  screen: { flex: 1, backgroundColor: colors.paper },
+  topBar: {
+    paddingTop: 52,
+    paddingBottom: 6,
+    paddingHorizontal: 18,
+    backgroundColor: colors.paper,
+  },
   back: {
-    position: "absolute",
-    top: 48,
-    left: 18,
     width: 38,
     height: 38,
     borderRadius: 19,
     backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#3A2A12",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 5,
-    elevation: 4,
   },
   backArrow: { fontSize: 20, color: colors.ink, marginTop: -2 },
   body: {
     flex: 1,
     backgroundColor: colors.paper,
-    marginTop: -22,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
     paddingHorizontal: 28,
-    paddingTop: 26,
+    paddingTop: 8,
   },
   center: { marginTop: 40, alignItems: "center", gap: 12 },
   error: { color: colors.danger, textAlign: "center", fontSize: 15 },
   title: { fontFamily: serif, fontSize: 28, color: colors.ink, lineHeight: 34 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 8 },
-  pin: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.terra },
-  meta: { color: colors.terraDeep, fontSize: 13, fontWeight: "600" },
-  image: { width: "100%", maxWidth: 560, alignSelf: "center", aspectRatio: 4 / 3, borderRadius: 14, marginTop: 16, backgroundColor: colors.sky, borderWidth: 1, borderColor: colors.line },
+  pin: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.coral },
+  meta: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1, textTransform: "uppercase" },
+  // Foto emoldurada como arte de capa: moldura carvão, canto quase reto.
+  image: { width: "100%", maxWidth: 560, alignSelf: "center", aspectRatio: 4 / 3, borderRadius: 3, marginTop: 16, backgroundColor: colors.sand, borderWidth: 3, borderColor: colors.frame },
   text: { color: colors.ink, fontSize: 16, lineHeight: 25, marginTop: 18 },
   divider: { height: 1, backgroundColor: colors.line, marginTop: 28 },
-  quote: { fontFamily: serif, fontStyle: "italic", fontSize: 16, color: colors.inkSoft, textAlign: "center", marginTop: 18 },
+  quote: { fontFamily: serif, fontStyle: "italic", fontSize: 16, color: colors.bloom, textAlign: "center", marginTop: 18 },
   editBtn: {
     marginTop: 30,
-    backgroundColor: colors.terra,
-    borderRadius: 12,
+    backgroundColor: colors.gold,
+    borderRadius: 8,
     paddingVertical: 13,
     alignItems: "center",
-    shadowColor: colors.terraDeep,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  editText: { color: "#FBF6E8", fontSize: 15, fontWeight: "600", letterSpacing: 0.3 },
+  editText: { fontFamily: mono, color: colors.pageBg, fontSize: 13, fontWeight: "700", letterSpacing: 1.4, textTransform: "uppercase" },
   deleteBtn: { marginTop: 14, alignItems: "center", paddingVertical: 12 },
   deleteText: { color: colors.danger, fontSize: 14, fontWeight: "500" },
   confirmRow: { marginTop: 32, alignItems: "center", gap: 14 },
   confirmText: { color: colors.ink, fontSize: 15, fontWeight: "600" },
   confirmActions: { flexDirection: "row", alignItems: "center", gap: 18 },
-  confirmYesBtn: { backgroundColor: colors.danger, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 22 },
-  confirmYesText: { color: "#FBF6E8", fontSize: 14, fontWeight: "700" },
+  confirmYesBtn: { backgroundColor: colors.danger, borderRadius: 8, paddingVertical: 11, paddingHorizontal: 22 },
+  confirmYesText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   confirmNo: { color: colors.inkSoft, fontSize: 14 },
-  open: { color: colors.terraDeep, fontWeight: "600", fontSize: 14 },
+  open: { color: colors.coral, fontWeight: "600", fontSize: 14 },
 });

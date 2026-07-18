@@ -140,7 +140,7 @@ export default function MemoryNewScreen() {
         />
 
         {error ? (
-          <Text style={{ color: "#A32D2D", fontSize: 13, marginTop: 12, textAlign: "center" }}>
+          <Text style={{ color: colors.danger, fontSize: 13, marginTop: 12, textAlign: "center" }}>
             {error}
           </Text>
         ) : null}

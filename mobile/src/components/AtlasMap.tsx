@@ -27,15 +27,21 @@ const HTML = `<!DOCTYPE html>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   html, body, #map { height: 100%; margin: 0; padding: 0; }
-  body { background: ${colors.sky}; }
-  .leaflet-container { background: ${colors.sky}; }
+  body { background: ${colors.sand}; }
+  .leaflet-container { background: ${colors.sand}; }
+  .leaflet-bar a, .leaflet-bar a:hover, .leaflet-bar a:focus {
+    background-color: ${colors.card} !important; color: ${colors.ink} !important;
+    border-bottom-color: rgba(242,234,216,0.15) !important;
+  }
+  .leaflet-control-attribution { background: rgba(13,21,36,0.75); color: ${colors.placeholder}; }
+  .leaflet-control-attribution a { color: ${colors.inkSoft}; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <script>
   var map, layer;
-  var TERRA = '${colors.terra}', TEAL = '${colors.teal}', BORDER = '${colors.card}', TRACK = '${colors.terraDeep}';
+  var TERRA = '${colors.coral}', TEAL = '${colors.mint}', BORDER = '${colors.ink}', TRACK = '${colors.gold}';
 
   function post(o) {
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(o));
@@ -80,8 +86,8 @@ const HTML = `<!DOCTYPE html>
   };
   function init() {
     map = L.map('map', { center: [-14.235, -51.925], zoom: 4 });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '© OpenStreetMap'
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
     }).addTo(map);
     layer = L.layerGroup().addTo(map);
     post({ type: 'ready' });
@@ -146,7 +152,7 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
         </View>
       ) : !ready ? (
         <View style={s.overlay}>
-          <ActivityIndicator color={colors.terra} />
+          <ActivityIndicator color={colors.coral} />
           <Text style={s.hint}>Carregando mapa…</Text>
         </View>
       ) : null}
@@ -155,17 +161,18 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
 }
 
 const s = StyleSheet.create({
+  // Moldura de "arte de álbum": carvão grosso, canto quase reto.
   shell: {
     position: "relative",
     width: "100%",
     height: 380,
-    borderRadius: 18,
+    borderRadius: 3,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.sky,
+    borderWidth: 3,
+    borderColor: colors.frame,
+    backgroundColor: colors.sand,
   },
-  web: { flex: 1, backgroundColor: colors.sky },
+  web: { flex: 1, backgroundColor: colors.sand },
   overlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", gap: 6 },
   hint: { color: colors.inkSoft, fontSize: 13, textAlign: "center" },
   errText: { color: colors.danger, fontSize: 14, fontWeight: "600", textAlign: "center" },

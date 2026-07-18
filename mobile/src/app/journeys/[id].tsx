@@ -6,7 +6,7 @@ import AtlasMap from "../../components/AtlasMap";
 import * as api from "../../lib/api";
 import { STATUS_COLOR, STATUS_LABEL } from "../../lib/journeyStatus";
 import { useTrackRecorder } from "../../lib/useTrackRecorder";
-import { colors, serif } from "../../theme/colors";
+import { colors, mono, serif } from "../../theme/colors";
 
 function formatDate(iso: string): string {
   try {
@@ -196,7 +196,7 @@ export default function JourneyDetailScreen() {
   if (!journey) {
     return (
       <View style={s.screen}>
-        <ActivityIndicator color={colors.terra} style={{ marginTop: 80 }} />
+        <ActivityIndicator color={colors.coral} style={{ marginTop: 80 }} />
       </View>
     );
   }
@@ -483,7 +483,7 @@ export default function JourneyDetailScreen() {
                 <Text style={s.sectionLabel}>MEMÓRIAS SOLTAS</Text>
                 {addError ? <Text style={s.inlineError}>{addError}</Text> : null}
                 {loose === null ? (
-                  <ActivityIndicator color={colors.terra} style={{ marginVertical: 16 }} />
+                  <ActivityIndicator color={colors.coral} style={{ marginVertical: 16 }} />
                 ) : loose.length === 0 ? (
                   <Text style={s.emptyPoints}>Nenhuma memória solta para trazer.</Text>
                 ) : (
@@ -541,40 +541,40 @@ const s = StyleSheet.create({
   inlineError: { color: colors.danger, fontSize: 13, marginTop: 12 },
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 14 },
   title: { fontFamily: serif, fontSize: 27, color: colors.ink, flex: 1 },
-  badge: { borderRadius: 20, paddingVertical: 3, paddingHorizontal: 10 },
-  badgeText: { color: "#FBF6E8", fontSize: 11, fontWeight: "700", letterSpacing: 0.3 },
+  badge: { borderRadius: 3, paddingVertical: 4, paddingHorizontal: 9 },
+  badgeText: { fontFamily: mono, color: colors.pageBg, fontSize: 10, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
   desc: { color: colors.inkSoft, fontSize: 14, lineHeight: 21, marginTop: 8 },
-  meta: { color: colors.terraDeep, fontSize: 12, fontWeight: "600", marginTop: 8 },
+  meta: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginTop: 8 },
   actions: { flexDirection: "row", gap: 10, marginTop: 16 },
-  primary: { backgroundColor: colors.terra, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 20, alignItems: "center" },
-  primaryText: { color: "#FBF6E8", fontSize: 14, fontWeight: "700" },
-  secondary: { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.terra, borderRadius: 11, paddingVertical: 11, paddingHorizontal: 20, alignItems: "center" },
-  secondaryText: { color: colors.terraDeep, fontSize: 14, fontWeight: "700" },
+  primary: { backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 11, paddingHorizontal: 20, alignItems: "center" },
+  primaryText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
+  secondary: { backgroundColor: "transparent", borderWidth: 1.5, borderColor: colors.gold, borderRadius: 8, paddingVertical: 11, paddingHorizontal: 20, alignItems: "center" },
+  secondaryText: { fontFamily: mono, color: colors.gold, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   disabled: { opacity: 0.5 },
-  finishedNote: { color: colors.sage, fontSize: 14, fontWeight: "600" },
-  sectionLabel: { fontSize: 11, letterSpacing: 1.2, color: colors.inkSoft, marginTop: 26, marginBottom: 10 },
+  finishedNote: { color: colors.violet, fontSize: 14, fontWeight: "600" },
+  sectionLabel: { fontFamily: mono, fontSize: 11, letterSpacing: 1.6, color: colors.bloom, marginTop: 26, marginBottom: 10 },
   emptyPoints: { color: colors.inkSoft, fontSize: 14, lineHeight: 20 },
-  point: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12 },
-  pos: { fontFamily: serif, fontSize: 16, color: colors.terra, width: 20, textAlign: "center" },
+  point: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 8, padding: 12 },
+  pos: { fontFamily: mono, fontSize: 14, color: colors.gold, width: 22, textAlign: "center" },
   pointTitle: { fontFamily: serif, fontSize: 16, color: colors.ink },
   pointMeta: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   pointActions: { flexDirection: "row", alignItems: "center", gap: 12 },
-  move: { fontSize: 18, color: colors.terraDeep, fontWeight: "700" },
+  move: { fontSize: 18, color: colors.coral, fontWeight: "700" },
   moveOff: { color: colors.line },
   remove: { fontSize: 15, color: colors.danger, fontWeight: "700" },
-  addNew: { backgroundColor: colors.terra, borderRadius: 11, paddingVertical: 12, alignItems: "center" },
-  addNewText: { color: "#FBF6E8", fontSize: 14, fontWeight: "600" },
+  addNew: { backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 12, alignItems: "center" },
+  addNewText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   linkExisting: { marginTop: 12, alignItems: "center", paddingVertical: 8 },
-  linkExistingText: { color: colors.teal, fontSize: 14, fontWeight: "600" },
-  addBox: { marginTop: 8, backgroundColor: "rgba(61,138,152,0.08)", borderRadius: 12, padding: 12 },
-  looseRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderRadius: 10, padding: 10 },
-  addPlus: { color: colors.terraDeep, fontSize: 13, fontWeight: "700" },
+  linkExistingText: { color: colors.mint, fontSize: 14, fontWeight: "600" },
+  addBox: { marginTop: 8, backgroundColor: "rgba(55,195,162,0.08)", borderRadius: 8, padding: 12 },
+  looseRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderRadius: 8, padding: 10 },
+  addPlus: { color: colors.gold, fontSize: 13, fontWeight: "700" },
   closeAdd: { color: colors.inkSoft, fontSize: 13, textAlign: "center", marginTop: 12 },
   confirmRow: { marginTop: 34, alignItems: "center", gap: 12 },
   confirmText: { color: colors.ink, fontSize: 14, fontWeight: "600", textAlign: "center", lineHeight: 20 },
   confirmActions: { flexDirection: "row", alignItems: "center", gap: 18 },
-  confirmYes: { backgroundColor: colors.danger, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 22 },
-  confirmYesText: { color: "#FBF6E8", fontSize: 14, fontWeight: "700" },
+  confirmYes: { backgroundColor: colors.danger, borderRadius: 8, paddingVertical: 11, paddingHorizontal: 22 },
+  confirmYesText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   confirmNo: { color: colors.inkSoft, fontSize: 14 },
   deleteBtn: { marginTop: 32, alignItems: "center", paddingVertical: 12 },
   deleteText: { color: colors.danger, fontSize: 14, fontWeight: "500" },
@@ -582,8 +582,8 @@ const s = StyleSheet.create({
   editInput: {
     backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: colors.line,
-    borderRadius: 12,
+    borderColor: "rgba(242,234,216,0.18)",
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
@@ -591,26 +591,27 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   editActions: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 8 },
-  editLink: { color: colors.teal, fontSize: 13, fontWeight: "600", marginTop: 10 },
-  mood: { fontFamily: serif, fontStyle: "italic", color: colors.inkSoft, fontSize: 14.5, marginTop: 6 },
+  editLink: { color: colors.mint, fontSize: 13, fontWeight: "600", marginTop: 10 },
+  // Atmosfera em itálico dourado: o toque afetivo da jornada.
+  mood: { fontFamily: serif, fontStyle: "italic", color: colors.bloom, fontSize: 14.5, marginTop: 6 },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 2, marginBottom: 4 },
-  track: { width: 46, height: 27, borderRadius: 14, backgroundColor: "rgba(35,39,47,0.18)", padding: 3, justifyContent: "center" },
-  trackOn: { backgroundColor: colors.sage },
-  knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.card },
+  track: { width: 46, height: 27, borderRadius: 14, backgroundColor: "rgba(242,234,216,0.16)", padding: 3, justifyContent: "center" },
+  trackOn: { backgroundColor: colors.mint },
+  knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.ink },
   knobOn: { alignSelf: "flex-end" },
   toggleText: { color: colors.inkSoft, fontSize: 14, flex: 1 },
   // Percurso real
-  recBox: { marginTop: 4, backgroundColor: "rgba(206,90,44,0.08)", borderRadius: 12, padding: 12, gap: 10 },
+  recBox: { marginTop: 4, backgroundColor: "rgba(240,120,74,0.08)", borderRadius: 8, padding: 12, gap: 10 },
   recRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.inkSoft },
-  recDotOn: { backgroundColor: colors.terra },
+  recDotOn: { backgroundColor: colors.coral },
   recLabel: { color: colors.ink, fontSize: 14, fontWeight: "600" },
   recActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  trackStart: { backgroundColor: colors.ink, borderRadius: 11, paddingVertical: 12, alignItems: "center" },
-  trackStartText: { color: colors.card, fontSize: 14, fontWeight: "600", letterSpacing: 0.3 },
+  trackStart: { backgroundColor: colors.coral, borderRadius: 8, paddingVertical: 12, alignItems: "center" },
+  trackStartText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   modeRow: { flexDirection: "row", gap: 20, marginTop: 18, borderBottomWidth: 1, borderColor: colors.line, paddingBottom: 8 },
   modeTab: { color: colors.inkSoft, fontSize: 14, fontWeight: "600" },
-  modeTabOn: { color: colors.terra },
-  trackMeta: { color: colors.terraDeep, fontSize: 12, fontWeight: "600", marginTop: 10 },
+  modeTabOn: { color: colors.coral },
+  trackMeta: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginTop: 10 },
   trackHint: { color: colors.inkSoft, fontSize: 13, lineHeight: 19, marginTop: 8 },
 });

@@ -11,7 +11,7 @@ export default function AppTabsLayout() {
   if (auth.checking) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.paper }}>
-        <ActivityIndicator color={colors.coral} />
+        <ActivityIndicator color={colors.cyan} />
       </View>
     );
   }

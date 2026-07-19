@@ -196,7 +196,7 @@ export default function JourneyDetailScreen() {
   if (!journey) {
     return (
       <View style={s.screen}>
-        <ActivityIndicator color={colors.coral} style={{ marginTop: 80 }} />
+        <ActivityIndicator color={colors.cyan} style={{ marginTop: 80 }} />
       </View>
     );
   }
@@ -483,7 +483,7 @@ export default function JourneyDetailScreen() {
                 <Text style={s.sectionLabel}>MEMÓRIAS SOLTAS</Text>
                 {addError ? <Text style={s.inlineError}>{addError}</Text> : null}
                 {loose === null ? (
-                  <ActivityIndicator color={colors.coral} style={{ marginVertical: 16 }} />
+                  <ActivityIndicator color={colors.cyan} style={{ marginVertical: 16 }} />
                 ) : loose.length === 0 ? (
                   <Text style={s.emptyPoints}>Nenhuma memória solta para trazer.</Text>
                 ) : (
@@ -542,16 +542,16 @@ const s = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 14 },
   title: { fontFamily: serif, fontSize: 27, color: colors.ink, flex: 1 },
   badge: { borderRadius: 3, paddingVertical: 4, paddingHorizontal: 9 },
-  badgeText: { fontFamily: mono, color: colors.pageBg, fontSize: 10, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
+  badgeText: { fontFamily: mono, color: colors.ink, fontSize: 10, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
   desc: { color: colors.inkSoft, fontSize: 14, lineHeight: 21, marginTop: 8 },
   meta: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginTop: 8 },
   actions: { flexDirection: "row", gap: 10, marginTop: 16 },
-  primary: { backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 11, paddingHorizontal: 20, alignItems: "center" },
-  primaryText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
+  primary: { backgroundColor: colors.wine, borderRadius: 8, paddingVertical: 11, paddingHorizontal: 20, alignItems: "center" },
+  primaryText: { fontFamily: mono, color: colors.ink, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   secondary: { backgroundColor: "transparent", borderWidth: 1.5, borderColor: colors.gold, borderRadius: 8, paddingVertical: 11, paddingHorizontal: 20, alignItems: "center" },
   secondaryText: { fontFamily: mono, color: colors.gold, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   disabled: { opacity: 0.5 },
-  finishedNote: { color: colors.violet, fontSize: 14, fontWeight: "600" },
+  finishedNote: { color: colors.cyan, fontSize: 14, fontWeight: "600" },
   sectionLabel: { fontFamily: mono, fontSize: 11, letterSpacing: 1.6, color: colors.bloom, marginTop: 26, marginBottom: 10 },
   emptyPoints: { color: colors.inkSoft, fontSize: 14, lineHeight: 20 },
   point: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.line, borderRadius: 8, padding: 12 },
@@ -559,14 +559,14 @@ const s = StyleSheet.create({
   pointTitle: { fontFamily: serif, fontSize: 16, color: colors.ink },
   pointMeta: { color: colors.inkSoft, fontSize: 12, marginTop: 2 },
   pointActions: { flexDirection: "row", alignItems: "center", gap: 12 },
-  move: { fontSize: 18, color: colors.coral, fontWeight: "700" },
+  move: { fontSize: 18, color: colors.cyan, fontWeight: "700" },
   moveOff: { color: colors.line },
   remove: { fontSize: 15, color: colors.danger, fontWeight: "700" },
-  addNew: { backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 12, alignItems: "center" },
-  addNewText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
+  addNew: { backgroundColor: colors.wine, borderRadius: 8, paddingVertical: 12, alignItems: "center" },
+  addNewText: { fontFamily: mono, color: colors.ink, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   linkExisting: { marginTop: 12, alignItems: "center", paddingVertical: 8 },
-  linkExistingText: { color: colors.mint, fontSize: 14, fontWeight: "600" },
-  addBox: { marginTop: 8, backgroundColor: "rgba(55,195,162,0.08)", borderRadius: 8, padding: 12 },
+  linkExistingText: { color: colors.cyan, fontSize: 14, fontWeight: "600" },
+  addBox: { marginTop: 8, backgroundColor: "rgba(37,178,198,0.08)", borderRadius: 8, padding: 12 },
   looseRow: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.card, borderRadius: 8, padding: 10 },
   addPlus: { color: colors.gold, fontSize: 13, fontWeight: "700" },
   closeAdd: { color: colors.inkSoft, fontSize: 13, textAlign: "center", marginTop: 12 },
@@ -591,27 +591,27 @@ const s = StyleSheet.create({
     marginBottom: 6,
   },
   editActions: { flexDirection: "row", alignItems: "center", gap: 18, marginTop: 8 },
-  editLink: { color: colors.mint, fontSize: 13, fontWeight: "600", marginTop: 10 },
+  editLink: { color: colors.cyan, fontSize: 13, fontWeight: "600", marginTop: 10 },
   // Atmosfera em itálico dourado: o toque afetivo da jornada.
   mood: { fontFamily: serif, fontStyle: "italic", color: colors.bloom, fontSize: 14.5, marginTop: 6 },
   toggleRow: { flexDirection: "row", alignItems: "center", gap: 12, marginTop: 2, marginBottom: 4 },
   track: { width: 46, height: 27, borderRadius: 14, backgroundColor: "rgba(242,234,216,0.16)", padding: 3, justifyContent: "center" },
-  trackOn: { backgroundColor: colors.mint },
+  trackOn: { backgroundColor: colors.cyan },
   knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.ink },
   knobOn: { alignSelf: "flex-end" },
   toggleText: { color: colors.inkSoft, fontSize: 14, flex: 1 },
   // Percurso real
-  recBox: { marginTop: 4, backgroundColor: "rgba(240,120,74,0.08)", borderRadius: 8, padding: 12, gap: 10 },
+  recBox: { marginTop: 4, backgroundColor: "rgba(183,49,79,0.08)", borderRadius: 8, padding: 12, gap: 10 },
   recRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.inkSoft },
-  recDotOn: { backgroundColor: colors.coral },
+  recDotOn: { backgroundColor: colors.wine },
   recLabel: { color: colors.ink, fontSize: 14, fontWeight: "600" },
   recActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  trackStart: { backgroundColor: colors.coral, borderRadius: 8, paddingVertical: 12, alignItems: "center" },
-  trackStartText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
+  trackStart: { backgroundColor: colors.wine, borderRadius: 8, paddingVertical: 12, alignItems: "center" },
+  trackStartText: { fontFamily: mono, color: colors.ink, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   modeRow: { flexDirection: "row", gap: 20, marginTop: 18, borderBottomWidth: 1, borderColor: colors.line, paddingBottom: 8 },
   modeTab: { color: colors.inkSoft, fontSize: 14, fontWeight: "600" },
-  modeTabOn: { color: colors.coral },
+  modeTabOn: { color: colors.cyan },
   trackMeta: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginTop: 10 },
   trackHint: { color: colors.inkSoft, fontSize: 13, lineHeight: 19, marginTop: 8 },
 });

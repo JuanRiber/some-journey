@@ -5,6 +5,12 @@ body {
   color-scheme: dark;
 }
 
+/* Fundo do container do mapa: navy (não o cinza padrão do Leaflet) enquanto os
+   tiles escuros não chegam — sem flash cinza no atlas noturno. */
+.leaflet-container {
+  background: #16213a !important;
+}
+
 /* Controles do Leaflet no tema noturno (zoom e attribution). O !important é
    necessário: o leaflet.css é importado depois deste arquivo e venceria o
    empate de especificidade. */

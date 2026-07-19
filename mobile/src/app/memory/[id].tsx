@@ -98,7 +98,7 @@ export default function MemoryDetailScreen() {
             </Pressable>
           </View>
         ) : !memory ? (
-          <ActivityIndicator color={colors.coral} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={colors.cyan} style={{ marginTop: 48 }} />
         ) : (
           <>
             <Text style={s.title}>{memory.title}</Text>
@@ -113,7 +113,7 @@ export default function MemoryDetailScreen() {
               <Image key={img.id} source={{ uri: img.url }} style={s.image} contentFit="cover" transition={200} />
             ))}
 
-            <Text style={s.text}>{memory.text}</Text>
+            {memory.text ? <Text style={s.text}>{memory.text}</Text> : null}
 
             {/* Os chips de Humor e Trilha dos mockups dependem de campos fora do
                 schema atual (e "trilha" cairia em referência de banda) — entram
@@ -191,7 +191,7 @@ const s = StyleSheet.create({
   error: { color: colors.danger, textAlign: "center", fontSize: 15 },
   title: { fontFamily: serif, fontSize: 28, color: colors.ink, lineHeight: 34 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 8 },
-  pin: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.coral },
+  pin: { width: 9, height: 9, borderRadius: 5, backgroundColor: colors.wine },
   meta: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1, textTransform: "uppercase" },
   // Foto emoldurada como arte de capa: moldura carvão, canto quase reto.
   image: { width: "100%", maxWidth: 560, alignSelf: "center", aspectRatio: 4 / 3, borderRadius: 3, marginTop: 16, backgroundColor: colors.sand, borderWidth: 3, borderColor: colors.frame },
@@ -214,5 +214,5 @@ const s = StyleSheet.create({
   confirmYesBtn: { backgroundColor: colors.danger, borderRadius: 8, paddingVertical: 11, paddingHorizontal: 22 },
   confirmYesText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
   confirmNo: { color: colors.inkSoft, fontSize: 14 },
-  open: { color: colors.coral, fontWeight: "600", fontSize: 14 },
+  open: { color: colors.cyan, fontWeight: "600", fontSize: 14 },
 });

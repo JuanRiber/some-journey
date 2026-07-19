@@ -113,7 +113,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  addPlus: { color: colors.mint, fontSize: 24, fontWeight: "700", marginBottom: -2 },
-  addHint: { color: colors.mint, fontSize: 11, fontWeight: "600" },
+  addPlus: { color: colors.cyan, fontSize: 24, fontWeight: "700", marginBottom: -2 },
+  addHint: { color: colors.cyan, fontSize: 11, fontWeight: "600" },
   error: { color: colors.danger, fontSize: 12, marginTop: 8 },
 });

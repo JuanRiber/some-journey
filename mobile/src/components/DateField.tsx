@@ -21,7 +21,7 @@ export default function DateField({ value, onChange }: Props) {
         accessibilityRole="button"
         accessibilityLabel="Escolher data"
       >
-        <Text style={{ fontSize: 16, color: value ? colors.ink : colors.placeholder }}>
+        <Text style={{ fontSize: 15, color: value ? colors.ink : colors.placeholder }}>
           {value || "Escolher data"}
         </Text>
       </Pressable>

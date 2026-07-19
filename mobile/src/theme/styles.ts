@@ -7,16 +7,17 @@ import { colors, mono, serif } from "./colors";
 // como cor de ação.
 export const ui = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.paper },
+  // contentContainerStyle do ScrollView raiz das telas de auth (rolam em
+  // aparelhos baixos / com o teclado aberto).
+  scrollBody: { flexGrow: 1, paddingBottom: 40 },
 
   body: {
-    flex: 1,
-    backgroundColor: colors.paper,
     paddingHorizontal: 28,
     paddingTop: 26,
   },
 
   brandRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  pin: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.coral },
+  pin: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.wine },
   // O wordmark da landing: serifa itálica dourada.
   wordmark: { fontFamily: serif, fontStyle: "italic", fontSize: 32, color: colors.gold },
   tagline: { fontFamily: serif, fontStyle: "italic", fontSize: 15, color: colors.inkSoft, marginTop: 6 },
@@ -39,20 +40,20 @@ export const ui = StyleSheet.create({
   hint: { fontSize: 12, color: colors.inkSoft, marginTop: 6 },
 
   forgotWrap: { alignSelf: "flex-end", marginTop: 12 },
-  forgot: { color: colors.mint, fontSize: 13, fontWeight: "600" },
+  forgot: { color: colors.cyan, fontSize: 13, fontWeight: "600" },
 
-  // Botão da landing: dourado, texto navy em mono caixa alta.
+  // Botão primário: vinho, texto creme em mono caixa alta.
   button: {
-    backgroundColor: colors.gold,
+    backgroundColor: colors.wine,
     borderRadius: 8,
     paddingVertical: 15,
     alignItems: "center",
     marginTop: 26,
   },
-  buttonPressed: { backgroundColor: colors.goldDeep },
+  buttonPressed: { backgroundColor: colors.wineDeep },
   buttonText: {
     fontFamily: mono,
-    color: colors.pageBg,
+    color: colors.ink,
     fontSize: 13,
     fontWeight: "700",
     letterSpacing: 1.6,
@@ -61,7 +62,7 @@ export const ui = StyleSheet.create({
 
   footerRow: { flexDirection: "row", justifyContent: "center", marginTop: 26 },
   footerText: { color: colors.inkSoft, fontSize: 14 },
-  footerLink: { color: colors.gold, fontSize: 14, fontWeight: "700" },
+  footerLink: { color: colors.cyan, fontSize: 14, fontWeight: "700" },
 
   backWrap: { marginTop: 26, alignItems: "center" },
   back: { color: colors.ink, fontSize: 14, fontWeight: "500" },

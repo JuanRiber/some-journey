@@ -87,7 +87,7 @@ export default function TimelineScreen() {
         <Text style={s.subtitle}>As memórias do seu atlas em ordem viva.</Text>
 
         {memories === null && !error ? (
-          <ActivityIndicator color={colors.coral} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={colors.cyan} style={{ marginTop: 48 }} />
         ) : error ? (
           <Text style={s.error}>{error}</Text>
         ) : memories!.length === 0 ? (
@@ -174,7 +174,7 @@ const s = StyleSheet.create({
   spineFull: { position: "absolute", left: 13, top: 0, bottom: 0, width: 2, backgroundColor: LINE },
   spineFirst: { position: "absolute", left: 13, top: 26, bottom: 0, width: 2, backgroundColor: LINE },
   spineLast: { position: "absolute", left: 13, top: 0, height: 34, width: 2, backgroundColor: LINE },
-  railDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.coral, marginTop: 22, zIndex: 1 },
+  railDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.wine, marginTop: 22, zIndex: 1 },
   yearRow: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: 22, marginBottom: 4 },
   // O ano como numeral mono dourado, ecoando o "01 / 02 / 03" da landing.
   year: { fontFamily: mono, fontSize: 36, color: colors.gold, letterSpacing: 2 },
@@ -185,7 +185,7 @@ const s = StyleSheet.create({
   thumb: { width: 54, height: 54, borderRadius: 10, backgroundColor: colors.sand, borderWidth: 1, borderColor: colors.line },
   cardTitle: { fontFamily: serif, fontSize: 17, color: colors.ink },
   coordRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  pin: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.coral },
+  pin: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.wine },
   coords: { color: colors.inkSoft, fontSize: 12 },
-  open: { color: colors.coral, fontWeight: "600", fontSize: 13, marginTop: 8 },
+  open: { color: colors.cyan, fontWeight: "600", fontSize: 13, marginTop: 8 },
 });

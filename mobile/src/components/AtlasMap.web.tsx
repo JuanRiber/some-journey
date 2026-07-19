@@ -56,6 +56,12 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
           center: DEFAULT_CENTER,
           zoom: DEFAULT_ZOOM,
           scrollWheelZoom: false,
+          // Mundo ÚNICO que dá a volta: ao arrastar para além da borda, a vista
+          // salta para a cópia equivalente do mesmo mundo, mantendo os pins
+          // sempre visíveis (sem "vários Brasils" sem marcação). minZoom evita
+          // afastar a ponto de ver o mundo repetido lado a lado.
+          worldCopyJump: true,
+          minZoom: 2,
         });
         map.on("focus", () => map.scrollWheelZoom.enable());
         map.on("blur", () => map.scrollWheelZoom.disable());
@@ -103,12 +109,12 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
       if (j.route && j.route.coordinates.length >= 2) {
         // GeoJSON é [lng, lat]; Leaflet quer [lat, lng].
         const line = j.route.coordinates.map(([lng, lat]) => [lat, lng]) as [number, number][];
-        L.polyline(line, { color: colors.coral, weight: 3, opacity: 0.75 }).addTo(layer);
+        L.polyline(line, { color: colors.cyan, weight: 3, opacity: 0.75 }).addTo(layer);
       }
-      for (const p of j.points) addPin(p.latitude, p.longitude, p.title, p.memory_id, colors.coral);
+      for (const p of j.points) addPin(p.latitude, p.longitude, p.title, p.memory_id, colors.wine);
     }
     // Pins soltos (teal).
-    for (const m of data.loose_points) addPin(m.latitude, m.longitude, m.title, m.memory_id, colors.mint);
+    for (const m of data.loose_points) addPin(m.latitude, m.longitude, m.title, m.memory_id, colors.cyan);
 
     // Percursos reais (GPS): traço dourado, mais grosso que o rastro simbólico.
     for (const coords of tracks ?? []) {
@@ -133,7 +139,7 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
         </View>
       ) : !ready ? (
         <View style={s.overlay}>
-          <ActivityIndicator color={colors.coral} />
+          <ActivityIndicator color={colors.cyan} />
           <Text style={s.hint}>Carregando mapa…</Text>
         </View>
       ) : null}

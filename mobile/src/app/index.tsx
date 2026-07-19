@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
 import JourneyHeader from "../components/JourneyHeader";
@@ -29,7 +29,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={ui.screen}>
+    <ScrollView style={ui.screen} contentContainerStyle={ui.scrollBody} keyboardShouldPersistTaps="handled">
       <JourneyHeader />
 
       {/* O wordmark e a tagline vivem na própria arte do topo. */}
@@ -81,6 +81,6 @@ export default function LoginScreen() {
           </Pressable>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }

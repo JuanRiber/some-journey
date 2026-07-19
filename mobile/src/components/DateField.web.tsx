@@ -19,14 +19,16 @@ export default function DateField({ value, onChange }: Props) {
       style={{
         width: "100%",
         boxSizing: "border-box",
-        padding: 14,
+        // Alinhado ao ui.input: padding 15/13, raio 8, borda creme translúcida.
+        padding: "13px 15px",
         marginTop: 6,
-        fontSize: 16,
-        borderRadius: 12,
-        border: `1px solid ${colors.line}`,
+        fontSize: 15,
+        borderRadius: 8,
+        border: "1px solid rgba(243,236,220,0.16)",
         backgroundColor: colors.card,
         color: colors.ink,
         fontFamily: "inherit",
+        colorScheme: "dark",
       }}
     />
   );

@@ -41,7 +41,7 @@ const HTML = `<!DOCTYPE html>
 <div id="map"></div>
 <script>
   var map, layer;
-  var TERRA = '${colors.coral}', TEAL = '${colors.mint}', BORDER = '${colors.ink}', TRACK = '${colors.gold}';
+  var TERRA = '${colors.wine}', TEAL = '${colors.cyan}', BORDER = '${colors.ink}', TRACK = '${colors.gold}';
 
   function post(o) {
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(o));
@@ -85,7 +85,7 @@ const HTML = `<!DOCTYPE html>
     else if (all.length > 1) map.fitBounds(all, { padding: [40, 40] });
   };
   function init() {
-    map = L.map('map', { center: [-14.235, -51.925], zoom: 4 });
+    map = L.map('map', { center: [-14.235, -51.925], zoom: 4, worldCopyJump: true, minZoom: 2 });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
     }).addTo(map);
@@ -152,7 +152,7 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
         </View>
       ) : !ready ? (
         <View style={s.overlay}>
-          <ActivityIndicator color={colors.coral} />
+          <ActivityIndicator color={colors.cyan} />
           <Text style={s.hint}>Carregando mapa…</Text>
         </View>
       ) : null}

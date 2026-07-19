@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
 import JourneyHeader from "../components/JourneyHeader";
@@ -29,7 +29,7 @@ export default function RegisterScreen() {
   }
 
   return (
-    <View style={ui.screen}>
+    <ScrollView style={ui.screen} contentContainerStyle={ui.scrollBody} keyboardShouldPersistTaps="handled">
       <JourneyHeader />
 
       <View style={ui.body}>
@@ -89,6 +89,6 @@ export default function RegisterScreen() {
           </Pressable>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }

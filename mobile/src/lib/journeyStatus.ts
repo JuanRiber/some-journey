@@ -10,11 +10,12 @@ export const STATUS_LABEL: Record<JourneyStatus, string> = {
   finished: "Concluída",
 };
 
-// Selos vivos sobre o navy (texto escuro em cima; ver badgeText nas telas):
-// ativa = coral, pausada = dourado, concluída = violeta (o atlas permanente).
+// Selos com TEXTO CREME (ver badgeText nas telas): todas as cores são
+// escuras/médias o bastante para o creme ler ≥5:1. Rascunho = ardósia,
+// ativa = vinho, pausada = bronze, concluída = ciano profundo.
 export const STATUS_COLOR: Record<JourneyStatus, string> = {
-  draft: colors.inkSoft,
-  active: colors.coral,
-  paused: colors.gold,
-  finished: colors.violet,
+  draft: "#4A5364",
+  active: colors.wine,
+  paused: "#8A5A1E",
+  finished: colors.cyanDeep,
 };

@@ -76,7 +76,7 @@ export default function AtlasScreen() {
         </Pressable>
 
         {map === null && !error ? (
-          <ActivityIndicator color={colors.coral} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={colors.cyan} style={{ marginTop: 40 }} />
         ) : error ? (
           <Text style={s.error}>{error}</Text>
         ) : (
@@ -84,11 +84,11 @@ export default function AtlasScreen() {
             <AtlasMap data={map} onSelect={(id) => router.push(`/memory/${id}`)} />
             <View style={s.legend}>
               <View style={s.legendItem}>
-                <View style={[s.dot, { backgroundColor: colors.mint }]} />
+                <View style={[s.dot, { backgroundColor: colors.cyan }]} />
                 <Text style={s.legendText}>Pontos soltos</Text>
               </View>
               <View style={s.legendItem}>
-                <View style={[s.dot, { backgroundColor: colors.coral }]} />
+                <View style={[s.dot, { backgroundColor: colors.wine }]} />
                 <Text style={s.legendText}>Jornadas + rastros</Text>
               </View>
             </View>
@@ -117,7 +117,7 @@ const s = StyleSheet.create({
   overline: { fontFamily: mono, fontSize: 11, letterSpacing: 2, color: colors.gold, textTransform: "uppercase" },
   title: { fontFamily: serif, fontSize: 32, color: colors.ink, marginTop: 6 },
   sub: { color: colors.inkSoft, fontSize: 14, marginTop: 4 },
-  sair: { color: colors.mint, fontSize: 14, fontWeight: "600", marginTop: 6 },
+  sair: { color: colors.cyan, fontSize: 14, fontWeight: "600", marginTop: 6 },
   journeysLink: {
     flexDirection: "row",
     alignItems: "center",
@@ -131,7 +131,7 @@ const s = StyleSheet.create({
     marginTop: 18,
   },
   journeysLinkText: { fontFamily: serif, fontSize: 17, color: colors.ink },
-  journeysArrow: { fontSize: 18, color: colors.coral, fontWeight: "700" },
+  journeysArrow: { fontSize: 18, color: colors.cyan, fontWeight: "700" },
   error: { color: colors.danger, textAlign: "center", marginTop: 32 },
   legend: { flexDirection: "row", gap: 18, marginTop: 12, paddingHorizontal: 4 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },

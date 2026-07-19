@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 
 import JourneyHeader from "../components/JourneyHeader";
@@ -35,7 +35,7 @@ export default function ChangePasswordScreen() {
   }
 
   return (
-    <View style={ui.screen}>
+    <ScrollView style={ui.screen} contentContainerStyle={ui.scrollBody} keyboardShouldPersistTaps="handled">
       <JourneyHeader />
       <View style={ui.body}>
         <Pressable style={ui.backWrap} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Voltar">
@@ -46,7 +46,7 @@ export default function ChangePasswordScreen() {
         <Text style={ui.subtitle}>Confirme a senha atual e escolha uma nova.</Text>
 
         {done ? (
-          <Text style={{ color: colors.mint, fontSize: 15, lineHeight: 22, marginTop: 22, textAlign: "center" }}>
+          <Text style={{ color: colors.cyan, fontSize: 15, lineHeight: 22, marginTop: 22, textAlign: "center" }}>
             Senha alterada! Use a nova no próximo login.
           </Text>
         ) : (
@@ -88,6 +88,6 @@ export default function ChangePasswordScreen() {
           </>
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }

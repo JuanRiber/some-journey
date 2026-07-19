@@ -128,7 +128,7 @@ const s = StyleSheet.create({
     width: 46, height: 27, borderRadius: 14, backgroundColor: "rgba(242,234,216,0.16)",
     padding: 3, justifyContent: "center",
   },
-  trackOn: { backgroundColor: colors.mint },
+  trackOn: { backgroundColor: colors.cyan },
   knob: { width: 21, height: 21, borderRadius: 11, backgroundColor: colors.ink },
   knobOn: { alignSelf: "flex-end" },
   toggleText: { color: colors.inkSoft, fontSize: 14, flex: 1 },

@@ -47,7 +47,7 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#22304F", // capa navy de diário de viagem
+    backgroundColor: colors.sand, // capa navy de diário de viagem
     borderRadius: 2,
   },
   spine: {
@@ -56,7 +56,7 @@ const s = StyleSheet.create({
     top: 0,
     bottom: 0,
     width: 5,
-    backgroundColor: "#B88930", // lombada dourada
+    backgroundColor: colors.goldDeep, // lombada dourada
     borderTopLeftRadius: 2,
     borderBottomLeftRadius: 2,
   },
@@ -66,7 +66,7 @@ const s = StyleSheet.create({
     right: "22%",
     width: 6,
     height: 15,
-    backgroundColor: colors.coral, // marcador coral
+    backgroundColor: colors.wine, // marcador vinho
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
   },

@@ -1,4 +1,4 @@
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 
 import JourneyHeader from "../components/JourneyHeader";
@@ -9,7 +9,7 @@ import { ui } from "../theme/styles";
 // botão que não faz nada, explica os caminhos reais de hoje.
 export default function ForgotPasswordScreen() {
   return (
-    <View style={ui.screen}>
+    <ScrollView style={ui.screen} contentContainerStyle={ui.scrollBody} keyboardShouldPersistTaps="handled">
       <JourneyHeader />
 
       <View style={ui.body}>
@@ -31,6 +31,6 @@ export default function ForgotPasswordScreen() {
           <Text style={ui.buttonText}>Voltar ao login</Text>
         </Pressable>
       </View>
-    </View>
+    </ScrollView>
   );
 }

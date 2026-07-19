@@ -99,7 +99,7 @@ export default function JourneysScreen() {
         {error ? (
           <Text style={s.error}>{error}</Text>
         ) : journeys === null ? (
-          <ActivityIndicator color={colors.coral} style={{ marginTop: 48 }} />
+          <ActivityIndicator color={colors.cyan} style={{ marginTop: 48 }} />
         ) : journeys.length === 0 ? (
           <View style={s.empty}>
             <Text style={s.emptyText}>Você ainda não criou nenhuma jornada.</Text>
@@ -149,7 +149,7 @@ export default function JourneysScreen() {
                       ) : null}
                       {!j.is_private ? (
                         <View style={[s.chip, s.chipPublic]}>
-                          <Text style={[s.chipText, { color: colors.mint }]}>pública</Text>
+                          <Text style={[s.chipText, { color: colors.cyan }]}>pública</Text>
 
                         </View>
                       ) : null}
@@ -171,15 +171,15 @@ const s = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16 },
   title: { fontFamily: serif, fontSize: 32, color: colors.ink },
   sub: { fontFamily: serif, fontStyle: "italic", color: colors.inkSoft, fontSize: 14.5, marginTop: 4 },
-  newBtn: { backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
-  newBtnText: { fontFamily: mono, color: colors.pageBg, fontSize: 12, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
+  newBtn: { backgroundColor: colors.wine, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16 },
+  newBtnText: { fontFamily: mono, color: colors.ink, fontSize: 12, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
   error: { color: colors.danger, textAlign: "center", marginTop: 40 },
 
   empty: { marginTop: 60, alignItems: "center", paddingHorizontal: 12 },
   emptyText: { fontFamily: serif, fontSize: 20, color: colors.ink, textAlign: "center", lineHeight: 27 },
   emptyHint: { color: colors.inkSoft, fontSize: 14.5, textAlign: "center", marginTop: 10, lineHeight: 22 },
-  emptyCta: { marginTop: 24, backgroundColor: colors.gold, borderRadius: 8, paddingVertical: 14, paddingHorizontal: 26 },
-  emptyCtaText: { fontFamily: mono, color: colors.pageBg, fontSize: 13, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
+  emptyCta: { marginTop: 24, backgroundColor: colors.wine, borderRadius: 8, paddingVertical: 14, paddingHorizontal: 26 },
+  emptyCtaText: { fontFamily: mono, color: colors.ink, fontSize: 13, fontWeight: "700", letterSpacing: 1.2, textTransform: "uppercase" },
 
   // Card = capa de disco em miniatura: plano, moldura fina, capa dourada no topo.
   card: {
@@ -204,11 +204,11 @@ const s = StyleSheet.create({
   },
   coverPin: {
     position: "absolute", bottom: 22, left: 168, width: 14, height: 14, borderRadius: 7,
-    backgroundColor: colors.coral, borderWidth: 1.5, borderColor: colors.coralDeep,
+    backgroundColor: colors.wine, borderWidth: 1.5, borderColor: colors.wineDeep,
   },
   coverBadge: { position: "absolute", top: 12, right: 12 },
   badge: { borderRadius: 3, paddingVertical: 4, paddingHorizontal: 9 },
-  badgeText: { fontFamily: mono, color: colors.pageBg, fontSize: 10, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
+  badgeText: { fontFamily: mono, color: colors.ink, fontSize: 10, fontWeight: "700", letterSpacing: 1, textTransform: "uppercase" },
 
   body: { padding: 16 },
   cardTitle: { fontFamily: serif, fontSize: 21, color: colors.ink },
@@ -216,6 +216,6 @@ const s = StyleSheet.create({
   cardMeta: { fontFamily: mono, color: colors.bloom, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginTop: 10 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
   chip: { backgroundColor: colors.chip, borderRadius: 4, paddingVertical: 5, paddingHorizontal: 10, maxWidth: "100%" },
-  chipPublic: { backgroundColor: "rgba(55,195,162,0.12)" },
-  chipText: { color: colors.coral, fontSize: 12, fontWeight: "500" },
+  chipPublic: { backgroundColor: "rgba(37,178,198,0.12)" },
+  chipText: { color: colors.cyan, fontSize: 12, fontWeight: "500" },
 });

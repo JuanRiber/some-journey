@@ -32,5 +32,5 @@ const s = StyleSheet.create({
     maxWidth: 640,
     alignSelf: "center",
   },
-  art: { width: "100%", aspectRatio: 2.25, borderRadius: 2, backgroundColor: "#22303F" },
+  art: { width: "100%", aspectRatio: 2.25, borderRadius: 2, backgroundColor: colors.sand },
 });

@@ -111,6 +111,43 @@ def test_valid_upload_still_works(client, auth_headers, monkeypatch):
     assert r.json()["image_url"] is not None
 
 
+# --- 4b. Upload entre o teto JSON e o de imagem NÃO é barrado ---------------
+def test_upload_between_json_and_image_limits_not_rejected(client, auth_headers, monkeypatch):
+    """Regressão: a isenção de tamanho do middleware precisa reconhecer as rotas
+    de upload reais (/images e /cover). Um arquivo acima de MAX_JSON_BODY_BYTES
+    (1MB) mas abaixo de MAX_IMAGE_BYTES (5MB) deve passar do middleware — antes
+    a isenção mirava "/image" e nunca casava, então tudo >1MB virava 413."""
+    from app.core import storage
+
+    monkeypatch.setattr(storage, "enabled", lambda: True)
+    monkeypatch.setattr(storage, "upload", lambda *a, **k: None)
+    monkeypatch.setattr(storage, "delete", lambda *a, **k: None)
+    monkeypatch.setattr(
+        storage, "sign_urls", lambda paths, ttl=None: {p: "https://signed.example/x" for p in paths}
+    )
+    monkeypatch.setattr(storage, "sign_url", lambda path, ttl=None: "https://signed.example/x")
+    h = auth_headers()
+    big = b"\xff\xd8\xff\xe0" + b"0" * (1_500_000)  # ~1.5MB: >1MB JSON, <5MB imagem
+
+    mid = client.post(
+        "/memories",
+        json={"title": "m", "text": "t", "latitude": 1.0, "longitude": 2.0, "occurred_at": "2026-01-01T00:00:00Z"},
+        headers=h,
+    ).json()["id"]
+    r_img = client.post(
+        f"/memories/{mid}/images", files={"file": ("x.jpg", big, "image/jpeg")}, headers=h
+    )
+    assert r_img.status_code != 413, "upload de memória barrado pelo limite JSON"
+    assert r_img.status_code == 200, r_img.text
+
+    jid = client.post("/journeys", json={"title": "J"}, headers=h).json()["id"]
+    r_cov = client.post(
+        f"/journeys/{jid}/cover", files={"file": ("c.jpg", big, "image/jpeg")}, headers=h
+    )
+    assert r_cov.status_code != 413, "upload de capa barrado pelo limite JSON"
+    assert r_cov.status_code == 200, r_cov.text
+
+
 # --- 5. Login com e-mail inexistente: 401 mas roda o dummy hash -------------
 def test_login_unknown_email_runs_dummy_verify(client, monkeypatch):
     from app.services import auth_service

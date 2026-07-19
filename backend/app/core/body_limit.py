@@ -24,17 +24,18 @@ class BodySizeLimitMiddleware:
         *,
         max_body_bytes: int,
         upload_max_body_bytes: int,
-        upload_path_suffix: str = "/image",
+        upload_path_suffixes: tuple[str, ...] = ("/images", "/cover"),
     ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
         self.upload_max_body_bytes = upload_max_body_bytes
-        self.upload_path_suffix = upload_path_suffix
+        self.upload_path_suffixes = upload_path_suffixes
 
     def _limit_for(self, scope: Scope) -> int:
-        # Rotas de upload (POST .../image) têm teto maior por causa do multipart.
+        # Rotas de upload multipart (POST .../images = foto de memória,
+        # .../cover = capa de jornada) têm teto maior por causa do arquivo.
         if scope.get("method") == "POST" and scope.get("path", "").endswith(
-            self.upload_path_suffix
+            self.upload_path_suffixes
         ):
             return self.upload_max_body_bytes
         return self.max_body_bytes

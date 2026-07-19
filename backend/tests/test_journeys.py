@@ -183,6 +183,32 @@ def test_update_journey_other_user_returns_404(client, auth_headers):
     assert client.patch(f"/journeys/{jid}", json={"title": "X"}, headers=h2).status_code == 404
 
 
+def test_delete_in_journey_memory_then_reorder(client, auth_headers):
+    """Regressão: apagar uma memória que está numa jornada precisa liberar o
+    slot do vínculo (soft delete cascata). Sem isso, reordenar os pontos
+    restantes colidia no slot órfão do índice único parcial e estourava 500."""
+    h = auth_headers()
+    jid = _journey(client, h)
+    client.post(f"/journeys/{jid}/start", headers=h)
+    ids = []
+    for i in range(3):
+        ids = [p["memory_id"] for p in _add_point(client, h, jid, i, float(i), float(i)).json()["points"]]
+    # Apaga a memória do meio direto (endpoint de memória, não desvínculo).
+    assert client.delete(f"/memories/{ids[1]}", headers=h).status_code == 204
+    remaining = [ids[0], ids[2]]
+    # Reordenar os dois que sobraram NÃO pode colidir com o slot do apagado.
+    r = client.patch(
+        f"/journeys/{jid}/points/reorder",
+        json={"memory_ids": list(reversed(remaining))},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert [p["memory_id"] for p in r.json()["points"]] == list(reversed(remaining))
+    # E a memória apagada realmente saiu da jornada.
+    detail = client.get(f"/journeys/{jid}", headers=h).json()
+    assert ids[1] not in [p["memory_id"] for p in detail["points"]]
+
+
 def test_single_point_route_is_null(client, auth_headers):
     h = auth_headers()
     jid = _journey(client, h)

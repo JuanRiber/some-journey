@@ -5,6 +5,8 @@ from geoalchemy2.shape import to_shape
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core import storage
+
 from app.models.journey import Journey
 from app.models.memory import Memory
 from app.repositories import journey_repository, memory_repository
@@ -57,6 +59,15 @@ class InvalidJourneyReorderError(Exception):
     """A reordenacao precisa conter exatamente os pontos atuais."""
 
 
+class InvalidCoverImageError(Exception):
+    """Tipo de imagem de capa não suportado — a rota traduz em 400."""
+
+
+# Tipos aceitos para a capa -> extensão no path do Storage (mesmo critério das
+# fotos de memória).
+_COVER_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+
+
 # Transicoes de status permitidas a partir do estado atual. Qualquer outra vira
 # 409 (InvalidJourneyTransitionError). 'finished' e terminal.
 _ALLOWED_FROM = {
@@ -74,22 +85,38 @@ def _ensure_transition(journey: Journey, action: str) -> None:
         )
 
 
-def _journey_to_read(journey: Journey, points_count: int) -> JourneyRead:
+def _journey_to_read(
+    journey: Journey, points_count: int, cover_url: str | None = None
+) -> JourneyRead:
     return JourneyRead(
         id=journey.id,
         title=journey.title,
         description=journey.description,
         mood=journey.mood,
         is_private=journey.is_private,
-        # Capa de jornada ainda não tem upload próprio; expomos o contrato como
-        # None para o cliente já poder tratar (placeholder editorial).
-        cover_image_url=None,
+        # URL assinada e temporária da capa (própria ou fallback), ou None.
+        cover_image_url=cover_url,
         status=journey.status,  # type: ignore[arg-type]
         started_at=journey.started_at,
         ended_at=journey.ended_at,
         points_count=points_count,
         created_at=journey.created_at,
     )
+
+
+def _cover_path(db: Session, journey: Journey) -> str | None:
+    """Caminho da capa: a explícita (upload) ou, sem ela, a primeira foto da
+    primeira memória do rastro (fallback automático)."""
+    if journey.cover_image_path:
+        return journey.cover_image_path
+    return journey_repository.first_memory_image_paths(
+        db, journey_ids=[journey.id]
+    ).get(journey.id)
+
+
+def _cover_url(db: Session, journey: Journey) -> str | None:
+    path = _cover_path(db, journey)
+    return storage.sign_url(path) if path else None
 
 
 def _point_to_read(memory: Memory, position: int) -> JourneyPointRead:
@@ -119,7 +146,7 @@ def _build_route(points: list[JourneyPointRead]) -> JourneyRoute | None:
 def _detail(db: Session, *, user_id: uuid.UUID, journey: Journey) -> JourneyDetailRead:
     rows = journey_repository.list_points(db, journey_id=journey.id, user_id=user_id)
     points = [_point_to_read(memory, item.position) for item, memory in rows]
-    base = _journey_to_read(journey, len(points))
+    base = _journey_to_read(journey, len(points), cover_url=_cover_url(db, journey))
     return JourneyDetailRead(
         **base.model_dump(), points=points, route=_build_route(points)
     )
@@ -169,11 +196,24 @@ def update(
 
 
 def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[JourneyRead]:
+    rows = journey_repository.list_journeys(db, user_id=user_id)
+    # Capas em LOTE: fallback (primeira foto) numa query + UMA assinatura para
+    # todas — a listagem não faz N idas ao banco/Storage.
+    fallbacks = journey_repository.first_memory_image_paths(
+        db, journey_ids=[journey.id for journey, _ in rows]
+    )
+    paths = {
+        journey.id: journey.cover_image_path or fallbacks.get(journey.id)
+        for journey, _ in rows
+    }
+    signed = storage.sign_urls([p for p in paths.values() if p])
     return [
-        _journey_to_read(journey, points_count)
-        for journey, points_count in journey_repository.list_journeys(
-            db, user_id=user_id
+        _journey_to_read(
+            journey,
+            points_count,
+            cover_url=signed.get(paths[journey.id] or ""),
         )
+        for journey, points_count in rows
     ]
 
 
@@ -190,7 +230,49 @@ def _read_with_count(
     return _journey_to_read(
         journey,
         journey_repository.points_count(db, journey_id=journey.id, user_id=user_id),
+        cover_url=_cover_url(db, journey),
     )
+
+
+def set_cover(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    journey_id: uuid.UUID,
+    data: bytes,
+    content_type: str,
+) -> JourneyRead:
+    """Define a capa da jornada (do dono): sobe o arquivo no Storage privado,
+    grava o caminho e apaga a capa antiga (best-effort). Pode levantar
+    InvalidCoverImageError (400), JourneyNotFoundError (404) e os erros de
+    Storage (503/502, propagados para a rota)."""
+    ext = _COVER_EXT.get(content_type)
+    if ext is None:
+        raise InvalidCoverImageError()
+    journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
+    if journey is None:
+        raise JourneyNotFoundError()
+    old_path = journey.cover_image_path
+    path = f"{user_id}/journeys/{journey_id}/cover-{uuid.uuid4().hex}.{ext}"
+    storage.upload(path, data, content_type)
+    journey_repository.set_cover_path(db, journey=journey, path=path)
+    if old_path:
+        storage.delete(old_path)
+    return _read_with_count(db, user_id=user_id, journey=journey)
+
+
+def remove_cover(
+    db: Session, *, user_id: uuid.UUID, journey_id: uuid.UUID
+) -> JourneyRead:
+    """Remove a capa explícita (a listagem volta ao fallback da primeira foto)."""
+    journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
+    if journey is None:
+        raise JourneyNotFoundError()
+    old_path = journey.cover_image_path
+    if old_path:
+        journey_repository.set_cover_path(db, journey=journey, path=None)
+        storage.delete(old_path)
+    return _read_with_count(db, user_id=user_id, journey=journey)
 
 
 def _activate(

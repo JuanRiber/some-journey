@@ -5,7 +5,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.journey import Journey, JourneyMemory
-from app.models.memory import Memory
+from app.models.memory import Memory, MemoryImage
 
 
 def create_journey(
@@ -229,6 +229,67 @@ def list_points(
         .order_by(JourneyMemory.position.asc())
     )
     return list(rows)
+
+
+def list_points_for_journeys(
+    db: Session, *, journey_ids: list[uuid.UUID], user_id: uuid.UUID
+) -> dict[uuid.UUID, list[tuple[JourneyMemory, Memory]]]:
+    """Pontos de VÁRIAS jornadas numa query só (evita o N+1 do /map). Devolve
+    um dict journey_id -> lista ordenada por posição; jornadas sem pontos ficam
+    de fora do dict."""
+    if not journey_ids:
+        return {}
+    rows = db.execute(
+        select(JourneyMemory, Memory)
+        .join(Memory, Memory.id == JourneyMemory.memory_id)
+        .where(
+            JourneyMemory.journey_id.in_(journey_ids),
+            JourneyMemory.deleted_at.is_(None),
+            Memory.user_id == user_id,
+            Memory.deleted_at.is_(None),
+        )
+        .order_by(JourneyMemory.journey_id, JourneyMemory.position.asc())
+    )
+    grouped: dict[uuid.UUID, list[tuple[JourneyMemory, Memory]]] = {}
+    for link, memory in rows:
+        grouped.setdefault(link.journey_id, []).append((link, memory))
+    return grouped
+
+
+def set_cover_path(db: Session, *, journey: Journey, path: str | None) -> Journey:
+    """Grava (após upload) ou LIMPA (None) o caminho da capa no Storage."""
+    journey.cover_image_path = path
+    db.commit()
+    db.refresh(journey)
+    return journey
+
+
+def first_memory_image_paths(
+    db: Session, *, journey_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """Capa de FALLBACK: a primeira foto (da primeira memória do rastro) de cada
+    jornada. Uma query só (DISTINCT ON) para a listagem não fazer N idas ao banco.
+    Jornadas sem nenhuma foto simplesmente não aparecem no dict."""
+    if not journey_ids:
+        return {}
+    rows = db.execute(
+        select(JourneyMemory.journey_id, MemoryImage.image_path)
+        .join(Memory, Memory.id == JourneyMemory.memory_id)
+        .join(MemoryImage, MemoryImage.memory_id == Memory.id)
+        .where(
+            JourneyMemory.journey_id.in_(journey_ids),
+            JourneyMemory.deleted_at.is_(None),
+            Memory.deleted_at.is_(None),
+            MemoryImage.deleted_at.is_(None),
+        )
+        .distinct(JourneyMemory.journey_id)
+        .order_by(
+            JourneyMemory.journey_id,
+            JourneyMemory.position.asc(),
+            MemoryImage.position.asc(),
+        )
+    ).all()
+    return {journey_id: image_path for journey_id, image_path in rows}
 
 
 def list_memories_chronological(

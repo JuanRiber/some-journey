@@ -1,8 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
+from app.core import storage
+from app.core.config import settings
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
@@ -20,6 +22,7 @@ from app.schemas.memory import MemoryRead
 from app.services import journey_service
 from app.services.journey_service import (
     ActiveJourneyExistsError,
+    InvalidCoverImageError,
     InvalidJourneyReorderError,
     InvalidJourneyTransitionError,
     JourneyClosedError,
@@ -243,6 +246,74 @@ def reorder_journey_points(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="memory_ids must match the current journey points exactly.",
         )
+
+
+@router.post("/{journey_id}/cover", response_model=JourneyRead)
+def set_journey_cover(
+    journey_id: uuid.UUID,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> JourneyRead:
+    """Define a capa da jornada (multipart, campo `file`). Mesmo teto e leitura
+    em blocos do upload de foto de memória."""
+    max_bytes = settings.MAX_IMAGE_BYTES
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = file.file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Image too large.",
+            )
+        chunks.append(chunk)
+    data = b"".join(chunks)
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
+    try:
+        return journey_service.set_cover(
+            db,
+            user_id=current_user.id,
+            journey_id=journey_id,
+            data=data,
+            content_type=file.content_type or "",
+        )
+    except JourneyNotFoundError:
+        raise _not_found
+    except InvalidCoverImageError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported image type. Use JPEG, PNG or WebP.",
+        )
+    except storage.StorageNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Image storage is not configured.",
+        )
+    except storage.StorageError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not store the image. Try again.",
+        )
+
+
+@router.delete("/{journey_id}/cover", response_model=JourneyRead)
+def remove_journey_cover(
+    journey_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> JourneyRead:
+    """Remove a capa explícita (volta ao fallback: primeira foto do rastro)."""
+    try:
+        return journey_service.remove_cover(
+            db, user_id=current_user.id, journey_id=journey_id
+        )
+    except JourneyNotFoundError:
+        raise _not_found
 
 
 @router.delete("/{journey_id}", status_code=status.HTTP_204_NO_CONTENT)

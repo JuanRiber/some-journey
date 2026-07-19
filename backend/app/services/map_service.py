@@ -47,9 +47,9 @@ def _in_bbox(point: MapPoint, bbox: Bbox) -> bool:
 
 
 def _journey_to_map(
-    db: Session, *, user_id: uuid.UUID, journey: Journey
+    journey: Journey,
+    rows: list[tuple[object, Memory]],
 ) -> MapJourney:
-    rows = journey_repository.list_points(db, journey_id=journey.id, user_id=user_id)
     points = [_memory_to_point(memory, position=item.position) for item, memory in rows]
     return MapJourney(
         id=journey.id,
@@ -74,18 +74,26 @@ def get_map(
         )
         if journey is None:
             raise JourneyNotFoundError()
+        rows = journey_repository.list_points(
+            db, journey_id=journey.id, user_id=user_id
+        )
         return MapResponse(
             loose_points=[],
-            journeys=[_journey_to_map(db, user_id=user_id, journey=journey)],
+            journeys=[_journey_to_map(journey, rows)],
         )
 
     loose = [
         _memory_to_point(m)
         for m in memory_repository.list_loose(db, user_id=user_id, bbox=bbox)
     ]
+    all_journeys = [j for j, _count in journey_repository.list_journeys(db, user_id=user_id)]
+    # Pontos de TODAS as jornadas numa query só (sem N+1).
+    points_by_journey = journey_repository.list_points_for_journeys(
+        db, journey_ids=[j.id for j in all_journeys], user_id=user_id
+    )
     journeys: list[MapJourney] = []
-    for journey, _count in journey_repository.list_journeys(db, user_id=user_id):
-        mapped = _journey_to_map(db, user_id=user_id, journey=journey)
+    for journey in all_journeys:
+        mapped = _journey_to_map(journey, points_by_journey.get(journey.id, []))
         # Com bbox, mantém só jornadas que tocam a viewport — mas o rastro vem
         # inteiro (não corta a linha no meio). Sem pontos = não aparece no mapa.
         if bbox is not None and not any(_in_bbox(p, bbox) for p in mapped.points):

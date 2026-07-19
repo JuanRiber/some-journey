@@ -13,6 +13,7 @@ from datetime import datetime
 
 from geoalchemy2 import Geometry
 from sqlalchemy import cast, func, select
+from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
 from app.models.journey import JourneyMemory
@@ -254,6 +255,21 @@ def soft_delete_image(db: Session, *, image: MemoryImage) -> None:
 
 
 def soft_delete(db: Session, *, memory: Memory) -> None:
-    """Soft delete: marca deleted_at = now(). A linha permanece no banco."""
+    """Soft delete: marca deleted_at = now(). A linha permanece no banco.
+
+    Também soft-deleta o vínculo ativo da memória com qualquer jornada, no mesmo
+    commit (espelha journey_repository.soft_delete). Sem isso o link órfão segue
+    "ocupando o slot" no índice parcial uq_journey_memories_position_active — e
+    um reorder posterior dos pontos restantes colide nesse slot, estourando
+    IntegrityError (→ 500) numa jornada que nem tem mais essa memória.
+    """
     memory.deleted_at = func.now()
+    db.execute(
+        sa_update(JourneyMemory)
+        .where(
+            JourneyMemory.memory_id == memory.id,
+            JourneyMemory.deleted_at.is_(None),
+        )
+        .values(deleted_at=func.now())
+    )
     db.commit()

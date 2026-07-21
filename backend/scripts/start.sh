@@ -30,4 +30,12 @@ while :; do
   i=$((i + 1))
 done
 
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers 2
+# --proxy-headers + --forwarded-allow-ips='*': em produção a API roda ATRÁS do
+# proxy do Render, então request.client.host seria sempre o IP do proxy. Sem
+# isto, o rate limit por IP (login/register/change-password) colapsaria num
+# ÚNICO balde global (o do proxy) — um atacante afogaria todo mundo. Com os
+# proxy-headers, o uvicorn lê o X-Forwarded-For e request.client passa a refletir
+# o IP real do cliente. Confiamos no XFF porque no Render só o proxy da própria
+# plataforma alcança o container (borda controlada); daí o '*'.
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers 2 \
+  --proxy-headers --forwarded-allow-ips='*'

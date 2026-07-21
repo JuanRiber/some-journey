@@ -37,18 +37,26 @@ def get_current_user(
     if credentials is None:
         raise _credentials_exception
 
-    sub = decode_access_token(credentials.credentials)
-    if sub is None:
+    payload = decode_access_token(credentials.credentials)
+    if payload is None:
         raise _credentials_exception
 
     # O sub é string; o id da tabela é UUID. Não confiamos no formato do token.
     try:
-        user_id = uuid.UUID(sub)
-    except ValueError:
+        user_id = uuid.UUID(payload["sub"])
+    except (ValueError, TypeError):
         raise _credentials_exception
 
     user = user_repository.get_by_id(db, user_id)
     if user is None or not user.is_active:
+        raise _credentials_exception
+
+    # Revogação por troca/reset de senha: se o token traz o claim "pcat" (epoch
+    # da senha vigente na emissão) e ele é ANTERIOR ao password_changed_at atual,
+    # o token foi emitido antes da troca -> recusa (mesmo 401 genérico). Tokens
+    # SEM pcat (legados) seguem válidos até expirar por ACCESS_TOKEN_EXPIRE_MINUTES.
+    pcat = payload.get("pcat")
+    if pcat is not None and int(pcat) < int(user.password_changed_at.timestamp()):
         raise _credentials_exception
 
     return user

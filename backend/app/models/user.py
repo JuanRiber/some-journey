@@ -60,6 +60,17 @@ class User(Base):
         onupdate=func.now(),
     )
 
+    # Instante da ÚLTIMA troca/reset de senha (TIMESTAMPTZ). Suporta a revogação
+    # de tokens: o access token carrega o claim "pcat" (epoch da senha vigente na
+    # emissão) e o get_current_user recusa qualquer token cujo pcat seja ANTERIOR
+    # a este valor — assim trocar/redefinir a senha invalida na hora os tokens
+    # antigos. server_default=func.now() preenche por linha no servidor (inclusive
+    # as linhas já existentes na migration), nunca um instante congelado no import.
+    password_changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
     # Conta ativa por padrão; soft-disable (false) preserva as FKs de ownership.
     # server_default é text("true") (literal SQL), não o bool Python True.
     is_active: Mapped[bool] = mapped_column(

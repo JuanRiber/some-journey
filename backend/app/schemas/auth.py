@@ -114,6 +114,31 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=10, max_length=128)
 
 
+# --- POST /auth/forgot-password --------------------------------------------
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Pedido de recuperação: só o e-mail (normalizado). A resposta é SEMPRE
+    genérica — não revela se a conta existe (anti-enumeração)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: NormalizedEmail
+
+
+# --- POST /auth/reset-password ---------------------------------------------
+
+
+class ResetPasswordRequest(BaseModel):
+    """Redefinição com o token recebido por e-mail + a nova senha (mesma regra
+    do cadastro: min 10). O token cru chega aqui; o service confere pelo hash."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token: str = Field(min_length=16, max_length=256)
+    new_password: str = Field(min_length=10, max_length=128)
+
+
 # --- GET /auth/me ----------------------------------------------------------
 
 

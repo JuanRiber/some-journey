@@ -86,25 +86,38 @@ def verify_password(password: str, password_hash: str) -> bool:
 # --- JWT (PyJWT 2.13.0) ----------------------------------------------------
 
 
-def create_access_token(subject: uuid.UUID | str) -> str:
-    """Emite um access token JWT com payload mínimo: {"sub", "exp"}.
+def create_access_token(
+    subject: uuid.UUID | str,
+    password_changed_at: datetime | None = None,
+) -> str:
+    """Emite um access token JWT com payload {"sub", "exp"} (+ "pcat" opcional).
 
-    `subject` é o user_id (UUID). Por decisão de design o token carrega APENAS
-    o sub e o exp — nada de nome/e-mail (menos PII no token, menos a corrigir se
-    vazar). O sub vira STRING via str(subject): no PyJWT 2.x o claim "sub" deve
-    ser string — passar um uuid.UUID estoura TypeError no encode (não é
-    JSON-serializável) e um sub não-string faria o próprio decode levantar
-    InvalidSubjectError. str() resolve para UUID, str ou int.
+    `subject` é o user_id (UUID). Por decisão de design o token carrega o mínimo
+    — nada de nome/e-mail (menos PII no token, menos a corrigir se vazar). O sub
+    vira STRING via str(subject): no PyJWT 2.x o claim "sub" deve ser string —
+    passar um uuid.UUID estoura TypeError no encode (não é JSON-serializável) e
+    um sub não-string faria o próprio decode levantar InvalidSubjectError. str()
+    resolve para UUID, str ou int.
 
     exp = agora + ACCESS_TOKEN_EXPIRE_MINUTES, em UTC timezone-aware
     (datetime.now(timezone.utc)); o PyJWT serializa o datetime aware para o
     timestamp NumericDate do JWT. O secret e o algoritmo vêm de settings.
     jwt.encode no 2.x já devolve str.
+
+    `password_changed_at` (OPCIONAL, retrocompatível): quando informado, grava o
+    claim "pcat" = epoch (segundos, int) do instante da senha vigente NA EMISSÃO.
+    O get_current_user compara esse pcat com o password_changed_at ATUAL do
+    usuário e recusa tokens anteriores a uma troca/reset de senha (revogação
+    imediata). O parâmetro é opcional de propósito: tokens já em circulação (sem
+    pcat) continuam válidos até expirar naturalmente — nada quebra ao adotar o
+    claim. Não incluímos pcat quando None (mantém o payload enxuto).
     """
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
-    payload = {"sub": str(subject), "exp": expire}
+    payload: dict[str, object] = {"sub": str(subject), "exp": expire}
+    if password_changed_at is not None:
+        payload["pcat"] = int(password_changed_at.timestamp())
     return jwt.encode(
         payload,
         settings.JWT_SECRET_KEY,
@@ -112,8 +125,14 @@ def create_access_token(subject: uuid.UUID | str) -> str:
     )
 
 
-def decode_access_token(token: str) -> str | None:
-    """Valida o token e devolve o sub (user_id como str), ou None se inválido.
+def decode_access_token(token: str) -> dict | None:
+    """Valida o token e devolve o PAYLOAD (claims) já verificado, ou None.
+
+    Devolve o dict completo de claims (contém no mínimo "sub" e "exp"; pode
+    conter "pcat") para que o get_current_user leia tanto o sub quanto o pcat sem
+    decodificar o token duas vezes. Antes esta função devolvia só o sub; passou a
+    devolver o payload inteiro porque a revogação por troca de senha precisa do
+    claim pcat. O único consumidor é o get_current_user (mesma lane).
 
     Validação feita pelo PyJWT:
       - assinatura (secret de settings);
@@ -131,7 +150,7 @@ def decode_access_token(token: str) -> str | None:
     InvalidSignatureError, InvalidSubjectError, ...) são subclasses de
     InvalidTokenError, então um único except cobre todos os casos. Quem
     transforma None em 401 é a dependency get_current_user — aqui só dizemos
-    "válido (sub)" ou "inválido (None)". Não logamos o token nem a exceção.
+    "válido (payload)" ou "inválido (None)". Não logamos o token nem a exceção.
     """
     try:
         payload = jwt.decode(
@@ -144,5 +163,6 @@ def decode_access_token(token: str) -> str | None:
         # Cobre expirado, sem exp, sem sub, assinatura inválida, algoritmo
         # recusado ("none" incluso) e token malformado.
         return None
-    # require garante a presença de "sub"; o PyJWT já validou que é string.
-    return payload["sub"]
+    # require garante "sub" e "exp"; devolvemos o payload inteiro (inclui pcat
+    # quando presente) para o get_current_user avaliar a revogação.
+    return payload

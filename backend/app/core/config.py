@@ -3,12 +3,18 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Regex de origem CORS para DESENVOLVIMENTO: aceita localhost/127.0.0.1 em
+# qualquer porta (Expo/Vite trocam de porta o tempo todo). É o default do campo
+# CORS_ALLOW_ORIGIN_REGEX; a property cors_allow_origin_regex o SUPRIME em
+# produção (ver abaixo) para que esse curinga de dev jamais vaze para o ar.
+_DEV_CORS_ORIGIN_REGEX = r"http://(localhost|127\.0\.0\.1):\d+"
+
 
 class Settings(BaseSettings):
     # HTTP edge / environment
     APP_ENV: Literal["development", "production", "test"] = "development"
     CORS_ALLOWED_ORIGINS: str = "http://localhost:8081,http://127.0.0.1:8081,http://localhost:19006"
-    CORS_ALLOW_ORIGIN_REGEX: str | None = r"http://(localhost|127\.0\.0\.1):\d+"
+    CORS_ALLOW_ORIGIN_REGEX: str | None = _DEV_CORS_ORIGIN_REGEX
     TRUSTED_HOSTS: str = "localhost,127.0.0.1,10.0.2.2"
 
     # Database
@@ -31,6 +37,25 @@ class Settings(BaseSettings):
     # FECHADO em produção (as contas dos testers vêm do seed). Force com
     # REGISTRATION_OPEN=true/false para sobrepor.
     REGISTRATION_OPEN: bool | None = None
+
+    # --- Recuperação de senha ---
+    # Validade do token de reset (minutos) e destino do link entregue por e-mail.
+    # PASSWORD_RESET_URL_BASE recebe o token como querystring `?token=`; aponte
+    # para a rota do app (deep link) ou para a página web de redefinição.
+    PASSWORD_RESET_TOKEN_TTL_MINUTES: int = Field(default=30, ge=5, le=1440)
+    PASSWORD_RESET_URL_BASE: str = "https://some-journey.pages.dev/reset-password"
+
+    # --- E-mail (SMTP) ---
+    # OPCIONAL: sem SMTP_HOST + SMTP_FROM o envio fica desabilitado. Nesse caso,
+    # fora de produção o token de reset é LOGADO (para os testers); em produção
+    # o envio apenas registra um erro (nunca loga o token). Configure para valer.
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = Field(default=587, gt=0, le=65535)
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM: str | None = None
+    SMTP_STARTTLS: bool = True
+    SMTP_TIMEOUT_SECONDS: int = Field(default=10, ge=1, le=60)
 
     # Storage de imagens (Supabase). OPCIONAL: sem SUPABASE_URL +
     # SUPABASE_SERVICE_KEY o upload fica desabilitado (o endpoint responde 503) e
@@ -62,6 +87,20 @@ class Settings(BaseSettings):
         return self._csv(self.CORS_ALLOWED_ORIGINS)
 
     @property
+    def cors_allow_origin_regex(self) -> str | None:
+        """Regex de origem CORS efetivo — usado pelo CORSMiddleware no main.py.
+
+        Em produção devolve None SALVO se CORS_ALLOW_ORIGIN_REGEX foi
+        explicitamente definido para um valor DIFERENTE do curinga de dev: o
+        regex localhost/127.0.0.1 de desenvolvimento jamais pode valer no ar
+        (deixaria qualquer app local passar pelo CORS). Fora de produção, ou
+        quando o operador sobrepõe o valor de propósito, devolve o valor como
+        está (inclusive None, se alguém quis desligar o regex)."""
+        if self.is_production and self.CORS_ALLOW_ORIGIN_REGEX == _DEV_CORS_ORIGIN_REGEX:
+            return None
+        return self.CORS_ALLOW_ORIGIN_REGEX
+
+    @property
     def trusted_hosts(self) -> list[str]:
         return self._csv(self.TRUSTED_HOSTS)
 
@@ -74,6 +113,11 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """True em produção — usado para desabilitar docs/openapi, etc."""
         return self.APP_ENV == "production"
+
+    @property
+    def smtp_enabled(self) -> bool:
+        """True só quando o envio de e-mail (SMTP) está configurado."""
+        return bool(self.SMTP_HOST and self.SMTP_FROM)
 
     @property
     def registration_open(self) -> bool:

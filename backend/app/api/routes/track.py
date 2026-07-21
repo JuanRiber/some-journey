@@ -20,7 +20,7 @@ from app.schemas.track import (
     TrackStart,
 )
 from app.services import track_service
-from app.services.journey_service import JourneyNotFoundError
+from app.services.journey_service import JourneyClosedError, JourneyNotFoundError
 from app.services.track_service import (
     TrackAlreadyActiveError,
     TrackClosedError,
@@ -55,6 +55,8 @@ def start_track(
         )
     except JourneyNotFoundError:
         raise _not_found
+    except JourneyClosedError:
+        raise _conflict("Cannot start a track on a finished journey.")
     except TrackAlreadyActiveError:
         raise _conflict("This journey already has an open track. Finish it first.")
 
@@ -81,6 +83,8 @@ def add_track_points(
         raise _track_not_found
     except TrackClosedError:
         raise _conflict("Track is already finished; start a new one.")
+    except JourneyClosedError:
+        raise _conflict("Cannot add points to a finished journey.")
 
 
 @router.post("/{journey_id}/tracks/{track_id}/finish", response_model=TrackRead)

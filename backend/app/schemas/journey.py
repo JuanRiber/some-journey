@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas._fields import AwareUtcDatetime
+
 
 JourneyStatus = Literal["draft", "active", "paused", "finished"]
 
@@ -18,9 +20,23 @@ class JourneyCreate(BaseModel):
     # Nasce privada por padrão (compartilhamento é V3).
     is_private: bool = True
     # Período descritivo da jornada. Opcional; o ciclo de vida (start/finish)
-    # também preenche started_at/ended_at por conta própria.
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
+    # também preenche started_at/ended_at por conta própria. Normalizados para
+    # UTC-aware (AwareUtcDatetime) — as colunas são TIMESTAMPTZ.
+    started_at: AwareUtcDatetime | None = None
+    ended_at: AwareUtcDatetime | None = None
+
+    @model_validator(mode="after")
+    def _dates_consistent(self) -> "JourneyCreate":
+        # Só valida quando o cliente informa AMBOS: um período com fim antes do
+        # início é incoerente. ValueError vira 422 nativo do Pydantic (mesmo
+        # status que a rota mapeia para o InvalidJourneyDatesError do finish()).
+        if (
+            self.started_at is not None
+            and self.ended_at is not None
+            and self.ended_at < self.started_at
+        ):
+            raise ValueError("ended_at nao pode ser anterior a started_at")
+        return self
 
 
 class JourneyUpdate(BaseModel):
@@ -81,7 +97,8 @@ class JourneyDetailRead(JourneyRead):
 class JourneyFinish(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    ended_at: datetime | None = None
+    # UTC-aware (a coluna é TIMESTAMPTZ); o serviço valida ended_at >= started_at.
+    ended_at: AwareUtcDatetime | None = None
 
 
 class JourneyMemoryAdd(BaseModel):
@@ -98,7 +115,8 @@ class JourneyMemoryCreate(BaseModel):
     text: str = Field(default="", max_length=5000)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
-    occurred_at: datetime
+    # UTC-aware (a coluna occurred_at da memória é TIMESTAMPTZ).
+    occurred_at: AwareUtcDatetime
 
 
 class JourneyReorder(BaseModel):

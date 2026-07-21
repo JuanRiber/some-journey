@@ -292,3 +292,112 @@ def test_deleting_journey_frees_and_keeps_its_memories(client, auth_headers):
     # e pode ser vinculada a outra jornada (o slot único foi liberado)
     jid2 = _journey(client, h, "Outra")
     assert client.post(f"/journeys/{jid2}/points", json={"memory_id": mem}, headers=h).status_code == 200
+
+
+# --- Validação de datas (ended_at >= started_at) ---------------------------
+
+
+def test_create_rejects_ended_before_started(client, auth_headers):
+    h = auth_headers()
+    r = client.post(
+        "/journeys",
+        json={
+            "title": "X",
+            "started_at": "2026-07-10T00:00:00Z",
+            "ended_at": "2026-07-01T00:00:00Z",
+        },
+        headers=h,
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_create_accepts_valid_period(client, auth_headers):
+    h = auth_headers()
+    r = client.post(
+        "/journeys",
+        json={
+            "title": "X",
+            "started_at": "2026-07-01T00:00:00Z",
+            "ended_at": "2026-07-10T00:00:00Z",
+        },
+        headers=h,
+    )
+    assert r.status_code == 201, r.text
+
+
+def test_finish_rejects_ended_before_started(client, auth_headers):
+    h = auth_headers()
+    jid = client.post(
+        "/journeys",
+        json={"title": "X", "started_at": "2026-07-10T00:00:00Z"},
+        headers=h,
+    ).json()["id"]
+    client.post(f"/journeys/{jid}/start", headers=h)
+    # started_at persistido = 2026-07-10; encerrar em 2026-07-01 é incoerente.
+    r = client.post(
+        f"/journeys/{jid}/finish",
+        json={"ended_at": "2026-07-01T00:00:00Z"},
+        headers=h,
+    )
+    assert r.status_code == 422, r.text
+    # a jornada não mudou de estado (continua active)
+    assert client.get(f"/journeys/{jid}", headers=h).json()["status"] == "active"
+
+
+def test_finish_accepts_ended_after_started(client, auth_headers):
+    h = auth_headers()
+    jid = client.post(
+        "/journeys",
+        json={"title": "X", "started_at": "2026-07-10T00:00:00Z"},
+        headers=h,
+    ).json()["id"]
+    client.post(f"/journeys/{jid}/start", headers=h)
+    r = client.post(
+        f"/journeys/{jid}/finish",
+        json={"ended_at": "2026-07-20T00:00:00Z"},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "finished"
+
+
+# --- Ciclo de vida x percurso (tracks) -------------------------------------
+
+
+def test_finish_closes_open_track(client, auth_headers):
+    """Finalizar a jornada encerra o trecho de GPS que estava aberto."""
+    h = auth_headers()
+    jid = _journey(client, h)
+    client.post(f"/journeys/{jid}/start", headers=h)
+    t = client.post(f"/journeys/{jid}/tracks/start", headers=h)
+    assert t.status_code == 201, t.text
+    assert t.json()["is_active"] is True
+    assert client.post(f"/journeys/{jid}/finish", headers=h).status_code == 200
+    tracks = client.get(f"/journeys/{jid}/tracks", headers=h).json()
+    assert len(tracks) == 1
+    assert tracks[0]["is_active"] is False
+    assert tracks[0]["ended_at"] is not None
+
+
+def test_delete_journey_soft_deletes_its_tracks(client, auth_headers):
+    """Excluir a jornada faz cascata (soft-delete) nos trechos ativos — não sobra
+    percurso (dado sensível de localização) vivo de uma jornada inexistente."""
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models.track import JourneyTrack
+
+    h = auth_headers()
+    jid = _journey(client, h)
+    client.post(f"/journeys/{jid}/start", headers=h)
+    tid = client.post(f"/journeys/{jid}/tracks/start", headers=h).json()["id"]
+    assert client.delete(f"/journeys/{jid}", headers=h).status_code == 204
+    db = SessionLocal()
+    try:
+        track = db.scalar(
+            select(JourneyTrack).where(JourneyTrack.id == uuid.UUID(tid))
+        )
+        assert track is not None  # a linha permanece (soft delete)
+        assert track.deleted_at is not None  # mas marcada como apagada
+    finally:
+        db.close()

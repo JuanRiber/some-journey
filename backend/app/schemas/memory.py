@@ -14,6 +14,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas._fields import AwareUtcDatetime
+
 
 class MemoryCreate(BaseModel):
     """Entrada do POST /memories."""
@@ -26,7 +28,9 @@ class MemoryCreate(BaseModel):
     text: str = Field(default="", max_length=5000)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
-    occurred_at: datetime
+    # Normaliza para UTC-aware: um horário naive seria reinterpretado no fuso da
+    # sessão do Postgres (TIMESTAMPTZ), corrompendo a ordem da timeline.
+    occurred_at: AwareUtcDatetime
 
 
 class MemoryUpdate(BaseModel):
@@ -38,7 +42,7 @@ class MemoryUpdate(BaseModel):
     text: str | None = Field(default=None, max_length=5000)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
-    occurred_at: datetime | None = None
+    occurred_at: AwareUtcDatetime | None = None
 
     @model_validator(mode="after")
     def _lat_long_juntas(self) -> "MemoryUpdate":

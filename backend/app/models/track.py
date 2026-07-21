@@ -80,8 +80,14 @@ class JourneyTrackPoint(Base):
     __tablename__ = "journey_track_points"
 
     __table_args__ = (
-        # Leitura típica: pontos de um trecho em ordem de captura.
-        Index("ix_journey_track_points_track_time", "track_id", "recorded_at"),
+        # Leitura típica: pontos de um(ns) trecho(s) em ORDEM DE CAPTURA. A ordem
+        # canônica é (recorded_at, id) — o id é o desempate estável quando dois
+        # pontos têm o mesmo recorded_at (sem ele, a polyline poderia embaralhar
+        # pontos coincidentes entre leituras). Incluir `id` na chave faz o Postgres
+        # servir tanto o filtro por track_id quanto o sort completo direto do
+        # índice (sem sort extra), o que importa para as leituras EM LOTE
+        # (point_coords_for / point_stats_for) que varrem vários tracks de uma vez.
+        Index("ix_journey_track_points_track_time", "track_id", "recorded_at", "id"),
         Index("ix_journey_track_points_journey", "journey_id"),
     )
 

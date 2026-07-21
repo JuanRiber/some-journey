@@ -6,7 +6,6 @@ jornada"), receber pontos em lote e montar o mapa da jornada em GeoJSON
 exceções de domínio que a rota traduz em 404/409. Ownership sempre pelo token.
 """
 
-import math
 import uuid
 from datetime import UTC, datetime
 
@@ -33,7 +32,7 @@ from app.schemas.track import (
     TrackStart,
 )
 from app.services import memory_service
-from app.services.journey_service import JourneyNotFoundError
+from app.services.journey_service import JourneyClosedError, JourneyNotFoundError
 
 
 class TrackNotFoundError(Exception):
@@ -48,26 +47,11 @@ class TrackClosedError(Exception):
     """Não dá para adicionar pontos a um trecho já finalizado — vira 409."""
 
 
-_EARTH_RADIUS_M = 6_371_000.0
-
-
-def _distance_m(coords: list[tuple[float, float]]) -> float:
-    """Distância aproximada ao longo da polyline (haversine, metros). coords são
-    pares (longitude, latitude)."""
-    if len(coords) < 2:
-        return 0.0
-    total = 0.0
-    for (lng1, lat1), (lng2, lat2) in zip(coords, coords[1:]):
-        phi1, phi2 = math.radians(lat1), math.radians(lat2)
-        dphi = math.radians(lat2 - lat1)
-        dlambda = math.radians(lng2 - lng1)
-        a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-        total += 2 * _EARTH_RADIUS_M * math.asin(min(1.0, math.sqrt(a)))
-    return total
-
-
-def _track_to_read(db: Session, track: JourneyTrack) -> TrackRead:
-    coords = track_repository.point_coords(db, track_id=track.id)
+def _build_read(track: JourneyTrack, point_count: int, distance_m: float) -> TrackRead:
+    """Monta o DTO de saída de um trecho a partir de metadados JÁ calculados no
+    banco (contagem + distância em metros). Separado de `_track_to_read` para que
+    a listagem possa reaproveitar estatísticas buscadas EM LOTE (uma query só)
+    sem uma ida ao banco por trecho."""
     return TrackRead(
         id=track.id,
         journey_id=track.journey_id,
@@ -75,10 +59,20 @@ def _track_to_read(db: Session, track: JourneyTrack) -> TrackRead:
         started_at=track.started_at,
         ended_at=track.ended_at,
         is_active=track.ended_at is None,
-        point_count=len(coords),
-        distance_m=round(_distance_m(coords), 1),
+        point_count=point_count,
+        distance_m=round(distance_m, 1),
         created_at=track.created_at,
     )
+
+
+def _track_to_read(db: Session, track: JourneyTrack) -> TrackRead:
+    """Leitura de UM trecho: contagem e distância vêm do banco (count(*) +
+    ST_Length da polyline), sem materializar as coordenadas no Python — o cliente
+    de start/points/finish só quer os números, não a geometria."""
+    count, distance = track_repository.point_stats_for(
+        db, track_ids=[track.id]
+    ).get(track.id, (0, 0.0))
+    return _build_read(track, count, distance)
 
 
 def start_track(
@@ -87,6 +81,10 @@ def start_track(
     journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
     if journey is None:
         raise JourneyNotFoundError()
+    # Jornada 'finished' é terminal: não abre gravação nova (mesma regra que o
+    # caminho das memórias, que já recusa pontos numa jornada encerrada).
+    if journey.status == "finished":
+        raise JourneyClosedError()
     if track_repository.get_open_track(db, journey_id=journey.id) is not None:
         raise TrackAlreadyActiveError()
     try:
@@ -119,6 +117,12 @@ def add_points(
         raise TrackNotFoundError()
     if track.ended_at is not None:
         raise TrackClosedError()
+    # Jornada 'finished' é terminal: não recebe mais GPS, ainda que o trecho em si
+    # continue aberto (consistente com o bloqueio do caminho das memórias). Leitura
+    # read-only da jornada pai; o trecho já garante ownership (user_id/journey_id).
+    journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
+    if journey is not None and journey.status == "finished":
+        raise JourneyClosedError()
     track_repository.add_points(
         db,
         track_id=track.id,
@@ -155,10 +159,12 @@ def list_tracks(
     journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
     if journey is None:
         raise JourneyNotFoundError()
-    return [
-        _track_to_read(db, t)
-        for t in track_repository.list_tracks(db, user_id=user_id, journey_id=journey.id)
-    ]
+    tracks = track_repository.list_tracks(db, user_id=user_id, journey_id=journey.id)
+    # Estatísticas (contagem + distância) de TODOS os trechos numa query só —
+    # antes era um `point_coords` por trecho (N+1). Trechos sem pontos não voltam
+    # no dict; assume-se (0, 0.0) para eles.
+    stats = track_repository.point_stats_for(db, track_ids=[t.id for t in tracks])
+    return [_build_read(t, *stats.get(t.id, (0, 0.0))) for t in tracks]
 
 
 def delete_track(
@@ -209,11 +215,21 @@ def get_journey_map(
         JourneyRoute(coordinates=symbolic_coords) if len(symbolic_coords) >= 2 else None
     )
 
+    # Percurso real: uma query para os trechos, UMA para todas as coordenadas
+    # (a LineString precisa da geometria) e UMA para contagem+distância — em vez
+    # de duas idas ao banco POR trecho (N+1). A distância vem do PostGIS
+    # (point_stats_for), a mesma fonte de `list_tracks`, para que o mesmo trecho
+    # relate a mesma distância nos dois endpoints.
+    tracks = track_repository.list_tracks(db, user_id=user_id, journey_id=journey.id)
+    track_ids = [t.id for t in tracks]
+    coords_by_track = track_repository.point_coords_for(db, track_ids=track_ids)
+    stats_by_track = track_repository.point_stats_for(db, track_ids=track_ids)
+
     track_features: list[TrackFeature] = []
     total_distance = 0.0
-    for track in track_repository.list_tracks(db, user_id=user_id, journey_id=journey.id):
-        coords = track_repository.point_coords(db, track_id=track.id)
-        dist = _distance_m(coords)
+    for track in tracks:
+        coords = coords_by_track.get(track.id, [])
+        count, dist = stats_by_track.get(track.id, (0, 0.0))
         total_distance += dist
         if len(coords) >= 2:
             track_features.append(
@@ -223,7 +239,7 @@ def get_journey_map(
                         source=track.source,
                         started_at=track.started_at,
                         ended_at=track.ended_at,
-                        point_count=len(coords),
+                        point_count=count,
                         distance_m=round(dist, 1),
                     ),
                     geometry=GeoLineString(coordinates=[[lng, lat] for lng, lat in coords]),

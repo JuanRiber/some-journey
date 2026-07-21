@@ -20,6 +20,14 @@ def _start(client, h, jid):
     return r.json()
 
 
+def _finish_journey(client, h, jid):
+    """Leva a jornada até 'finished': draft -> active (/start) -> finished (/finish)."""
+    assert client.post(f"/journeys/{jid}/start", headers=h).status_code == 200
+    r = client.post(f"/journeys/{jid}/finish", headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "finished"
+
+
 def _mem_in_journey(client, h, jid, i=0):
     r = client.post(
         f"/journeys/{jid}/memories",
@@ -198,3 +206,80 @@ def test_map_shows_memories_and_track_together(client, auth_headers):
     body = client.get(f"/journeys/{jid}/map", headers=h).json()
     assert len(body["memories"]["features"]) >= 1
     assert len(body["tracks"]["features"]) == 1
+
+
+# 13 — bulk insert: um lote grande entra numa tacada e a contagem bate.
+def test_bulk_insert_persists_all_points(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h)
+    t = _start(client, h, jid)
+    pts = [
+        {
+            "latitude": -3.73 - i * 0.0005,
+            "longitude": -38.52 - i * 0.0005,
+            "recorded_at": f"2026-07-07T10:{i:02d}:00Z",
+        }
+        for i in range(50)
+    ]
+    r = client.post(f"/journeys/{jid}/tracks/{t['id']}/points", json={"points": pts}, headers=h)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["point_count"] == 50
+    assert body["distance_m"] > 0
+    # A geometria do mapa tem exatamente os 50 pontos, na ordem de captura.
+    feats = client.get(f"/journeys/{jid}/map", headers=h).json()["tracks"]["features"]
+    assert len(feats[0]["geometry"]["coordinates"]) == 50
+
+
+# 14 — pontos fora de ordem de captura saem ordenados por recorded_at (estável).
+def test_points_ordered_by_recorded_at(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h)
+    t = _start(client, h, jid)
+    a = {"latitude": -3.7320, "longitude": -38.5260, "recorded_at": "2026-07-07T10:00:00Z"}
+    b = {"latitude": -3.7330, "longitude": -38.5270, "recorded_at": "2026-07-07T10:01:00Z"}
+    c = {"latitude": -3.7340, "longitude": -38.5280, "recorded_at": "2026-07-07T10:02:00Z"}
+    # Enviados embaralhados: C, A, B.
+    client.post(f"/journeys/{jid}/tracks/{t['id']}/points", json={"points": [c, a, b]}, headers=h)
+    coords = client.get(f"/journeys/{jid}/map", headers=h).json()["tracks"]["features"][0]["geometry"]["coordinates"]
+    # Ordem esperada por recorded_at: A (-38.526), B (-38.527), C (-38.528).
+    assert abs(coords[0][0] - (-38.526)) < 1e-6
+    assert abs(coords[1][0] - (-38.527)) < 1e-6
+    assert abs(coords[2][0] - (-38.528)) < 1e-6
+
+
+# 15 — jornada finished recusa abrir novo trecho (409).
+def test_start_track_on_finished_journey_returns_409(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h)
+    _finish_journey(client, h, jid)
+    r = client.post(f"/journeys/{jid}/tracks/start", headers=h)
+    assert r.status_code == 409, r.text
+
+
+# 16 — jornada finished recusa novos pontos (409).
+def test_add_points_after_journey_finished_returns_409(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h)
+    # Ativa a jornada e abre um trecho ANTES de finalizar.
+    assert client.post(f"/journeys/{jid}/start", headers=h).status_code == 200
+    t = _start(client, h, jid)
+    r = client.post(f"/journeys/{jid}/finish", headers=h)
+    assert r.status_code == 200, r.text
+    # Finalizar a jornada encerra o trecho aberto: novos pontos -> 409.
+    r = client.post(f"/journeys/{jid}/tracks/{t['id']}/points", json={"points": PTS}, headers=h)
+    assert r.status_code == 409, r.text
+
+
+# 17 — list_tracks devolve contagem e distância corretas (batch stats).
+def test_list_tracks_reports_count_and_distance(client, auth_headers):
+    h = auth_headers()
+    jid = _journey(client, h)
+    t = _start(client, h, jid)
+    client.post(f"/journeys/{jid}/tracks/{t['id']}/points", json={"points": PTS}, headers=h)
+    r = client.get(f"/journeys/{jid}/tracks", headers=h)
+    assert r.status_code == 200, r.text
+    tracks = r.json()
+    assert len(tracks) == 1
+    assert tracks[0]["point_count"] == 3
+    assert tracks[0]["distance_m"] > 0

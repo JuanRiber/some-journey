@@ -8,11 +8,26 @@ inexistente OU de outro usuário resulta no MESMO 404 (não revela existência).
 
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.core import storage
 from app.core.config import settings
+from app.core.pagination import (
+    NEXT_CURSOR_HEADER,
+    CursorError,
+    clamp_limit,
+    decode_cursor,
+)
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
@@ -44,10 +59,30 @@ def create_memory(
 
 @router.get("", response_model=list[MemoryRead])
 def list_memories(
+    response: Response,
+    limit: int | None = Query(default=None),
+    cursor: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[MemoryRead]:
-    return memory_service.list_for_user(db, user_id=current_user.id)
+    """Lista paginada por keyset. Corpo = ARRAY puro (retrocompatível); quando há
+    próxima página, o cursor vai no header X-Next-Cursor. `?limit` é normalizado
+    para [1, MAX_LIMIT]; `?cursor` opaco e malformado -> 400 (nunca 500)."""
+    decoded = None
+    if cursor is not None:
+        try:
+            decoded = decode_cursor(cursor)
+        except CursorError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid pagination cursor.",
+            )
+    items, next_cursor = memory_service.list_for_user(
+        db, user_id=current_user.id, limit=clamp_limit(limit), cursor=decoded
+    )
+    if next_cursor is not None:
+        response.headers[NEXT_CURSOR_HEADER] = next_cursor
+    return items
 
 
 @router.get("/{memory_id}", response_model=MemoryRead)
@@ -123,7 +158,6 @@ def add_memory_image(
             user_id=current_user.id,
             memory_id=memory_id,
             data=data,
-            content_type=file.content_type or "",
         )
     except MemoryNotFoundError:
         raise _not_found

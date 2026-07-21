@@ -5,7 +5,8 @@ from geoalchemy2.shape import to_shape
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core import storage
+from app.core import images, storage
+from app.core.pagination import clamp_limit, decode_cursor, encode_cursor
 
 from app.models.journey import Journey
 from app.models.memory import Memory
@@ -61,6 +62,10 @@ class InvalidJourneyReorderError(Exception):
 
 class InvalidCoverImageError(Exception):
     """Tipo de imagem de capa não suportado — a rota traduz em 400."""
+
+
+class InvalidJourneyDatesError(Exception):
+    """Período incoerente (ended_at anterior a started_at) — a rota traduz em 422."""
 
 
 # Tipos aceitos para a capa -> extensão no path do Storage (mesmo critério das
@@ -195,26 +200,54 @@ def update(
     return _read_with_count(db, user_id=user_id, journey=updated)
 
 
-def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[JourneyRead]:
-    rows = journey_repository.list_journeys(db, user_id=user_id)
+def list_for_user(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    limit: int | None = None,
+    cursor: str | None = None,
+) -> tuple[list[JourneyRead], str | None]:
+    """Listagem paginada por keyset das jornadas do usuário.
+
+    Contrato compartilhado (idêntico ao das Memórias): devolve a página de itens
+    E um cursor opaco da PRÓXIMA página (ou None quando acabou) — a rota expõe o
+    cursor no header X-Next-Cursor e responde um array JSON puro. Decodificar um
+    cursor inválido levanta CursorError (a rota traduz em 400).
+
+    Busca limit+1 no repositório para saber se há próxima página sem uma query
+    de COUNT extra: se veio a linha excedente, corta-se ao limite e monta-se o
+    cursor a partir do (created_at, id) do último item devolvido.
+    """
+    clamped = clamp_limit(limit)
+    decoded = decode_cursor(cursor) if cursor else None
+    rows = journey_repository.list_journeys(
+        db, user_id=user_id, limit=clamped, cursor=decoded
+    )
+    has_next = len(rows) > clamped
+    page = rows[:clamped]
     # Capas em LOTE: fallback (primeira foto) numa query + UMA assinatura para
     # todas — a listagem não faz N idas ao banco/Storage.
     fallbacks = journey_repository.first_memory_image_paths(
-        db, journey_ids=[journey.id for journey, _ in rows]
+        db, journey_ids=[journey.id for journey, _ in page]
     )
     paths = {
         journey.id: journey.cover_image_path or fallbacks.get(journey.id)
-        for journey, _ in rows
+        for journey, _ in page
     }
     signed = storage.sign_urls([p for p in paths.values() if p])
-    return [
+    items = [
         _journey_to_read(
             journey,
             points_count,
             cover_url=signed.get(paths[journey.id] or ""),
         )
-        for journey, points_count in rows
+        for journey, points_count in page
     ]
+    next_cursor = None
+    if has_next and page:
+        last_journey = page[-1][0]
+        next_cursor = encode_cursor(last_journey.created_at, last_journey.id)
+    return items, next_cursor
 
 
 def get(db: Session, *, user_id: uuid.UUID, journey_id: uuid.UUID) -> JourneyDetailRead:
@@ -245,17 +278,33 @@ def set_cover(
     """Define a capa da jornada (do dono): sobe o arquivo no Storage privado,
     grava o caminho e apaga a capa antiga (best-effort). Pode levantar
     InvalidCoverImageError (400), JourneyNotFoundError (404) e os erros de
-    Storage (503/502, propagados para a rota)."""
-    ext = _COVER_EXT.get(content_type)
-    if ext is None:
+    Storage (503/502, propagados para a rota).
+
+    O tipo é decidido pelos MAGIC BYTES do conteúdo (images.sniff_image_type),
+    nunca pelo Content-Type do cliente (que pode mentir): o mime DETECTADO é a
+    fonte da verdade para a extensão do path e o Content-Type de armazenamento.
+
+    Rollback de consistência: o upload ao Storage acontece ANTES do write no
+    banco. Se o write falhar, o arquivo recém-subido ficaria órfão no bucket —
+    então apagamos o NOVO path e repropagamos, tudo isso ANTES de tocar na capa
+    antiga (que só é removida depois de o novo caminho estar persistido)."""
+    mime = images.sniff_image_type(data)
+    if mime is None:
         raise InvalidCoverImageError()
+    ext = _COVER_EXT[mime]
     journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
     if journey is None:
         raise JourneyNotFoundError()
     old_path = journey.cover_image_path
     path = f"{user_id}/journeys/{journey_id}/cover-{uuid.uuid4().hex}.{ext}"
-    storage.upload(path, data, content_type)
-    journey_repository.set_cover_path(db, journey=journey, path=path)
+    storage.upload(path, data, mime)
+    try:
+        journey_repository.set_cover_path(db, journey=journey, path=path)
+    except Exception:
+        # O write falhou: não deixa arquivo órfão no bucket e mantém a capa
+        # antiga intacta (ela ainda nem foi tocada).
+        storage.delete(path)
+        raise
     if old_path:
         storage.delete(old_path)
     return _read_with_count(db, user_id=user_id, journey=journey)
@@ -328,6 +377,15 @@ def finish(
         raise JourneyNotFoundError()
     _ensure_transition(journey, "finish")
     ended_at = data.ended_at or datetime.now(UTC)
+    # Coerência do período: uma jornada não pode terminar ANTES de começar.
+    # Compara-se contra o started_at já persistido (fonte da verdade); ambos são
+    # UTC-aware (coluna TIMESTAMPTZ; ended_at normalizado por AwareUtcDatetime ou
+    # datetime.now(UTC)).
+    if journey.started_at is not None and ended_at < journey.started_at:
+        raise InvalidJourneyDatesError()
+    # Fecha qualquer trecho de GPS ainda aberto no MESMO commit do set_status
+    # (uma jornada 'finished' não fica com gravação em aberto).
+    journey_repository.close_open_tracks(db, journey_id=journey.id)
     updated = journey_repository.set_status(
         db, journey=journey, status="finished", ended_at=ended_at
     )

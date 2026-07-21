@@ -1,7 +1,10 @@
 """Capa da jornada: upload, fallback automático (primeira foto do rastro),
-remoção e ownership."""
+remoção, ownership, validação por magic bytes e rollback de Storage."""
 
 import uuid
+
+import pytest
+from sqlalchemy import select
 
 JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
 
@@ -91,3 +94,65 @@ def test_cover_rejects_bad_type_and_other_user(client, auth_headers, monkeypatch
     )
     assert other.status_code == 404
     assert client.delete(f"/journeys/{uuid.uuid4()}/cover", headers=h1).status_code == 404
+
+
+def test_cover_rejects_spoofed_content_type(client, auth_headers, monkeypatch):
+    """A validação é por MAGIC BYTES: um corpo que não é imagem é recusado mesmo
+    quando o cliente MENTE o Content-Type como image/jpeg."""
+    _storage_on(monkeypatch)
+    h = auth_headers()
+    jid = _journey(client, h)
+    r = client.post(
+        f"/journeys/{jid}/cover",
+        files={"file": ("fake.jpg", b"not really an image at all", "image/jpeg")},
+        headers=h,
+    )
+    assert r.status_code == 400
+
+
+def test_set_cover_rolls_back_storage_on_db_failure(client, auth_headers, monkeypatch):
+    """Se o write no banco falha DEPOIS do upload, o arquivo recém-subido é
+    apagado do Storage (não fica órfão) e a capa antiga não é tocada."""
+    from app.db.session import SessionLocal
+    from app.models.journey import Journey
+    from app.repositories import journey_repository
+    from app.services import journey_service
+
+    h = auth_headers()
+    jid = _journey(client, h)
+
+    uploaded: list[str] = []
+    deleted: list[str] = []
+    monkeypatch.setattr(
+        journey_service.storage,
+        "upload",
+        lambda path, data, content_type: uploaded.append(path),
+    )
+    monkeypatch.setattr(
+        journey_service.storage,
+        "delete",
+        lambda path: deleted.append(path),
+    )
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("db write failed")
+
+    monkeypatch.setattr(journey_repository, "set_cover_path", _boom)
+
+    db = SessionLocal()
+    try:
+        journey = db.scalar(select(Journey).where(Journey.id == uuid.UUID(jid)))
+        assert journey.cover_image_path is None
+        with pytest.raises(RuntimeError):
+            journey_service.set_cover(
+                db,
+                user_id=journey.user_id,
+                journey_id=journey.id,
+                data=JPEG,
+                content_type="image/jpeg",
+            )
+    finally:
+        db.close()
+
+    assert len(uploaded) == 1  # o arquivo novo chegou a subir
+    assert deleted == uploaded  # e foi exatamente ele que se apagou (rollback)

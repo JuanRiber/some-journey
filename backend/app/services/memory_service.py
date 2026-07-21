@@ -7,11 +7,13 @@ filtra por user_id (ownership) e deleted_at (soft delete).
 """
 
 import uuid
+from datetime import datetime
 
 from geoalchemy2.shape import to_shape
 from sqlalchemy.orm import Session
 
-from app.core import storage
+from app.core import images, storage
+from app.core.pagination import encode_cursor
 from app.models.memory import Memory, MemoryImage
 from app.repositories import memory_repository
 from app.schemas.memory import (
@@ -105,8 +107,29 @@ def reads_for(db: Session, memories: list[Memory]) -> list[MemoryRead]:
     return [_to_read(m, by_memory.get(m.id, []), signed) for m in memories]
 
 
-def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[MemoryRead]:
-    return reads_for(db, memory_repository.list_by_user(db, user_id=user_id))
+def list_for_user(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    limit: int,
+    cursor: tuple[datetime, uuid.UUID] | None = None,
+) -> tuple[list[MemoryRead], str | None]:
+    """Uma PÁGINA das memórias do usuário + o cursor da próxima (ou None).
+
+    O repository devolve `limit + 1` linhas: se vieram mais que `limit`, existe
+    próxima página. Cortamos em `limit` e o cursor é o par (occurred_at, id) da
+    ÚLTIMA linha da página — o mesmo par que o keyset usa para continuar. Retorna
+    a lista (corpo, array puro) e o cursor separados; a rota decide o header.
+    """
+    rows = memory_repository.list_by_user(
+        db, user_id=user_id, limit=limit, cursor=cursor
+    )
+    has_next = len(rows) > limit
+    page = rows[:limit]
+    next_cursor = (
+        encode_cursor(page[-1].occurred_at, page[-1].id) if has_next else None
+    )
+    return reads_for(db, page), next_cursor
 
 
 def get(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> MemoryRead:
@@ -142,16 +165,27 @@ def add_image(
     user_id: uuid.UUID,
     memory_id: uuid.UUID,
     data: bytes,
-    content_type: str,
 ) -> MemoryRead:
     """Adiciona uma foto à memória (do dono), respeitando o teto _MAX_IMAGES.
 
+    Tipo por MAGIC BYTES, não pelo Content-Type do multipart (o cliente mente):
+    `images.sniff_image_type` fareja os bytes e é a ÚNICA fonte da verdade tanto
+    para a extensão do path quanto para o Content-Type gravado no Storage. None
+    (não é imagem suportada) -> InvalidImageError.
+
     Caminho isolado: `${user_id}/${memory_id}/${rand}.${ext}`. Pode levantar
     InvalidImageError (tipo), MemoryNotFoundError (404), TooManyImagesError (409),
-    StorageNotConfigured/StorageError (propagam para a rota)."""
-    ext = _IMAGE_EXT.get(content_type)
-    if ext is None:
+    StorageNotConfigured/StorageError (propagam para a rota).
+
+    Escrita em DOIS sistemas (Storage + banco) sem transação distribuída: subimos
+    o arquivo primeiro e, se o INSERT falhar por QUALQUER motivo, fazemos o
+    delete COMPENSATÓRIO do objeto já enviado (best-effort/silencioso) antes de
+    repropagar — sem isso, uma falha no banco deixaria um órfão pagando storage e
+    fora de qualquer registro."""
+    mime = images.sniff_image_type(data)
+    if mime is None:
         raise InvalidImageError()
+    ext = _IMAGE_EXT[mime]
     memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
     if memory is None:
         raise MemoryNotFoundError()
@@ -159,10 +193,15 @@ def add_image(
         raise TooManyImagesError()
     position = memory_repository.next_image_position(db, memory_id=memory.id)
     path = f"{user_id}/{memory_id}/{uuid.uuid4().hex}.{ext}"
-    storage.upload(path, data, content_type)
-    memory_repository.add_image(
-        db, memory_id=memory.id, image_path=path, position=position
-    )
+    storage.upload(path, data, mime)
+    try:
+        memory_repository.add_image(
+            db, memory_id=memory.id, image_path=path, position=position
+        )
+    except Exception:
+        # Compensa o upload já concluído: remove o órfão e repropaga o erro.
+        storage.delete(path)
+        raise
     return _read_with_images(db, memory)
 
 

@@ -12,6 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas._fields import AwareUtcDatetime
 from app.schemas.journey import JourneyRoute
 
 TrackSource = Literal["manual", "gps_live", "imported"]
@@ -29,7 +30,9 @@ class TrackStart(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source: TrackSource = "gps_live"
-    started_at: datetime | None = None
+    # Entrada opcional: normalizada para UTC-aware (as colunas são TIMESTAMPTZ e
+    # os defaults do serviço usam datetime.now(UTC)).
+    started_at: AwareUtcDatetime | None = None
 
 
 class TrackPointIn(BaseModel):
@@ -44,7 +47,9 @@ class TrackPointIn(BaseModel):
     altitude: float | None = None
     speed: float | None = None
     heading: float | None = None
-    recorded_at: datetime
+    # Instante da captura no device: normalizado para UTC-aware para não corromper
+    # ordenação/distância se o cliente mandar um horário naive.
+    recorded_at: AwareUtcDatetime
 
 
 class TrackPointsBatch(BaseModel):

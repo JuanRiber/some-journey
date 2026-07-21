@@ -25,6 +25,19 @@ class Journey(Base):
             unique=True,
             postgresql_where=sql_text("deleted_at IS NULL AND status = 'active'"),
         ),
+        # Índice de COBERTURA da listagem paginada por keyset (GET /journeys):
+        # a ordenação canônica é (created_at DESC, id DESC) e o filtro é sempre
+        # (user_id, deleted_at IS NULL). Este índice parcial casa exatamente com
+        # essa query — o Postgres varre só as linhas do dono, já na ordem do
+        # cursor, sem sort extra, e a página profunda continua O(limit). Parcial
+        # (WHERE deleted_at IS NULL) para não indexar linhas soft-deletadas.
+        Index(
+            "ix_journeys_user_created",
+            "user_id",
+            sql_text("created_at DESC"),
+            sql_text("id DESC"),
+            postgresql_where=sql_text("deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(

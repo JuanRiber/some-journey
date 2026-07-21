@@ -21,11 +21,26 @@ class Memory(Base):
 
     __tablename__ = "memories"
 
-    # Índice parcial: acelera "listar minhas memórias ativas" (query mais comum).
+    # Índices parciais (só linhas ativas — o filtro deleted_at IS NULL entra em
+    # TODA query, então o índice não carrega lixo soft-deletado):
+    # - ix_memories_user_active: acelera o ownership puro (user_id).
+    # - ix_memories_user_occurred: casa EXATAMENTE com a paginação por keyset da
+    #   listagem — order by (occurred_at DESC, id DESC) filtrando por user_id.
+    #   Com as colunas do ORDER BY já ordenadas no índice, o Postgres varre a
+    #   página (e o desempate por id) sem sort em memória. O id no fim garante
+    #   ordenação estável e um cursor sem ambiguidade (dois occurred_at iguais
+    #   nunca "pulam" nem "repetem" linhas entre páginas).
     __table_args__ = (
         Index(
             "ix_memories_user_active",
             "user_id",
+            postgresql_where=sql_text("deleted_at IS NULL"),
+        ),
+        Index(
+            "ix_memories_user_occurred",
+            "user_id",
+            sql_text("occurred_at DESC"),
+            sql_text("id DESC"),
             postgresql_where=sql_text("deleted_at IS NULL"),
         ),
     )

@@ -1,10 +1,21 @@
 import uuid
 
-from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Body,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.core import storage
 from app.core.config import settings
+from app.core.pagination import NEXT_CURSOR_HEADER, CursorError
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
@@ -23,6 +34,7 @@ from app.services import journey_service
 from app.services.journey_service import (
     ActiveJourneyExistsError,
     InvalidCoverImageError,
+    InvalidJourneyDatesError,
     InvalidJourneyReorderError,
     InvalidJourneyTransitionError,
     JourneyClosedError,
@@ -55,10 +67,33 @@ def create_journey(
 
 @router.get("", response_model=list[JourneyRead])
 def list_journeys(
+    response: Response,
+    # Sem ge/le aqui de propósito: o teto/piso é do contrato compartilhado
+    # (clamp_limit → [1, MAX_LIMIT]); valores fora do intervalo são normalizados,
+    # não rejeitados.
+    limit: int | None = Query(default=None),
+    cursor: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[JourneyRead]:
-    return journey_service.list_for_user(db, user_id=current_user.id)
+    """Jornadas do usuário (mais recentes primeiro), paginadas por keyset.
+
+    Contrato compartilhado: corpo é um ARRAY JSON puro (retrocompatível); aceita
+    ?limit (default DEFAULT_LIMIT, teto MAX_LIMIT) e ?cursor (opaco, o do fim da
+    página anterior); havendo próxima página, o cursor volta no header
+    X-Next-Cursor. Cursor inválido -> 400."""
+    try:
+        items, next_cursor = journey_service.list_for_user(
+            db, user_id=current_user.id, limit=limit, cursor=cursor
+        )
+    except CursorError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid pagination cursor.",
+        )
+    if next_cursor is not None:
+        response.headers[NEXT_CURSOR_HEADER] = next_cursor
+    return items
 
 
 @router.get("/{journey_id}", response_model=JourneyDetailRead)
@@ -153,6 +188,11 @@ def finish_journey(
         raise _not_found
     except InvalidJourneyTransitionError:
         raise _conflict("Only an active or paused journey can be finished.")
+    except InvalidJourneyDatesError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="ended_at cannot be earlier than started_at.",
+        )
 
 
 @router.post("/{journey_id}/points", response_model=JourneyDetailRead)

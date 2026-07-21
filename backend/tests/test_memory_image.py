@@ -7,8 +7,12 @@ caminho "storage desabilitado -> 503" força as credenciais Supabase a None.
 
 import uuid
 
-# 1x1 JPEG-ish header (o backend não decodifica: valida pelo content-type).
+import pytest
+
+# Cabeçalhos com MAGIC BYTES reais (o backend valida pelos bytes, não pelo
+# Content-Type do multipart): JPEG começa com FF D8 FF; PNG com 89 50 4E 47...
 JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"0" * 64
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"0" * 64
 
 
 def _memory(client, headers):
@@ -132,3 +136,77 @@ def test_remove_other_users_image_returns_404(client, auth_headers, monkeypatch)
     img_id = _add(client, h1, mid).json()["images"][0]["id"]
     r = client.delete(f"/memories/{mid}/images/{img_id}", headers=h2)
     assert r.status_code == 404
+
+
+# --- validação por MAGIC BYTES (não confia no Content-Type) -----------------
+def test_add_lying_content_type_rejected_by_magic_bytes(client, auth_headers, monkeypatch):
+    """Content-Type diz image/jpeg mas os bytes NÃO são imagem -> 400. A decisão
+    é pelos bytes farejados, não pelo header mentiroso do cliente."""
+    _stub_storage(monkeypatch)
+    h = auth_headers()
+    mid = _memory(client, h)
+    r = client.post(
+        f"/memories/{mid}/images",
+        files={"file": ("x.jpg", b"this is plainly not an image payload", "image/jpeg")},
+        headers=h,
+    )
+    assert r.status_code == 400
+
+
+def test_detected_type_overrides_client_content_type(client, auth_headers, monkeypatch):
+    """Content-Type mente 'text/plain' mas os bytes são PNG: aceito, e tanto a
+    extensão do path quanto o Content-Type gravado no Storage vêm do DETECTADO."""
+    from app.core import storage
+
+    captured: dict[str, str] = {}
+
+    def fake_upload(path, data, content_type):
+        captured["path"] = path
+        captured["content_type"] = content_type
+
+    monkeypatch.setattr(storage, "enabled", lambda: True)
+    monkeypatch.setattr(storage, "upload", fake_upload)
+    monkeypatch.setattr(
+        storage, "sign_urls", lambda paths, ttl=None: {p: f"https://signed/{p}" for p in paths}
+    )
+    monkeypatch.setattr(storage, "delete", lambda *a, **k: None)
+
+    h = auth_headers()
+    mid = _memory(client, h)
+    r = client.post(
+        f"/memories/{mid}/images",
+        files={"file": ("x.bin", PNG_BYTES, "text/plain")},
+        headers=h,
+    )
+    assert r.status_code == 200, r.text
+    assert captured["content_type"] == "image/png"
+    assert captured["path"].endswith(".png")
+
+
+# --- rollback compensatório do upload em falha do banco ---------------------
+def test_upload_rolled_back_when_db_write_fails(client, auth_headers, monkeypatch):
+    """Escrita em dois sistemas: se o INSERT no banco falha DEPOIS do upload, o
+    objeto já enviado é apagado (delete compensatório) e o erro é repropagado."""
+    from app.core import storage
+    from app.repositories import memory_repository
+
+    deleted: list[str] = []
+    uploaded: list[str] = []
+
+    monkeypatch.setattr(storage, "enabled", lambda: True)
+    monkeypatch.setattr(storage, "upload", lambda path, *a, **k: uploaded.append(path))
+    monkeypatch.setattr(storage, "sign_urls", lambda paths, ttl=None: {})
+    monkeypatch.setattr(storage, "delete", lambda path: deleted.append(path))
+
+    def boom(*a, **k):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(memory_repository, "add_image", boom)
+
+    h = auth_headers()
+    mid = _memory(client, h)
+    with pytest.raises(RuntimeError):
+        _add(client, h, mid)
+    # subiu um objeto e apagou exatamente esse mesmo objeto (compensação).
+    assert len(uploaded) == 1
+    assert deleted == uploaded

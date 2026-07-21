@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import cast, func, select
+from sqlalchemy import cast, func, select, tuple_
 from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
@@ -101,15 +101,39 @@ def get_by_id(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> Memor
     )
 
 
-def list_by_user(db: Session, *, user_id: uuid.UUID) -> list[Memory]:
-    """Memórias ativas do usuário, da mais recente para a mais antiga (occurred_at)."""
-    return list(
-        db.scalars(
-            select(Memory)
-            .where(Memory.user_id == user_id, Memory.deleted_at.is_(None))
-            .order_by(Memory.occurred_at.desc())
-        )
+def list_by_user(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    limit: int,
+    cursor: tuple[datetime, uuid.UUID] | None = None,
+) -> list[Memory]:
+    """Página de memórias ativas do usuário, da mais recente para a mais antiga.
+
+    Paginação por KEYSET (não offset): ordena por (occurred_at DESC, id DESC) —
+    o id é o desempate que torna a ordem TOTAL e estável, sem o qual duas
+    memórias com o mesmo occurred_at poderiam trocar de lugar entre requisições
+    e o cursor pularia/duplicaria linhas.
+
+    Busca `limit + 1` linhas de propósito: a linha extra é o sinal de que existe
+    próxima página (quem chama corta em `limit` e usa a última como cursor). Com
+    `cursor = (occurred_at, id)` da página anterior, filtramos as linhas que vêm
+    DEPOIS dela na ordem DESC — ou seja, cujo par (occurred_at, id) é MENOR que o
+    do cursor. Usamos comparação de tupla (row-value) `tuple_(...) < tuple_(...)`,
+    que o Postgres avalia lexicograficamente (occurred_at < c_ts OR (occurred_at
+    = c_ts AND id < c_id)) e resolve pelo índice ix_memories_user_occurred.
+    """
+    stmt = (
+        select(Memory)
+        .where(Memory.user_id == user_id, Memory.deleted_at.is_(None))
+        .order_by(Memory.occurred_at.desc(), Memory.id.desc())
     )
+    if cursor is not None:
+        cursor_ts, cursor_id = cursor
+        stmt = stmt.where(
+            tuple_(Memory.occurred_at, Memory.id) < tuple_(cursor_ts, cursor_id)
+        )
+    return list(db.scalars(stmt.limit(limit + 1)))
 
 
 def list_loose(
@@ -132,7 +156,8 @@ def list_loose(
             Memory.deleted_at.is_(None),
             ~has_active_link,
         )
-        .order_by(Memory.occurred_at.desc())
+        # id como desempate: ordem determinística mesmo com occurred_at iguais.
+        .order_by(Memory.occurred_at.desc(), Memory.id.desc())
     )
     if bbox is not None:
         stmt = stmt.where(_bbox_filter(bbox))

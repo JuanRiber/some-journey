@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.models.journey import Journey, JourneyMemory
 from app.models.memory import Memory, MemoryImage
+from app.models.track import JourneyTrack
 
 
 def create_journey(
@@ -64,8 +65,29 @@ def update_journey(
     return journey
 
 
-def list_journeys(db: Session, *, user_id: uuid.UUID) -> list[tuple[Journey, int]]:
-    rows = db.execute(
+def list_journeys(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    limit: int | None = None,
+    cursor: tuple[datetime, uuid.UUID] | None = None,
+) -> list[tuple[Journey, int]]:
+    """Jornadas do usuário (com a contagem de pontos ativos), da mais recente
+    para a mais antiga.
+
+    Ordenação CANÔNICA e estável: (created_at DESC, id DESC). O id é o desempate
+    único — sem ele, duas jornadas com o mesmo created_at poderiam trocar de
+    lugar entre requisições e a paginação por keyset pularia/duplicaria linhas.
+
+    Paginação por keyset (opcional, retrocompatível):
+    - `limit=None` (default) devolve TODAS as linhas — preserva o contrato antigo
+      para chamadores que não paginam (ex.: montagem do mapa).
+    - `limit=int` busca limit+1 linhas: o serviço detecta "há próxima página" pela
+      linha extra e monta o cursor. `cursor` é o par (created_at, id) do fim da
+      página anterior; como a ordem é DESC, a próxima página é tudo que vem DEPOIS
+      dele, i.e. (created_at, id) estritamente MENOR que o cursor.
+    """
+    stmt = (
         select(Journey, func.count(Memory.id))
         .outerjoin(
             JourneyMemory,
@@ -80,8 +102,22 @@ def list_journeys(db: Session, *, user_id: uuid.UUID) -> list[tuple[Journey, int
         )
         .where(Journey.user_id == user_id, Journey.deleted_at.is_(None))
         .group_by(Journey.id)
-        .order_by(Journey.created_at.desc())
+        .order_by(Journey.created_at.desc(), Journey.id.desc())
     )
+    if cursor is not None:
+        cursor_created, cursor_id = cursor
+        stmt = stmt.where(
+            or_(
+                Journey.created_at < cursor_created,
+                and_(
+                    Journey.created_at == cursor_created,
+                    Journey.id < cursor_id,
+                ),
+            )
+        )
+    if limit is not None:
+        stmt = stmt.limit(limit + 1)
+    rows = db.execute(stmt)
     return [(journey, int(points_count)) for journey, points_count in rows]
 
 
@@ -308,7 +344,10 @@ def list_memories_chronological(
                 Memory.user_id == user_id,
                 Memory.deleted_at.is_(None),
             )
-            .order_by(Memory.occurred_at.asc())
+            # Desempate estável por id ASC: memórias com o MESMO occurred_at
+            # mantêm sempre a mesma ordem entre requisições (sem isso a timeline
+            # poderia embaralhar itens de mesma data a cada leitura).
+            .order_by(Memory.occurred_at.asc(), Memory.id.asc())
         )
     )
 
@@ -324,6 +363,26 @@ def reorder(
     db.commit()
 
 
+def close_open_tracks(db: Session, *, journey_id: uuid.UUID) -> None:
+    """Fecha (ended_at = now()) qualquer trecho de percurso AINDA ABERTO da
+    jornada. Chamado ao finalizar a jornada: uma jornada 'finished' não pode
+    ficar com gravação de GPS em aberto.
+
+    NÃO faz commit — o UPDATE participa da mesma transação de quem chama (o
+    finish() comita junto ao mudar o status), mantendo a operação atômica. Só
+    lê/escreve JourneyTrack (não toca no ciclo de vida do percurso além de
+    encerrar o trecho aberto)."""
+    db.execute(
+        update(JourneyTrack)
+        .where(
+            JourneyTrack.journey_id == journey_id,
+            JourneyTrack.ended_at.is_(None),
+            JourneyTrack.deleted_at.is_(None),
+        )
+        .values(ended_at=func.now())
+    )
+
+
 def soft_delete(db: Session, *, journey: Journey) -> None:
     # Soft-delete a jornada E seus vínculos ativos no mesmo commit (atômico).
     # Sem isso os links ficariam vivos: a memória continuaria "ocupando o slot"
@@ -336,6 +395,20 @@ def soft_delete(db: Session, *, journey: Journey) -> None:
         .where(
             JourneyMemory.journey_id == journey.id,
             JourneyMemory.deleted_at.is_(None),
+        )
+        .values(deleted_at=func.now())
+    )
+    # Mesma cascata para os percursos (tracks) ativos: excluir a jornada
+    # soft-deleta os trechos de GPS no mesmo commit. Sem isso um trecho ABERTO
+    # continuaria ocupando o slot do índice único parcial
+    # uq_journey_tracks_one_open_per_journey e sobraria dado de localização
+    # (sensível) vivo de uma jornada que já não existe. Espelha o bloco de
+    # JourneyMemory acima.
+    db.execute(
+        update(JourneyTrack)
+        .where(
+            JourneyTrack.journey_id == journey.id,
+            JourneyTrack.deleted_at.is_(None),
         )
         .values(deleted_at=func.now())
     )

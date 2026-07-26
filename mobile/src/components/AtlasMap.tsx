@@ -29,11 +29,13 @@ const HTML = `<!DOCTYPE html>
   html, body, #map { height: 100%; margin: 0; padding: 0; }
   body { background: ${colors.sand}; }
   .leaflet-container { background: ${colors.sand}; }
+  /* Controles do Leaflet no papel: superfície off-white, tinta marrom e
+     hairline da própria paleta (o leaflet.css carrega depois, daí o !important). */
   .leaflet-bar a, .leaflet-bar a:hover, .leaflet-bar a:focus {
     background-color: ${colors.card} !important; color: ${colors.ink} !important;
-    border-bottom-color: rgba(242,234,216,0.15) !important;
+    border-bottom-color: ${colors.line} !important;
   }
-  .leaflet-control-attribution { background: rgba(13,21,36,0.75); color: ${colors.placeholder}; }
+  .leaflet-control-attribution { background: rgba(251,248,241,0.82); color: ${colors.placeholder}; }
   .leaflet-control-attribution a { color: ${colors.inkSoft}; }
 </style>
 </head>
@@ -41,7 +43,8 @@ const HTML = `<!DOCTYPE html>
 <div id="map"></div>
 <script>
   var map, layer;
-  var TERRA = '${colors.wine}', TEAL = '${colors.cyan}', BORDER = '${colors.ink}', TRACK = '${colors.gold}';
+  // BORDER = anel creme do pin (sobre base clara), não a tinta escura.
+  var TERRA = '${colors.wine}', TEAL = '${colors.cyan}', BORDER = '${colors.card}', TRACK = '${colors.gold}';
 
   function post(o) {
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(o));
@@ -50,7 +53,7 @@ const HTML = `<!DOCTYPE html>
     return L.divIcon({
       className: 'sj-pin',
       html: '<div style="width:20px;height:20px;border-radius:50%;background:' + color +
-            ';border:2px solid ' + BORDER + ';box-shadow:0 2px 5px rgba(0,0,0,.4)"></div>',
+            ';border:2px solid ' + BORDER + ';box-shadow:0 2px 6px rgba(43,39,36,.28)"></div>',
       iconSize: [20, 20], iconAnchor: [10, 10]
     });
   }
@@ -86,7 +89,8 @@ const HTML = `<!DOCTYPE html>
   };
   function init() {
     map = L.map('map', { center: [-14.235, -51.925], zoom: 4, worldCopyJump: true, minZoom: 2 });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Positron (light_all): base clara, do mesmo papel da interface.
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 20, attribution: '© OpenStreetMap © CARTO'
     }).addTo(map);
     layer = L.layerGroup().addTo(map);

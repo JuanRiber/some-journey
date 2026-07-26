@@ -21,8 +21,10 @@ function pinIcon(L: any, color: string) {
   return L.divIcon({
     className: "sj-atlas-pin",
     html:
+      // Anel CREME + sombra suave: sobre a base clara o pin precisa se separar
+      // do papel sem endurecer o desenho (nada de preto duro).
       `<div style="width:20px;height:20px;border-radius:50%;background:${color};` +
-      `border:2px solid ${colors.ink};box-shadow:0 0 8px rgba(0,0,0,.6)"></div>`,
+      `border:2px solid ${colors.card};box-shadow:0 2px 6px rgba(43,39,36,.28)"></div>`,
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
@@ -66,7 +68,9 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
         map.on("focus", () => map.scrollWheelZoom.enable());
         map.on("blur", () => map.scrollWheelZoom.disable());
         // Tiles escuras (CARTO dark matter): o mapa vira o céu noturno do atlas.
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        // Positron (light_all): base clara e silenciosa, que casa com o papel da
+        // interface e deixa pins/rastros serem a informação.
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
           maxZoom: 20,
           attribution: "© OpenStreetMap © CARTO",
         }).addTo(map);
@@ -109,7 +113,9 @@ export default function AtlasMap({ data, onSelect, tracks }: Props) {
       if (j.route && j.route.coordinates.length >= 2) {
         // GeoJSON é [lng, lat]; Leaflet quer [lat, lng].
         const line = j.route.coordinates.map(([lng, lat]) => [lat, lng]) as [number, number][];
-        L.polyline(line, { color: colors.cyan, weight: 3, opacity: 0.75 }).addTo(layer);
+        // Rastro SIMBÓLICO da jornada em vinho (mesma convenção do app Flutter:
+        // vinho = jornada; o percurso real de GPS abaixo usa o couro/ouro).
+        L.polyline(line, { color: colors.wine, weight: 3, opacity: 0.75 }).addTo(layer);
       }
       for (const p of j.points) addPin(p.latitude, p.longitude, p.title, p.memory_id, colors.wine);
     }

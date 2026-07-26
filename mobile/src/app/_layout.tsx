@@ -15,7 +15,9 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.paper },
         }}
       />
-      <StatusBar style="light" />
+      {/* Papel quente é claro: os ícones da barra de status precisam ser ESCUROS
+          (com "light" eles ficariam brancos sobre creme, ou seja, invisíveis). */}
+      <StatusBar style="dark" />
     </SafeAreaProvider>
   );
 }

@@ -119,6 +119,21 @@ class Api {
         authed: true,
       );
 
+  /// Pede o link de recuperação de senha. O backend responde SEMPRE 202 com a
+  /// mesma mensagem genérica — exista a conta ou não (anti-enumeração). Portanto
+  /// a UI nunca deve afirmar que "o e-mail existe": só que, se existir, o link foi
+  /// enviado.
+  Future<void> forgotPassword(String email) =>
+      _request('POST', '/auth/forgot-password', body: {'email': email});
+
+  /// Conclui a recuperação com o token recebido por e-mail (uso único, com
+  /// validade). Token inválido/expirado/usado volta como ApiError 400.
+  Future<void> resetPassword(String token, String newPassword) => _request(
+        'POST',
+        '/auth/reset-password',
+        body: {'token': token, 'new_password': newPassword},
+      );
+
   // ---- Memórias ----
   Future<List<Memory>> listMemories() async {
     final data = await _request('GET', '/memories', authed: true);

@@ -70,6 +70,19 @@ export function login(email: string, password: string) {
   return request("POST", "/auth/login", { email, password });
 }
 
+// Recuperação de senha (pública). O backend responde SEMPRE 202 com a mesma
+// mensagem genérica — exista a conta ou não (anti-enumeração): a UI nunca deve
+// afirmar que o e-mail existe, só que, se existir, o link foi enviado.
+export function forgotPassword(email: string) {
+  return request("POST", "/auth/forgot-password", { email });
+}
+
+// Conclui a recuperação com o token do e-mail (uso único, com validade).
+// Token inválido/expirado/usado volta como erro 400.
+export function resetPassword(token: string, newPassword: string): Promise<null> {
+  return request("POST", "/auth/reset-password", { token, new_password: newPassword });
+}
+
 // --- Autenticadas (token no header) ---
 export function me() {
   return request("GET", "/auth/me", undefined, true);

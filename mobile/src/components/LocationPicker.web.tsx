@@ -93,10 +93,11 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
         pinRef.current = L.divIcon({
           className: "sj-pin",
           html:
+            // Anel creme + sombra suave (mesmo pin do atlas, sobre base clara).
             `<div style="width:24px;height:24px;border-radius:50%;background:${colors.wine};` +
-            `border:2px solid ${colors.ink};box-shadow:0 0 8px rgba(0,0,0,.6);` +
+            `border:2px solid ${colors.card};box-shadow:0 2px 6px rgba(43,39,36,.28);` +
             `display:flex;align-items:center;justify-content:center">` +
-            `<div style="width:8px;height:8px;border-radius:50%;background:${colors.ink}"></div></div>`,
+            `<div style="width:8px;height:8px;border-radius:50%;background:${colors.card}"></div></div>`,
           iconSize: [24, 24],
           iconAnchor: [12, 12],
         });
@@ -116,7 +117,8 @@ export default function LocationPicker({ latitude, longitude, label, onChange }:
         });
         map.on("focus", () => map.scrollWheelZoom.enable());
         map.on("blur", () => map.scrollWheelZoom.disable());
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        // Positron (light_all): base clara, do mesmo papel da interface.
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
           maxZoom: 20,
           attribution: "© OpenStreetMap © CARTO",
         }).addTo(map);

@@ -1,32 +1,33 @@
-/* Atlas noturno: o fundo da página é o navy da landing (evita flash branco). */
+/* Papel quente: o fundo da página é o creme do produto (evita flash branco/azul
+   antes de o app pintar). Espelha `sjLight` em src/theme/tokens.ts. */
 html,
 body {
-  background-color: #0d1524;
-  color-scheme: dark;
+  background-color: #f5f0e6;
+  color-scheme: light;
 }
 
-/* Fundo do container do mapa: navy (não o cinza padrão do Leaflet) enquanto os
-   tiles escuros não chegam — sem flash cinza no atlas noturno. */
+/* Fundo do container do mapa: creme recuado (não o cinza padrão do Leaflet)
+   enquanto os tiles claros não chegam — sem flash cinza no atlas. */
 .leaflet-container {
-  background: #16213a !important;
+  background: #efe7d7 !important;
 }
 
-/* Controles do Leaflet no tema noturno (zoom e attribution). O !important é
+/* Controles do Leaflet no papel (zoom e attribution). O !important é
    necessário: o leaflet.css é importado depois deste arquivo e venceria o
    empate de especificidade. */
 .leaflet-bar a,
 .leaflet-bar a:hover,
 .leaflet-bar a:focus {
-  background-color: #141e33 !important;
-  color: #f2ead8 !important;
-  border-bottom-color: rgba(242, 234, 216, 0.15) !important;
+  background-color: #fbf8f1 !important;
+  color: #2b2724 !important;
+  border-bottom-color: rgba(43, 39, 36, 0.12) !important;
 }
 .leaflet-control-attribution {
-  background: rgba(13, 21, 36, 0.75) !important;
-  color: #6b7488;
+  background: rgba(251, 248, 241, 0.82) !important;
+  color: #9c917e;
 }
 .leaflet-control-attribution a {
-  color: #98a0b3;
+  color: #6e6353;
 }
 
 :root {

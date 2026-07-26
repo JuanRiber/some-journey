@@ -212,3 +212,29 @@ class MapResponse {
   int get totalPoints =>
       loosePoints.length + journeys.fold(0, (n, j) => n + j.points.length);
 }
+
+/// Perfil da conta (GET /auth/me). Só campos públicos — o hash de senha nunca
+/// sai da API.
+class UserProfile {
+  final String id;
+  final String name;
+  final String email;
+  final bool isActive;
+  final String createdAt;
+
+  UserProfile({
+    required this.id,
+    required this.name,
+    required this.email,
+    required this.isActive,
+    required this.createdAt,
+  });
+
+  factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
+        id: j['id'] as String,
+        name: (j['name'] ?? '') as String,
+        email: (j['email'] ?? '') as String,
+        isActive: (j['is_active'] ?? true) as bool,
+        createdAt: (j['created_at'] ?? '') as String,
+      );
+}

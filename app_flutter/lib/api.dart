@@ -149,6 +149,11 @@ class Api {
         body: {'token': token, 'new_password': newPassword},
       );
 
+  /// Perfil do usuário autenticado (GET /auth/me). O backend nunca devolve
+  /// hash de senha — só os campos públicos da conta.
+  Future<UserProfile> me() async =>
+      UserProfile.fromJson(await _request('GET', '/auth/me', authed: true));
+
   // ---- Memórias ----
   Future<List<Memory>> listMemories() async {
     final data = await _request('GET', '/memories', authed: true);

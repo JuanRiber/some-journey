@@ -1,23 +1,43 @@
 import 'package:flutter/material.dart';
 
-import '../theme.dart';
+import '../design/components.dart';
+import '../design/sj_theme.dart';
+import '../design/tokens.dart';
 
-/// A arte de marca (o viajante de primeira classe) emoldurada em ouro.
+/// # Widgets compartilhados (ponte para o design system).
+///
+/// Estes nomes são usados por várias telas que ainda não foram reescritas uma a
+/// uma. Em vez de duplicar estilo, cada um aqui DELEGA para o componente
+/// equivalente de `lib/design/` e lê a paleta ativa via `SJTheme.of(context)`.
+/// Assim as telas legadas ganham o sistema (e o modo escuro) sem alteração, e a
+/// API pública destes widgets permanece intacta — nada quebra.
+///
+/// Para código NOVO: importe `design/components.dart` direto.
+
+/// A arte de marca (o viajante de primeira classe) emoldurada em couro.
 class HeroArt extends StatelessWidget {
   const HeroArt({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 640),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(26, 24, 26, 0),
+          padding: const EdgeInsets.fromLTRB(
+            SJSpace.screenX,
+            SJSpace.x6,
+            SJSpace.screenX,
+            0,
+          ),
           child: Container(
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: SJColors.frame,
+              // Moldura da paleta ativa (couro no papel, ouro na noite).
+              color: s.frame,
               borderRadius: BorderRadius.circular(3),
+              boxShadow: SJElevation.e1(s),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(2),
@@ -38,36 +58,44 @@ class HeroArt extends StatelessWidget {
   }
 }
 
-/// Overline mono dourada ("E-MAIL", "TÍTULO"...).
+/// Overline mono do acento ("E-MAIL", "TÍTULO"...) — o mesmo rótulo dos campos
+/// do sistema, para o formulário ter uma só voz.
 class FieldLabel extends StatelessWidget {
   final String text;
   const FieldLabel(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 20, bottom: 7),
-        child: Text(text.toUpperCase(), style: monoLabel(11)),
-      );
-}
-
-/// Botão primário vinho com texto creme em mono caixa alta.
-class PrimaryButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  final bool busy;
-  const PrimaryButton({super.key, required this.label, this.onPressed, this.busy = false});
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: busy ? null : onPressed,
-          child: Text(busy ? '...' : label.toUpperCase()),
+        padding: const EdgeInsets.only(top: SJSpace.x5, bottom: SJSpace.x2),
+        child: Text(
+          text.toUpperCase(),
+          style: SJText.overline(color: SJTheme.of(context).accent),
         ),
       );
 }
 
-/// Mensagem de erro inline (vermelho suave, centrada).
+/// Botão primário do sistema, em largura cheia (mantém a API antiga `busy`).
+class PrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool busy;
+  const PrimaryButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.busy = false,
+  });
+
+  @override
+  Widget build(BuildContext context) => SJButton(
+        label: label,
+        loading: busy,
+        expand: true,
+        onPressed: busy ? null : onPressed,
+      );
+}
+
+/// Mensagem de erro inline (centrada, na cor de perigo da paleta ativa).
 class InlineError extends StatelessWidget {
   final String message;
   const InlineError(this.message, {super.key});
@@ -76,43 +104,46 @@ class InlineError extends StatelessWidget {
   Widget build(BuildContext context) => message.isEmpty
       ? const SizedBox.shrink()
       : Padding(
-          padding: const EdgeInsets.only(top: 12),
+          padding: const EdgeInsets.only(top: SJSpace.x3),
           child: Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: SJColors.danger, fontSize: 13),
+            style: SJText.caption(color: SJTheme.of(context).danger),
           ),
         );
 }
 
-/// Tile pontilhado do "+ foto" na galeria (mesmo look do app Expo).
+/// Tile "+ foto" da galeria: convite discreto, tracejado no hairline do tema.
 class DottedTile extends StatelessWidget {
   final String label;
   const DottedTile({super.key, required this.label});
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: 84,
-        height: 84,
-        decoration: BoxDecoration(
-          color: SJColors.card,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: const Color(0x29F3ECDC)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('+',
-                style: TextStyle(color: SJColors.cyan, fontSize: 24, fontWeight: FontWeight.w700)),
-            Text(label,
-                style: const TextStyle(
-                    color: SJColors.cyan, fontSize: 11, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
+    return Container(
+      width: 84,
+      height: 84,
+      decoration: BoxDecoration(
+        color: s.surfaceAlt,
+        borderRadius: BorderRadius.circular(SJRadius.sm),
+        border: Border.all(color: s.line),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.add, size: 22, color: s.secondary),
+          const SizedBox(height: SJSpace.x1),
+          Text(label, style: SJText.caption(color: s.secondary)),
+        ],
+      ),
+    );
+  }
 }
 
-/// Selo de status (texto creme sobre preenchimento escuro o bastante).
+/// Selo de status da jornada — delega ao SJBadge, com a cor do papel semântico:
+/// rascunho = tinta suave, ativa = ação (vinho), pausada = mostarda, concluída =
+/// musgo (o capítulo virou parte permanente do atlas).
 class StatusBadge extends StatelessWidget {
   final String status;
   const StatusBadge(this.status, {super.key});
@@ -123,23 +154,16 @@ class StatusBadge extends StatelessWidget {
     'paused': 'Pausada',
     'finished': 'Concluída',
   };
-  static const _colors = {
-    'draft': Color(0xFF4A5364),
-    'active': SJColors.wine,
-    'paused': Color(0xFF8A5A1E),
-    'finished': SJColors.cyanDeep,
-  };
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(
-          color: _colors[status] ?? SJColors.inkSoft,
-          borderRadius: BorderRadius.circular(3),
-        ),
-        child: Text(
-          (_labels[status] ?? status).toUpperCase(),
-          style: monoLabel(10, color: SJColors.ink, weight: FontWeight.w700),
-        ),
-      );
+  Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
+    final color = switch (status) {
+      'active' => s.primary,
+      'paused' => s.highlight,
+      'finished' => s.moss,
+      _ => s.inkSoft,
+    };
+    return SJBadge(_labels[status] ?? status, color: color);
+  }
 }

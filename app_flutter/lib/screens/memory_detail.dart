@@ -45,7 +45,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() => _error = e.isNotFound ? 'Memória não encontrada.' : e.message);
@@ -60,7 +60,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() {

@@ -37,7 +37,7 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() => _error = e.isNotFound ? 'Jornada não encontrada.' : e.message);
@@ -55,7 +55,7 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() => _error = e.message);

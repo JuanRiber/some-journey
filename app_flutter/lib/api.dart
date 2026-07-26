@@ -34,20 +34,35 @@ class Api {
 
   String? _token;
 
+  /// Lê a sessão salva. Falha de armazenamento NÃO derruba o app: sem token, o
+  /// bootstrap manda para o login (ver _Bootstrap em main.dart).
   Future<void> loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString(_tokenKey);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _token = prefs.getString(_tokenKey);
+    } catch (_) {
+      _token = null;
+    }
   }
 
   bool get hasToken => _token != null;
 
+  /// Guarda (ou apaga) a sessão. O token vale EM MEMÓRIA na hora — a persistência
+  /// é best-effort: se o armazenamento estiver indisponível (aba privada, política
+  /// de site na web), o login continua funcionando nesta sessão; ele só não
+  /// sobrevive a um recarregamento. Antes, uma exceção aqui fazia um login
+  /// bem-sucedido parecer que falhou.
   Future<void> _saveToken(String? token) async {
     _token = token;
-    final prefs = await SharedPreferences.getInstance();
-    if (token == null) {
-      await prefs.remove(_tokenKey);
-    } else {
-      await prefs.setString(_tokenKey, token);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (token == null) {
+        await prefs.remove(_tokenKey);
+      } else {
+        await prefs.setString(_tokenKey, token);
+      }
+    } catch (_) {
+      // Sessão só em memória — aceitável e melhor que quebrar o fluxo.
     }
   }
 

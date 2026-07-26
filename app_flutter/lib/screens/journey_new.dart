@@ -55,7 +55,7 @@ class _JourneyNewScreenState extends State<JourneyNewScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() {

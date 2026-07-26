@@ -73,7 +73,7 @@ class _AtlasScreenState extends State<AtlasScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() {
@@ -86,7 +86,7 @@ class _AtlasScreenState extends State<AtlasScreen> {
   Future<void> _logout() async {
     await Api.instance.logout();
     if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
   }
 
   /// Registrar a primeira memória (ação do estado vazio). Ao voltar, recarrega —

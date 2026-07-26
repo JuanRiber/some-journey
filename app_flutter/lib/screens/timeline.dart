@@ -91,7 +91,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() {

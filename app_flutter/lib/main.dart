@@ -40,8 +40,17 @@ class SomeJourneyApp extends StatelessWidget {
       home: const _Bootstrap(),
       // Rotas com argumento (id) são resolvidas em onGenerateRoute; as sem
       // argumento ficam no mapa estático.
+      //
+      // ATENÇÃO — POR QUE O LOGIN É '/login' E NÃO '/':
+      // com `home` definido, o MaterialApp responde ao nome de rota '/' com o
+      // PRÓPRIO `home`, antes de consultar `routes`/`onGenerateRoute`. Então
+      // `pushReplacementNamed('/')` no fim do bootstrap trocava a tela de
+      // carregamento... pela mesma tela de carregamento — spinner para sempre.
+      // Em debug um assert alertaria sobre `home` + '/' juntos; em release o
+      // assert é removido e a falha era SILENCIOSA (foi o que travou o build web).
+      // O login tem nome próprio; todo o app navega para '/login'.
       routes: {
-        '/': (_) => const LoginScreen(),
+        '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
         '/forgot': (_) => const ForgotPasswordScreen(),
         '/change-password': (_) => const ChangePasswordScreen(),
@@ -88,10 +97,25 @@ class _BootstrapState extends State<_Bootstrap> {
     _decide();
   }
 
+  /// Decide a tela inicial SEM NUNCA travar aqui.
+  ///
+  /// `loadToken()` depende de armazenamento da plataforma (shared_preferences →
+  /// localStorage na web). Se isso lançar (armazenamento bloqueado, modo privado,
+  /// política de site) ou simplesmente não responder, um `await` nu deixaria o app
+  /// eternamente nesta tela de carregamento — foi exatamente o que aconteceu no
+  /// build web: fundo creme e um spinner girando para sempre.
+  ///
+  /// Agora o boot é resiliente: qualquer falha OU demora acima de 5s cai no
+  /// caminho seguro (login). Perder a sessão salva é um incômodo pequeno; não
+  /// conseguir abrir o app é fatal.
   Future<void> _decide() async {
-    await Api.instance.loadToken();
+    try {
+      await Api.instance.loadToken().timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Sessão indisponível: segue para o login (sem token).
+    }
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed(Api.instance.hasToken ? '/tabs' : '/');
+    Navigator.of(context).pushReplacementNamed(Api.instance.hasToken ? '/tabs' : '/login');
   }
 
   @override

@@ -54,7 +54,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() => _loadError = e.isNotFound ? 'Memória não encontrada.' : e.message);
@@ -105,7 +105,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
       setState(() {
@@ -162,7 +162,8 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                   maxLines: 5,
                   decoration: const InputDecoration(hintText: 'Conte a memória...'),
                 ),
-                const FieldLabel('Quando'),
+                // O SJDateField já desenha a própria overline ("QUANDO FOI").
+                const SizedBox(height: 20),
                 SJDateField(value: _date, onChange: (v) => setState(() => _date = v)),
                 const FieldLabel('Localização'),
                 LocationPicker(

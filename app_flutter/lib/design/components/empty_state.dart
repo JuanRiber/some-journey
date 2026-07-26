@@ -42,7 +42,11 @@ class SJEmptyState extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
-        child: Padding(
+        // Rolagem de segurança: ilustração + título + corpo + ação passam de 360px
+        // de altura em telas baixas (ou com Dynamic Type grande) e a Column
+        // estourava o espaço — o estado vazio, que existe para ACOLHER, aparecia
+        // com a faixa de overflow. Agora ele encolhe e rola em vez de quebrar.
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(SJSpace.x8),
           child: Column(
             mainAxisSize: MainAxisSize.min,

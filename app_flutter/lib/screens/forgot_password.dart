@@ -97,7 +97,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       await Api.instance.resetPassword(token, password);
       if (!mounted) return;
       // Senha trocada: volta ao login com uma confirmação discreta.
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Senha redefinida. Entre com a nova senha.')),
       );

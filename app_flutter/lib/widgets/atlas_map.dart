@@ -5,9 +5,11 @@ import 'package:latlong2/latlong.dart';
 import '../models.dart';
 import '../theme.dart';
 
-/// Mapa noturno do atlas: tiles CARTO dark, pins vinho (jornadas) e ciano
-/// (pontos soltos), rastros em ciano. A câmera é contida a UM único mundo
-/// (sem cópias laterais vazias — o equivalente do worldCopyJump do app web).
+/// Mapa do atlas em PAPEL: tiles claros (CARTO Positron), que casam com o creme
+/// da interface e deixam a cartografia parecer um mapa impresso — o fundo é
+/// discreto para os pins e rastros (a memória) serem a informação. Pins vinho
+/// (jornadas) e azul-lago (pontos soltos), rastros em vinho. A câmera é contida
+/// a UM único mundo (sem cópias laterais vazias — o worldCopyJump do app web).
 class AtlasMap extends StatelessWidget {
   final MapResponse? data;
   final void Function(String memoryId)? onSelect;
@@ -27,7 +29,8 @@ class AtlasMap extends StatelessWidget {
         if (route != null && route.coordinates.length >= 2) {
           polylines.add(Polyline(
             points: route.coordinates.map((c) => LatLng(c[1], c[0])).toList(),
-            color: SJColors.cyan.withValues(alpha: 0.85),
+            // Rastro simbólico da jornada: vinho (a cor da ação/jornada).
+            color: SJColors.wine.withValues(alpha: 0.75),
             strokeWidth: 3,
           ));
         }
@@ -74,7 +77,9 @@ class AtlasMap extends StatelessWidget {
         ),
         children: [
           TileLayer(
-            urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+            // Positron = base clara e silenciosa (papel). Trocar por dark_all
+            // quando o modo escuro por tela chegar.
+            urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
             subdomains: const ['a', 'b', 'c', 'd'],
             retinaMode: RetinaMode.isHighDensity(context),
             userAgentPackageName: 'app.somejourney',
@@ -96,8 +101,16 @@ class AtlasMap extends StatelessWidget {
             decoration: BoxDecoration(
               color: color,
               shape: BoxShape.circle,
-              border: Border.all(color: SJColors.ink, width: 2),
-              boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 8)],
+              // Anel creme: destaca o pin sobre a base clara sem endurecer o
+              // desenho; a sombra é muito suave (nada de preto duro no papel).
+              border: Border.all(color: const Color(0xFFFBF8F1), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: SJColors.ink.withValues(alpha: 0.22),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
           ),
         ),

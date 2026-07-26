@@ -30,15 +30,13 @@ class SomeJourneyApp extends StatelessWidget {
       title: 'Some Journey',
       debugShowCheckedModeBanner: false,
       // Design system: DOIS modos saem do mesmo mapeamento de tokens.
-      // `theme` = papel quente (claro, padrão do produto); `darkTheme` = atlas
-      // noturno. Os dois já ficam ligados aqui para o app estar PRONTO para
-      // alternar. Porém o default segue `ThemeMode.dark` de propósito: as telas
-      // atuais ainda leem o antigo `lib/theme.dart` (escuro, hardcoded) e
-      // ficariam quebradas sob um claro imediato. A Fase 3 vira para `.light`
-      // depois que as telas migrarem para os tokens.
+      // `theme` = papel quente (claro, PADRÃO do produto); `darkTheme` = atlas
+      // noturno. O legado `lib/theme.dart` já foi reapontado para a paleta clara,
+      // então as telas atuais respiram papel — o default agora é `ThemeMode.light`.
+      // O modo escuro por tela chega na etapa editorial (SJTheme.of(context)).
       theme: buildSjTheme(sjLight),
       darkTheme: buildSjTheme(sjDark),
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.light,
       home: const _Bootstrap(),
       // Rotas com argumento (id) são resolvidas em onGenerateRoute; as sem
       // argumento ficam no mapa estático.

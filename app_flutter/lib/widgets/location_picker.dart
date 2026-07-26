@@ -173,7 +173,8 @@ class _LocationPickerState extends State<LocationPicker> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                // Base clara (Positron): casa com o papel da interface.
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 subdomains: const ['a', 'b', 'c', 'd'],
                 retinaMode: RetinaMode.isHighDensity(context),
                 userAgentPackageName: 'app.somejourney',
@@ -188,7 +189,15 @@ class _LocationPickerState extends State<LocationPicker> {
                       decoration: BoxDecoration(
                         color: SJColors.wine,
                         shape: BoxShape.circle,
-                        border: Border.all(color: SJColors.ink, width: 2),
+                        // Anel creme sobre a base clara (mesmo pin do atlas).
+                        border: Border.all(color: SJColors.card, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: SJColors.ink.withValues(alpha: 0.22),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                     ),
                   ),

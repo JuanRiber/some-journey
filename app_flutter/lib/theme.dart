@@ -1,27 +1,36 @@
 import 'package:flutter/material.dart';
 
-/// Paleta "primeira classe": a base navy noturna com a coloração da arte —
-/// VINHO (ação, jornadas, rastros) + AZUL CIANO (links, pontos soltos), ouro
-/// nas molduras/overlines. Espelha mobile/src/theme/colors.ts.
+/// Tema COMPARTILHADO (legado) — agora reapontado para a paleta "papel quente".
+///
+/// Historicamente estas constantes eram o "atlas noturno" (navy escuro). O
+/// produto adotou o PAPEL QUENTE como modo padrão (ver `lib/design/tokens.dart`,
+/// a fonte única da verdade). Como ~19 telas leem estes MESMOS nomes
+/// (`SJColors.wine`, `serif(...)`, `monoLabel(...)`), reapontá-los aqui migra o
+/// app inteiro para o novo visual sem reescrever cada tela — os NOMES/roles
+/// continuam iguais, só os VALORES mudaram para o esquema claro `sjLight`.
+///
+/// A migração fina para dois modos (claro/escuro por tela, via
+/// `SJTheme.of(context)` + componentes de `lib/design/`) é a etapa editorial
+/// seguinte; este arquivo garante que, enquanto isso, tudo já respire papel.
 abstract final class SJColors {
-  static const pageBg = Color(0xFF080D18);
-  static const paper = Color(0xFF0D1524);
-  static const card = Color(0xFF16213A);
-  static const ink = Color(0xFFF3ECDC);
-  static const inkSoft = Color(0xFF9AA3B8);
-  static const frame = Color(0xFF8C7440);
-  static const gold = Color(0xFFE3B04B);
-  static const goldDeep = Color(0xFFB88930);
-  static const wine = Color(0xFFB7314F);
-  static const wineDeep = Color(0xFF8A2740);
-  static const cyan = Color(0xFF25B2C6);
-  static const cyanDeep = Color(0xFF12707E);
-  static const bloom = Color(0xFFD9A94E);
-  static const sand = Color(0xFF16213A);
-  static const placeholder = Color(0xFF6B7488);
-  static const line = Color(0x1FF3ECDC); // creme a 12%
-  static const danger = Color(0xFFE4604E);
-  static const chip = Color(0x29B7314F); // vinho a 16%
+  static const pageBg = Color(0xFFECE3D2); // bgDeep — barras/fundo recuado
+  static const paper = Color(0xFFF5F0E6); // bg — superfície principal (creme)
+  static const card = Color(0xFFFBF8F1); // surface — cards (off-white)
+  static const ink = Color(0xFF2B2724); // tinta marrom quente
+  static const inkSoft = Color(0xFF6E6353);
+  static const frame = Color(0xFFC4AE86); // moldura couro
+  static const gold = Color(0xFF7A5A2E); // acento couro (overlines/numerais)
+  static const goldDeep = Color(0xFF5E4522);
+  static const wine = Color(0xFF6E2C3A); // ação primária / jornada ativa
+  static const wineDeep = Color(0xFF57222D);
+  static const cyan = Color(0xFF2E6C7E); // links / pontos soltos (azul-lago)
+  static const cyanDeep = Color(0xFF224E5B);
+  static const bloom = Color(0xFF8A6A34); // itálicos afetivos / datas
+  static const sand = Color(0xFFEFE7D7); // surfaceAlt — campos/placeholders
+  static const placeholder = Color(0xFF9C917E);
+  static const line = Color(0x1A2B2724); // tinta a 10%
+  static const danger = Color(0xFFA6392C);
+  static const chip = Color(0x1F6E2C3A); // vinho a ~12%
 }
 
 /// Serifa editorial (Georgia) para títulos e itálicos afetivos.
@@ -54,12 +63,12 @@ TextStyle monoLabel(double size, {Color color = SJColors.bloom, FontWeight weigh
 
 ThemeData buildTheme() {
   final base = ThemeData(
-    brightness: Brightness.dark,
+    brightness: Brightness.light,
     useMaterial3: true,
     scaffoldBackgroundColor: SJColors.paper,
-    colorScheme: const ColorScheme.dark(
+    colorScheme: const ColorScheme.light(
       primary: SJColors.wine,
-      onPrimary: SJColors.ink,
+      onPrimary: Color(0xFFF7F1E7),
       secondary: SJColors.cyan,
       surface: SJColors.card,
       onSurface: SJColors.ink,
@@ -70,38 +79,38 @@ ThemeData buildTheme() {
     textTheme: base.textTheme.apply(bodyColor: SJColors.ink, displayColor: SJColors.ink),
     textSelectionTheme: const TextSelectionThemeData(
       cursorColor: SJColors.cyan,
-      selectionColor: Color(0x3325B2C6),
+      selectionColor: Color(0x332E6C7E),
       selectionHandleColor: SJColors.cyan,
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: SJColors.card,
+      fillColor: SJColors.sand,
       hintStyle: const TextStyle(color: SJColors.placeholder, fontSize: 15),
       contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0x29F3ECDC)),
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: SJColors.line),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: SJColors.cyan, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: SJColors.danger),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: SJColors.danger, width: 1.5),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: SJColors.wine,
-        foregroundColor: SJColors.ink,
+        foregroundColor: const Color(0xFFF7F1E7),
         elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         textStyle: TextStyle(
           fontFamily: monoFamily,
           fontFamilyFallback: monoFallback,

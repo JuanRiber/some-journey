@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
-import '../theme.dart';
+import '../design/components.dart';
+import '../design/sj_theme.dart';
+import '../design/tokens.dart';
 import '../widgets/common.dart';
 
+/// # Entrar — a porta do próprio atlas.
+///
+/// **Por que existe:** as memórias são privadas; esta é a única entrada.
+///
+/// **O que o usuário sente:** reconhecimento e calma. A arte de marca ocupa o
+/// topo (é o que diz "você chegou em casa"), e o formulário é curto o bastante
+/// para não parecer burocracia.
+///
+/// **Ação principal:** entrar. Secundárias: recuperar senha e criar conta.
+///
+/// **Atrito:** dois campos, teclado encadeado (e-mail → senha → enviar), rolagem
+/// que respeita o teclado e erro inline (nunca um diálogo que interrompe).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -14,6 +28,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _passwordFocus = FocusNode();
   bool _loading = false;
   String _error = '';
 
@@ -39,63 +54,81 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
     return Scaffold(
+      backgroundColor: s.bg,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 40),
+          padding: EdgeInsets.only(
+            bottom: SJSpace.x10 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const HeroArt(),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
+                padding: const EdgeInsets.symmetric(horizontal: SJSpace.screenX),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 10),
-                    const FieldLabel('E-mail'),
-                    TextField(
+                    const SizedBox(height: SJSpace.x6),
+                    SJTextField(
+                      label: 'E-mail',
                       controller: _email,
+                      hint: 'voce@email.com',
                       keyboardType: TextInputType.emailAddress,
-                      autocorrect: false,
-                      decoration: const InputDecoration(hintText: 'voce@email.com'),
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _passwordFocus.requestFocus(),
                     ),
-                    const FieldLabel('Senha'),
-                    TextField(
+                    const SizedBox(height: SJSpace.x4),
+                    SJTextField(
+                      label: 'Senha',
                       controller: _password,
+                      focusNode: _passwordFocus,
+                      hint: '••••••••',
                       obscureText: true,
+                      textInputAction: TextInputAction.done,
                       onSubmitted: (_) => _onLogin(),
-                      decoration: const InputDecoration(hintText: '••••••••'),
                     ),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(
+                      child: SJButton(
+                        label: 'Esqueci minha senha',
+                        variant: SJButtonVariant.text,
                         onPressed: () => Navigator.of(context).pushNamed('/forgot'),
-                        child: const Text(
-                          'Esqueci minha senha',
-                          style: TextStyle(color: SJColors.cyan, fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
                       ),
                     ),
-                    InlineError(_error),
-                    const SizedBox(height: 14),
-                    PrimaryButton(label: _loading ? 'Entrando...' : 'Entrar', onPressed: _onLogin, busy: _loading),
-                    const SizedBox(height: 26),
+                    if (_error.isNotEmpty) ...[
+                      const SizedBox(height: SJSpace.x2),
+                      Text(
+                        _error,
+                        textAlign: TextAlign.center,
+                        style: SJText.caption(color: s.danger),
+                      ),
+                    ],
+                    const SizedBox(height: SJSpace.x4),
+                    SJButton(
+                      label: 'Entrar',
+                      loading: _loading,
+                      expand: true,
+                      onPressed: _loading ? null : _onLogin,
+                    ),
+                    const SizedBox(height: SJSpace.x5),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('Não tem conta? ', style: TextStyle(color: SJColors.inkSoft, fontSize: 14)),
-                        GestureDetector(
-                          onTap: () => Navigator.of(context).pushNamed('/register'),
-                          child: const Text(
-                            'Criar conta',
-                            style: TextStyle(color: SJColors.cyan, fontSize: 14, fontWeight: FontWeight.w700),
-                          ),
+                        Text('Não tem conta?', style: SJText.bodySm(color: s.inkSoft)),
+                        const SizedBox(width: SJSpace.x1),
+                        SJButton(
+                          label: 'Criar conta',
+                          variant: SJButtonVariant.text,
+                          onPressed: () => Navigator.of(context).pushNamed('/register'),
                         ),
                       ],
                     ),

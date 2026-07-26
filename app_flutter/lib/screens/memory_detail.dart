@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../widgets/photo_viewer.dart';
 
 const _mesesLong = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -112,18 +113,32 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                 ),
                               ],
                             ),
-                            for (final img in m.images)
+                            // A foto é a protagonista: tocar abre em TELA CHEIA
+                            // (zoom por pinça, deslize entre as fotos da memória).
+                            for (final entry in m.images.asMap().entries)
                               Padding(
                                 padding: const EdgeInsets.only(top: 16),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(3),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                        border:
-                                            Border.all(color: SJColors.frame, width: 3)),
-                                    child: AspectRatio(
-                                      aspectRatio: 4 / 3,
-                                      child: Image.network(img.url, fit: BoxFit.cover),
+                                child: Semantics(
+                                  button: true,
+                                  label: 'Abrir foto ${entry.key + 1} em tela cheia',
+                                  child: GestureDetector(
+                                    onTap: () => showSJPhotoViewer(
+                                      context,
+                                      urls: [for (final i in m.images) i.url],
+                                      initialIndex: entry.key,
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(3),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                            border: Border.all(
+                                                color: SJColors.frame, width: 3)),
+                                        child: AspectRatio(
+                                          aspectRatio: 4 / 3,
+                                          child: Image.network(entry.value.url,
+                                              fit: BoxFit.cover),
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),

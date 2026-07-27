@@ -74,3 +74,12 @@ class MemoryRead(BaseModel):
     # por compatibilidade com o cliente atual.
     images: list[MemoryImageRead] = []
     image_url: str | None = None
+    # O LUGAR (preenchido por geocodificação em segundo plano; nulo enquanto não
+    # resolve). `place_label` é o que a UI mostra; os demais alimentam Passaporte,
+    # filtros e estatísticas sem o cliente precisar geocodificar nada.
+    place_label: str | None = None
+    city: str | None = None
+    state_province: str | None = None
+    country: str | None = None
+    country_code: str | None = None
+    continent: str | None = None

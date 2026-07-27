@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     # REGISTRATION_OPEN=true/false para sobrepor.
     REGISTRATION_OPEN: bool | None = None
 
+    # --- Geocodificação reversa (lugar da memória) ---
+    # Ligada por padrão: em produção o lugar É parte do produto (Passaporte,
+    # estatísticas, filtros). Desligue para rodar offline. O Nominatim exige um
+    # User-Agent identificável com contato — configure o seu.
+    GEOCODING_ENABLED: bool = True
+    GEOCODING_USER_AGENT: str = "SomeJourney/1.0 (contato: suporte@some-journey.app)"
+
     # --- Recuperação de senha ---
     # Validade do token de reset (minutos) e destino do link entregue por e-mail.
     # PASSWORD_RESET_URL_BASE recebe o token como querystring `?token=`; aponte
@@ -113,6 +120,12 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """True em produção — usado para desabilitar docs/openapi, etc."""
         return self.APP_ENV == "production"
+
+    @property
+    def geocoding_enabled(self) -> bool:
+        """Geocodificar de verdade? Nunca em TESTE — a suíte não pode depender de
+        rede nem bater num serviço público de terceiros."""
+        return self.GEOCODING_ENABLED and self.APP_ENV != "test"
 
     @property
     def smtp_enabled(self) -> bool:

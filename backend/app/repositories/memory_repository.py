@@ -16,6 +16,7 @@ from sqlalchemy import cast, func, select, tuple_
 from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
+from app.domain.location import Location
 from app.models.journey import JourneyMemory
 from app.models.memory import Memory, MemoryImage
 
@@ -184,6 +185,19 @@ def update(
         memory.occurred_at = occurred_at
     if latitude is not None and longitude is not None:
         memory.location = _point(latitude, longitude)
+    db.commit()
+    db.refresh(memory)
+    return memory
+
+
+def set_location(db: Session, *, memory: Memory, location: "Location") -> Memory:
+    """Grava o Value Object de lugar nas colunas achatadas de `memories`.
+
+    Este é o ÚNICO lugar do sistema que conhece o mapeamento objeto↔colunas
+    (contraparte de `Location.to_columns`). Service e rotas falam só em `Location`.
+    """
+    for column, value in location.to_columns().items():
+        setattr(memory, column, value)
     db.commit()
     db.refresh(memory)
     return memory

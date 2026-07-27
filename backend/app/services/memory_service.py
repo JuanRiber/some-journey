@@ -6,6 +6,7 @@ rotas traduz em status (404/400/409). Todo acesso passa pelo repository, que já
 filtra por user_id (ownership) e deleted_at (soft delete).
 """
 
+import logging
 import uuid
 from datetime import datetime
 
@@ -14,8 +15,10 @@ from sqlalchemy.orm import Session
 
 from app.core import images, storage
 from app.core.pagination import encode_cursor
+from app.db.session import SessionLocal
 from app.models.memory import Memory, MemoryImage
 from app.repositories import memory_repository
+from app.services import geocoding
 from app.schemas.memory import (
     MemoryCreate,
     MemoryImageRead,
@@ -27,6 +30,8 @@ from app.schemas.memory import (
 _IMAGE_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 # Teto de fotos por memória.
 _MAX_IMAGES = 5
+
+logger = logging.getLogger("app.memory")
 
 
 class MemoryNotFoundError(Exception):
@@ -70,6 +75,12 @@ def _to_read(
         created_at=memory.created_at,
         images=image_reads,
         image_url=image_reads[0].url if image_reads else None,
+        place_label=memory.place_label,
+        city=memory.city,
+        state_province=memory.state_province,
+        country=memory.country,
+        country_code=memory.country_code,
+        continent=memory.continent,
     )
 
 
@@ -91,6 +102,39 @@ def create(db: Session, *, user_id: uuid.UUID, data: MemoryCreate) -> MemoryRead
         occurred_at=data.occurred_at,
     )
     return _to_read(memory, [], {})  # nasce sem fotos
+
+
+def geocode_memory(*, user_id: uuid.UUID, memory_id: uuid.UUID) -> None:
+    """Resolve e PERSISTE o lugar de uma memória — roda em SEGUNDO PLANO.
+
+    Por que fora do request: o provedor leva centenas de milissegundos e é de
+    terceiros. Fazer o usuário esperar por isso para registrar uma memória seria
+    cobrar dele a latência de um serviço externo — a memória grava na hora e o
+    lugar aparece logo depois.
+
+    ABRE A PRÓPRIA SESSÃO de propósito: a sessão do request já foi FECHADA pelo
+    `get_db` quando a tarefa de fundo roda (ela executa depois da resposta).
+    Reaproveitá-la daria erro de sessão fechada — e o lugar nunca seria gravado.
+
+    Nunca levanta: qualquer falha deixa `geocoded_at` nulo e a linha na fila de
+    backfill (índice `ix_memories_pending_geocode`).
+    """
+    try:
+        with SessionLocal() as db:
+            memory = memory_repository.get_by_id(
+                db, user_id=user_id, memory_id=memory_id
+            )
+            if memory is None:
+                return  # apagada entre o create e o job — nada a fazer
+            point = to_shape(memory.location)
+            located = geocoding.resolve_location(
+                geocoding.get_provider(), latitude=point.y, longitude=point.x
+            )
+            if not located.is_geocoded:
+                return  # provedor indisponível: fica para o backfill
+            memory_repository.set_location(db, memory=memory, location=located)
+    except Exception:  # noqa: BLE001 - job de fundo jamais derruba o processo
+        logger.exception("Falha ao geocodificar a memória em segundo plano.")
 
 
 def reads_for(db: Session, memories: list[Memory]) -> list[MemoryRead]:

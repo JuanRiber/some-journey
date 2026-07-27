@@ -10,6 +10,7 @@ import uuid
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     HTTPException,
@@ -51,10 +52,22 @@ _not_found = HTTPException(
 @router.post("", response_model=MemoryRead, status_code=status.HTTP_201_CREATED)
 def create_memory(
     data: MemoryCreate,
+    background: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MemoryRead:
-    return memory_service.create(db, user_id=current_user.id, data=data)
+    """Registra a memória e resolve o LUGAR em segundo plano.
+
+    A resposta sai assim que a memória está salva: o usuário não espera pelo
+    provedor de geocodificação (serviço de terceiros, centenas de ms). O lugar
+    aparece logo depois; se o provedor falhar, a linha fica na fila de backfill."""
+    created = memory_service.create(db, user_id=current_user.id, data=data)
+    background.add_task(
+        memory_service.geocode_memory,
+        user_id=current_user.id,
+        memory_id=created.id,
+    )
+    return created
 
 
 @router.get("", response_model=list[MemoryRead])

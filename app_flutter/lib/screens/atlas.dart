@@ -40,11 +40,6 @@ class AtlasScreen extends StatefulWidget {
   State<AtlasScreen> createState() => _AtlasScreenState();
 }
 
-/// Escolhas do sheet de conta. Um enum (em vez de callbacks soltos) deixa o
-/// `pop` do sheet ser resolvido DEPOIS que ele fecha — evita empilhar rota nova
-/// por cima de um sheet ainda aberto.
-enum _AccountAction { password, logout }
-
 class _AtlasScreenState extends State<AtlasScreen> {
   MapResponse? _map;
   String _error = '';
@@ -83,12 +78,6 @@ class _AtlasScreenState extends State<AtlasScreen> {
     }
   }
 
-  Future<void> _logout() async {
-    await Api.instance.logout();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
-  }
-
   /// Registrar a primeira memória (ação do estado vazio). Ao voltar, recarrega —
   /// senão o atlas continuaria "em branco" mesmo já tendo um pin.
   Future<void> _createMemory() async {
@@ -97,45 +86,9 @@ class _AtlasScreenState extends State<AtlasScreen> {
     await _load();
   }
 
-  /// Sheet de conta: guarda as utilidades sem poluir o masthead.
-  Future<void> _openAccount() async {
-    final action = await showSJSheet<_AccountAction>(
-      context,
-      child: Builder(
-        builder: (sheetContext) => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: SJSectionHeader(title: 'Sua conta', overline: 'Conta'),
-            ),
-            const SizedBox(height: SJSpace.x6),
-            SJButton(
-              label: 'Alterar senha',
-              variant: SJButtonVariant.secondary,
-              expand: true,
-              onPressed: () =>
-                  Navigator.of(sheetContext).pop(_AccountAction.password),
-            ),
-            const SizedBox(height: SJSpace.x2),
-            SJButton(
-              label: 'Sair',
-              variant: SJButtonVariant.text,
-              onPressed: () =>
-                  Navigator.of(sheetContext).pop(_AccountAction.logout),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (!mounted || action == null) return;
-    switch (action) {
-      case _AccountAction.password:
-        await Navigator.of(context).pushNamed('/change-password');
-      case _AccountAction.logout:
-        await _logout();
-    }
-  }
+  // As utilidades de conta (alterar senha, sair) MIGRARAM para Configurações,
+  // alcançadas pela engrenagem do Perfil. O masthead do atlas agora tem uma
+  // única porta de conta: o avatar.
 
   @override
   Widget build(BuildContext context) {
@@ -237,19 +190,23 @@ class _AtlasScreenState extends State<AtlasScreen> {
               Expanded(
                 child: Text('Seu atlas', style: SJText.display(color: s.ink)),
               ),
-              // Selo de conta: alvo de toque de 48pt, peso visual de nota de pé.
+              // AVATAR no topo direito: a porta do Perfil (padrão Airbnb/GitHub).
+              // As configurações NÃO ficam aqui — vivem atrás da engrenagem do
+              // próprio Perfil, para a home ter UMA ação de conta só.
               SJPressable(
-                onTap: _openAccount,
-                semanticLabel: 'Sua conta',
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: SJSpace.x2,
-                    vertical: SJSpace.x4,
+                onTap: () => Navigator.of(context).pushNamed('/profile'),
+                semanticLabel: 'Seu perfil',
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  margin: const EdgeInsets.only(left: SJSpace.x2),
+                  decoration: BoxDecoration(
+                    color: s.surfaceAlt,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: s.frame, width: 1.5),
                   ),
-                  child: Text(
-                    'CONTA',
-                    style: SJText.overline(color: s.secondary),
-                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Icons.person_outline, size: 20, color: s.accent),
                 ),
               ),
             ],

@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'features/profile/profile_models.dart';
 import 'models.dart';
 
 const apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://127.0.0.1:8000');
@@ -148,6 +149,12 @@ class Api {
         '/auth/reset-password',
         body: {'token': token, 'new_password': newPassword},
       );
+
+  /// Perfil COMPLETO da tela (GET /me/profile): identidade, estatísticas,
+  /// passaporte, última aventura e jornada atual — tudo agregado no backend.
+  /// O cliente NÃO calcula nada nem baixa memórias para contar.
+  Future<Profile> getProfile() async =>
+      Profile.fromJson(await _request('GET', '/me/profile', authed: true));
 
   /// Perfil do usuário autenticado (GET /auth/me). O backend nunca devolve
   /// hash de senha — só os campos públicos da conta.

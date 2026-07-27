@@ -11,6 +11,9 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Grafemas (iniciais do avatar sem cortar acento/emoji ao meio). Já vem na
+  # árvore do Flutter; declarado por ser usado diretamente.
+  characters: ^1.4.0
   cupertino_icons: ^1.0.8
   http: ^1.2.2
   http_parser: ^4.0.2

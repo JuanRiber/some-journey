@@ -13,7 +13,9 @@ import 'screens/login.dart';
 import 'screens/memory_detail.dart';
 import 'screens/memory_edit.dart';
 import 'screens/memory_new.dart';
+import 'screens/profile.dart';
 import 'screens/register.dart';
+import 'screens/settings.dart';
 import 'screens/tabs.dart';
 
 void main() {
@@ -57,6 +59,10 @@ class SomeJourneyApp extends StatelessWidget {
         '/tabs': (_) => const TabsScreen(),
         '/journeys': (_) => const JourneysScreen(),
         '/journey-new': (_) => const JourneyNewScreen(),
+        // Perfil (avatar no topo do atlas) e, atrás da engrenagem dele,
+        // as configurações.
+        '/profile': (_) => const ProfileScreen(),
+        '/settings': (_) => const SettingsScreen(),
         // Vitrine do design system (componentes/tokens) — criada por outro
         // agente em design/gallery.dart. Rota estática, sem argumento.
         '/design-gallery': (_) => const DesignGalleryScreen(),

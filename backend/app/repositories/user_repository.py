@@ -17,7 +17,7 @@ com a injeção de dependência do FastAPI.
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -113,6 +113,50 @@ def set_password_hash(db: Session, *, user: User, password_hash: str) -> User:
     """Atualiza o hash da senha de um usuário já carregado (usado pelo script de
     reset). Recebe o hash JÁ pronto — quem gera é o service/security."""
     user.password_hash = password_hash
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def get_by_username(db: Session, username: str) -> User | None:
+    """Busca sem CAIXA: a unicidade do @username é por LOWER(username), então a
+    consulta precisa usar o mesmo critério do índice (senão o Postgres nem o
+    aproveitaria, e '@Juan' passaria como livre com '@juan' já existente)."""
+    return db.scalar(select(User).where(func.lower(User.username) == username.lower()))
+
+
+def update_profile(
+    db: Session,
+    *,
+    user: User,
+    name: str | None = None,
+    username: str | None = None,
+    bio: str | None = None,
+) -> User:
+    """Atualização PARCIAL da identidade pública. Só toca no que foi enviado —
+    quem não manda `bio` não a apaga sem querer.
+
+    O IntegrityError (corrida de dois @iguais no mesmo instante) PROPAGA: a
+    política HTTP (409) é decisão do service/rota, não da camada de dados. Mas o
+    rollback é nosso, porque o commit que falhou saiu daqui."""
+    if name is not None:
+        user.name = name
+    if username is not None:
+        user.username = username
+    if bio is not None:
+        user.bio = bio
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise
+    db.refresh(user)
+    return user
+
+
+def set_avatar_path(db: Session, *, user: User, path: str | None) -> User:
+    """Grava (após o upload) ou LIMPA (None, na remoção) o caminho do avatar."""
+    user.avatar_path = path
     db.commit()
     db.refresh(user)
     return user

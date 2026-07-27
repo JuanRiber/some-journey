@@ -156,6 +156,25 @@ class Api {
   Future<Profile> getProfile() async =>
       Profile.fromJson(await _request('GET', '/me/profile', authed: true));
 
+  /// Edita a identidade pública (nome, @username, bio). PARCIAL: só o que for
+  /// enviado muda. Devolve o Perfil já atualizado — sem segunda chamada.
+  /// 422 = @username inválido/reservado (a mensagem já vem pronta em pt-BR);
+  /// 409 = @username em uso por outra pessoa.
+  Future<Profile> updateProfile({String? name, String? username, String? bio}) async =>
+      Profile.fromJson(await _request('PATCH', '/me/profile', authed: true, body: {
+        'name': ?name,
+        'username': ?username,
+        'bio': ?bio,
+      }));
+
+  /// Envia a foto de perfil e devolve o Perfil atualizado (com a URL assinada).
+  Future<Profile> setAvatar(List<int> bytes, String filename, String mimeType) async =>
+      Profile.fromJson(await _uploadJson('/me/avatar', bytes, filename, mimeType));
+
+  /// Remove a foto de perfil (idempotente): volta a mostrar as iniciais.
+  Future<Profile> removeAvatar() async =>
+      Profile.fromJson(await _request('DELETE', '/me/avatar', authed: true));
+
   /// Perfil do usuário autenticado (GET /auth/me). O backend nunca devolve
   /// hash de senha — só os campos públicos da conta.
   Future<UserProfile> me() async =>
@@ -184,6 +203,36 @@ class Api {
 
   Future<void> deleteMemoryImage(String memoryId, String imageId) =>
       _request('DELETE', '/memories/$memoryId/images/$imageId', authed: true);
+
+  /// Upload multipart que DEVOLVE o corpo decodificado (o `_upload` abaixo
+  /// descarta a resposta; aqui o servidor devolve o recurso atualizado).
+  Future<dynamic> _uploadJson(
+      String path, List<int> bytes, String filename, String mimeType) async {
+    final r = await _sendMultipart(path, bytes, filename, mimeType);
+    if (r.statusCode >= 400) throw ApiError(r.statusCode, _detail(r));
+    if (r.bodyBytes.isEmpty) return null;
+    return jsonDecode(utf8.decode(r.bodyBytes));
+  }
+
+  Future<http.Response> _sendMultipart(
+      String path, List<int> bytes, String filename, String mimeType) async {
+    final req = http.MultipartRequest('POST', Uri.parse('$apiUrl$path'));
+    req.headers.addAll(_headers(json: false, authed: true));
+    final parts = mimeType.split('/');
+    req.files.add(http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: filename,
+      contentType: parts.length == 2 ? MediaType(parts[0], parts[1]) : null,
+    ));
+    try {
+      return await http.Response.fromStream(await req.send().timeout(_timeout));
+    } on TimeoutException {
+      throw ApiError(0, 'O upload demorou demais. Tente de novo.');
+    } catch (_) {
+      throw ApiError(0, 'Sem conexão com o servidor.');
+    }
+  }
 
   Future<void> _upload(String path, List<int> bytes, String filename, String mimeType) async {
     final req = http.MultipartRequest('POST', Uri.parse('$apiUrl$path'));

@@ -9,7 +9,7 @@ entra sem quebrar quem já consome os anteriores.
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProfileIdentity(BaseModel):
@@ -26,6 +26,21 @@ class ProfileIdentity(BaseModel):
     username: str | None = None
     avatar_url: str | None = None
     bio: str | None = None
+
+
+class ProfileUpdate(BaseModel):
+    """Edição da identidade pública. Parcial: o que não vier não muda.
+
+    `extra="forbid"` numa fronteira de escrita de conta — um payload com campos
+    desconhecidos é sondagem, não descuido, e deve falhar alto (422)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    # O formato do @username é validado no DOMÍNIO (app.domain.username), que
+    # tem as mensagens em pt-BR e a lista de reservados; aqui só o teto de tamanho.
+    username: str | None = Field(default=None, max_length=30)
+    bio: str | None = Field(default=None, max_length=160)
 
 
 class ProfileStats(BaseModel):

@@ -113,7 +113,15 @@ class Settings(BaseSettings):
 
     @property
     def storage_enabled(self) -> bool:
-        """True só quando o Supabase Storage está configurado."""
+        """True só quando o Supabase Storage está configurado — e NUNCA em teste.
+
+        O corte por APP_ENV é proteção real: o `.env` de desenvolvimento tem
+        credenciais VÁLIDAS do Supabase, então sem isto a suíte gravava arquivos
+        no bucket de verdade (foi o que aconteceu ao subir um avatar num teste).
+        Testes não podem escrever em serviço de terceiros nem sujar produção;
+        quem precisa exercitar o upload monkeypatcha `storage.enabled`."""
+        if self.APP_ENV == "test":
+            return False
         return bool(self.SUPABASE_URL and self.SUPABASE_SERVICE_KEY)
 
     @property

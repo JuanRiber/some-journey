@@ -6,6 +6,7 @@ import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../features/profile/profile_models.dart';
+import 'profile_edit.dart';
 
 const _meses = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -380,9 +381,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       );
 
+  /// Abre a edição e adota o perfil que voltar — a foto pode ter sido trocada
+  /// mesmo sem salvar os campos, então recarregar seria desperdício.
+  Future<void> _edit() async {
+    final current = _profile;
+    if (current == null) return;
+    final updated = await Navigator.of(context).push<Profile>(
+      MaterialPageRoute(builder: (_) => ProfileEditScreen(profile: current)),
+    );
+    if (updated != null && mounted) setState(() => _profile = updated);
+  }
+
   Widget _quickActions(SJScheme s) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          SJButton(
+            label: 'Editar perfil',
+            onPressed: _edit,
+            expand: true,
+          ),
+          const SizedBox(height: SJSpace.x3),
           SJButton(
             label: 'Ver meu atlas',
             variant: SJButtonVariant.secondary,

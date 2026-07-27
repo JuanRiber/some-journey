@@ -71,6 +71,16 @@ class User(Base):
         server_default=func.now(),
     )
 
+    # --- Identidade pública do Perfil (tudo opcional) --------------------
+    # @username: guardado como a pessoa escolheu; a UNICIDADE é por
+    # LOWER(username) (índice funcional na 0010) — @Juan e @juan são o mesmo.
+    # As regras de formato vivem em app.domain.username, não aqui.
+    username: Mapped[str | None] = mapped_column(String(30))
+    # Caminho no bucket PRIVADO; a URL assinada é gerada na leitura.
+    avatar_path: Mapped[str | None] = mapped_column(Text)
+    # Frase pessoal curta ("Cada lugar guarda uma história.").
+    bio: Mapped[str | None] = mapped_column(String(160))
+
     # Conta ativa por padrão; soft-disable (false) preserva as FKs de ownership.
     # server_default é text("true") (literal SQL), não o bool Python True.
     is_active: Mapped[bool] = mapped_column(

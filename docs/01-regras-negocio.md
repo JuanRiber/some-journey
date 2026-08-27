@@ -14,8 +14,9 @@
 - Pode existir **sozinha**, sem jornada. **(impl.)**
 - Precisa de **localização** (latitude/longitude). **(impl.)**
 - Precisa de **data do acontecimento** (`occurred_at`), separada de `created_at`. **(impl.)**
-- **Texto** é o núcleo da memória. **(impl.)**
-- **Foto** é opcional. **(impl.)**
+- **Texto** deveria ser o núcleo da memória; **hoje a API o trata como opcional**
+  (`text` tem default `""`, máx. 5000 chars) — o inverso do título. **(impl. — divergência)**
+- **Foto** é opcional; até **5 por memória**. **(impl.)**
 - **Título**: a intenção do produto é ser opcional; **hoje a API exige título não vazio**
   (1–120 chars). Reavaliar quando for o caso. **(impl. — divergência)**
 - Pode ser vinculada a uma jornada **depois** de criada. **(impl.)**
@@ -40,14 +41,15 @@
 - **MVP:** uma memória pertence a **no máximo uma** jornada por vez (índice único parcial). Desvincular libera a memória. **(impl.)**
 
 ## Imagens
-- Opcionais. **(impl.)**
+- Opcionais, até **5 por memória**. **(impl.)**
 - O **arquivo não fica no PostgreSQL**. **(impl.)**
 - Armazenadas no **Supabase Storage** (bucket privado). **(impl.)**
 - O banco guarda só a referência (`image_path`); a API devolve uma `image_url` **assinada** e temporária. **(impl.)**
 - Um usuário só anexa imagem às próprias memórias. **(impl.)**
 
 ## Mapa
-- O mapa é o centro da experiência. **(impl. no web; nativo em evolução)**
+- O mapa é o centro da experiência. **(impl.)** O app Flutter desenha o atlas com
+  `flutter_map` consumindo `GET /map`; o app Expo usa Leaflet no web. **(impl.)**
 - Mostra pins de memórias e rastros de jornadas. **(impl.)**
 - Diferencia pontos soltos de pontos de jornada (cores distintas). **(impl.)**
 - Suporta recorte por área (bbox) e por jornada; visão mundo/país/região/cidade vem do zoom. **(impl. via `GET /map`)**

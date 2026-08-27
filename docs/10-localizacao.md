@@ -76,8 +76,9 @@ reprocessar quando o provedor melhorar. Nada disso exige nova migração depois.
   objeto. Falha → persiste sem lugar, `geocoded_at` nulo, backfill depois.
 - **`continent`** não vem do Nominatim: derivar de `country_code` por **tabela
   estática** (sem chamada extra de rede).
-- **`timezone`** também não vem do Nominatim: resolver **pelas coordenadas**
-  (biblioteca de lookup tz offline, ex. `timezonefinder`) — evita mais uma
+- **`timezone`** também não vem do Nominatim: resolvido **pelas coordenadas** por
+  `geocoding.resolve_timezone`, com lookup **offline** (`tzfpy`, 4,5 MB — preferido
+  ao `timezonefinder`, 53 MB, por causa do peso da imagem no free tier) — evita mais uma
   dependência de rede por memória.
 - **Nominatim exige** User-Agent identificável e **máx. 1 req/s**: rate limit e
   cabeçalho ficam DENTRO do adapter, nunca espalhados.

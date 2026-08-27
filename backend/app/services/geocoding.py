@@ -155,6 +155,28 @@ class NominatimGeocodingProvider:
         )
 
 
+def resolve_timezone(latitude: float, longitude: float) -> str | None:
+    """Fuso IANA a partir das coordenadas, OFFLINE.
+
+    Mora aqui, e não dentro do adapter, porque nada disto vem do Nominatim: ele
+    não devolve fuso, e perguntar a um serviço de fuso seria mais uma chamada de
+    rede POR MEMÓRIA — exatamente o que a decisão de arquitetura evita.
+
+    A importação é local de propósito: sem a biblioteca instalada o campo fica
+    nulo e a memória é gravada do mesmo jeito (o `geocoded_at` continua válido —
+    o fuso é acessório, não motivo de reprocessamento).
+
+    Cuidado: `tzfpy.get_tz` recebe **(longitude, latitude)**, a ordem inversa da
+    deste contrato. A troca acontece aqui, uma vez só.
+    """
+    try:
+        from tzfpy import get_tz
+    except ImportError:  # pragma: no cover - ambiente sem a dependência opcional
+        logger.warning("tzfpy indisponível: o fuso da memória ficará nulo.")
+        return None
+    return get_tz(longitude, latitude)
+
+
 def get_provider() -> GeocodingProvider:
     """Composição: qual provedor o app usa AGORA.
 
@@ -164,7 +186,10 @@ def get_provider() -> GeocodingProvider:
     """
     if not settings.geocoding_enabled:
         return NullGeocodingProvider()
-    return NominatimGeocodingProvider(user_agent=settings.GEOCODING_USER_AGENT)
+    return NominatimGeocodingProvider(
+        user_agent=settings.GEOCODING_USER_AGENT,
+        timezone_resolver=resolve_timezone,
+    )
 
 
 def resolve_location(

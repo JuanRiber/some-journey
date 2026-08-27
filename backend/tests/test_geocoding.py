@@ -4,10 +4,13 @@ from datetime import UTC, datetime
 
 import httpx
 
+from app.services import geocoding
 from app.services.geocoding import (
     NominatimGeocodingProvider,
     NullGeocodingProvider,
+    get_provider,
     resolve_location,
+    resolve_timezone,
 )
 
 FORTALEZA = (-3.7319, -38.5267)
@@ -119,3 +122,31 @@ class TestNuncaBloquearAEscrita:
 
         loc = resolve_location(Broken(), latitude=-3.73, longitude=-38.52)
         assert loc.is_geocoded is False
+
+
+class TestFusoHorario:
+    """O fuso sai das COORDENADAS, offline — nunca de uma chamada de rede."""
+
+    def test_resolve_o_fuso_de_pontos_conhecidos(self):
+        assert resolve_timezone(-3.7319, -38.5267) == "America/Fortaleza"
+        assert resolve_timezone(38.7223, -9.1393) == "Europe/Lisbon"
+
+    def test_nao_troca_latitude_com_longitude(self):
+        """Guarda de regressão: a biblioteca recebe (lng, lat), o contrato daqui
+        é (lat, lng). Invertido, estes pontos caem no mar e mudam de fuso."""
+        assert resolve_timezone(-38.5267, -3.7319) != "America/Fortaleza"
+        assert resolve_timezone(-9.1393, 38.7223) != "Europe/Lisbon"
+
+    def test_o_provedor_de_verdade_ja_vem_com_o_resolvedor_ligado(self, monkeypatch):
+        """A divergência que isto impede: o campo `timezone` existia, o encaixe
+        existia, e mesmo assim nenhuma memória saía com fuso — ninguém havia
+        ligado um resolvedor na composição."""
+        monkeypatch.setattr(geocoding.settings, "APP_ENV", "development")
+        provider = get_provider()
+
+        assert isinstance(provider, NominatimGeocodingProvider)
+        assert provider._timezone_resolver is resolve_timezone
+
+    def test_desligado_continua_sem_provedor(self, monkeypatch):
+        monkeypatch.setattr(geocoding.settings, "GEOCODING_ENABLED", False)
+        assert isinstance(get_provider(), NullGeocodingProvider)

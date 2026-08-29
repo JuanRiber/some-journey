@@ -238,3 +238,84 @@ class UserProfile {
         createdAt: (j['created_at'] ?? '') as String,
       );
 }
+
+/// Um trecho de percurso REAL (rastro de GPS), distinto da linha simbólica que
+/// liga as memórias na ordem. Pausar e retomar a gravação gera vários trechos;
+/// juntos formam uma experiência só.
+class JourneyTrack {
+  final String id;
+  final String journeyId;
+  final String source;
+  final String startedAt;
+  final String? endedAt;
+  final bool isActive;
+  final int pointCount;
+  final double distanceMeters;
+
+  JourneyTrack({
+    required this.id,
+    required this.journeyId,
+    required this.source,
+    required this.startedAt,
+    required this.isActive,
+    required this.pointCount,
+    required this.distanceMeters,
+    this.endedAt,
+  });
+
+  factory JourneyTrack.fromJson(Map<String, dynamic> j) => JourneyTrack(
+        id: j['id'] as String,
+        journeyId: j['journey_id'] as String,
+        source: (j['source'] ?? 'gps_live') as String,
+        startedAt: j['started_at'] as String,
+        endedAt: j['ended_at'] as String?,
+        isActive: (j['is_active'] ?? false) as bool,
+        pointCount: (j['point_count'] as num?)?.toInt() ?? 0,
+        distanceMeters: (j['distance_m'] as num?)?.toDouble() ?? 0,
+      );
+}
+
+/// O mapa da jornada: percurso real por trecho, memórias e o rastro simbólico.
+///
+/// Vem em GeoJSON — `[lng, lat]`, ordem do padrão, INVERTIDA em relação ao que
+/// o mapa desenha. A conversão acontece na borda, uma vez, para não espalhar a
+/// troca de eixos pela UI.
+class JourneyMap {
+  final String journeyId;
+  final String title;
+
+  /// Uma lista de coordenadas por trecho gravado.
+  final List<List<List<double>>> trackLines;
+  final JourneyRoute? symbolicRoute;
+  final double distanceMeters;
+
+  JourneyMap({
+    required this.journeyId,
+    required this.title,
+    required this.trackLines,
+    required this.distanceMeters,
+    this.symbolicRoute,
+  });
+
+  bool get hasRealTrack => trackLines.any((l) => l.length >= 2);
+
+  factory JourneyMap.fromJson(Map<String, dynamic> j) {
+    final journey = (j['journey'] ?? const {}) as Map<String, dynamic>;
+    final tracks = (j['tracks'] ?? const {}) as Map<String, dynamic>;
+    final features = (tracks['features'] ?? const []) as List;
+    return JourneyMap(
+      journeyId: (journey['id'] ?? '') as String,
+      title: (journey['title'] ?? '') as String,
+      trackLines: features
+          .map((f) => (((f as Map<String, dynamic>)['geometry']
+                  as Map<String, dynamic>)['coordinates'] as List)
+              .map((c) => (c as List).map((v) => (v as num).toDouble()).toList())
+              .toList())
+          .toList(),
+      symbolicRoute: j['symbolic_route'] == null
+          ? null
+          : JourneyRoute.fromJson(j['symbolic_route'] as Map<String, dynamic>),
+      distanceMeters: (j['distance_m'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}

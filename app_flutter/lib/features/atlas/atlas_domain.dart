@@ -215,12 +215,25 @@ abstract final class AtlasDomain {
   }
 
   /// Haversine entre dois pontos, em metros.
-  static double distanceMeters(AtlasPoint a, AtlasPoint b) {
-    final dLat = _rad(b.latitude - a.latitude);
-    final dLng = _rad(b.longitude - a.longitude);
+  static double distanceMeters(AtlasPoint a, AtlasPoint b) =>
+      haversineMeters(a.latitude, a.longitude, b.latitude, b.longitude);
+
+  /// Haversine sobre COORDENADAS cruas, em metros.
+  ///
+  /// Existe separado de [distanceMeters] porque a gravação de percurso mede
+  /// distância entre leituras de GPS, que não são memórias — forçá-las a virar
+  /// [AtlasPoint] só para medir seria inventar identidade que elas não têm.
+  static double haversineMeters(
+    double aLat,
+    double aLng,
+    double bLat,
+    double bLng,
+  ) {
+    final dLat = _rad(bLat - aLat);
+    final dLng = _rad(bLng - aLng);
     final h = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_rad(a.latitude)) *
-            math.cos(_rad(b.latitude)) *
+        math.cos(_rad(aLat)) *
+            math.cos(_rad(bLat)) *
             math.sin(dLng / 2) *
             math.sin(dLng / 2);
     return 2 * _earthRadiusM * math.asin(math.min(1, math.sqrt(h)));

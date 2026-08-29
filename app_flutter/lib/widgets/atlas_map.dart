@@ -15,7 +15,20 @@ class AtlasMap extends StatelessWidget {
   final void Function(String memoryId)? onSelect;
   final double height;
 
-  const AtlasMap({super.key, required this.data, this.onSelect, this.height = 380});
+  /// Percurso REAL de GPS, uma lista de coordenadas `[lng, lat]` por trecho.
+  ///
+  /// Desenhado por cima e com traço distinto do rastro simbólico de propósito:
+  /// são coisas diferentes. O simbólico liga memórias na ordem; este é o caminho
+  /// que a pessoa percorreu de fato.
+  final List<List<List<double>>>? trackLines;
+
+  const AtlasMap({
+    super.key,
+    required this.data,
+    this.onSelect,
+    this.height = 380,
+    this.trackLines,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +58,19 @@ class AtlasMap extends StatelessWidget {
         all.add(pos);
         markers.add(_pin(pos, SJColors.cyan, p.memoryId));
       }
+    }
+
+    for (final line in trackLines ?? const <List<List<double>>>[]) {
+      if (line.length < 2) continue;
+      final pontos = line.map((c) => LatLng(c[1], c[0])).toList();
+      all.addAll(pontos);
+      polylines.add(Polyline(
+        points: pontos,
+        // Ciano (o acento de "lugar/percurso"), mais grosso que o simbólico:
+        // o caminho real é o protagonista quando existe.
+        color: SJColors.cyanDeep.withValues(alpha: 0.9),
+        strokeWidth: 4.5,
+      ));
     }
 
     final center = all.isEmpty

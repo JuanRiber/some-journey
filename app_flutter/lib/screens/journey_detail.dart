@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../features/atlas/atlas_domain.dart';
+import '../features/tracks/track_panel.dart';
+import '../features/tracks/track_recorder.dart';
 import '../models.dart';
 import '../theme.dart';
+import '../features/tracks/track_list.dart';
 import '../widgets/atlas_map.dart';
 import '../widgets/common.dart';
 
@@ -21,6 +25,16 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
   JourneyDetail? _journey;
   String _error = '';
   bool _busy = false;
+
+  /// Mapa da jornada (percurso real + distância). Carregado à parte do detalhe
+  /// porque só ele conhece os trechos de GPS.
+  JourneyMap? _map;
+
+  /// Trechos gravados. Vêm da listagem, não do mapa: o mapa traz a geometria
+  /// para desenhar, a listagem traz a identidade de cada trecho — que é o que
+  /// permite remover um sem tocar nos outros.
+  List<JourneyTrack> _tracks = const [];
+  TrackRecorder? _recorder;
   bool _confirmDelete = false;
   List<JourneyPoint>? _loose; // pontos soltos para vincular (null = fechado)
 
@@ -30,10 +44,54 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
     _load();
   }
 
+  /// Busca o percurso real. Falha aqui NÃO derruba a tela: a jornada continua
+  /// legível sem o traço de GPS.
+  Future<void> _loadMap(String id) async {
+    try {
+      final m = await Api.instance.journeyMap(id);
+      final t = await Api.instance.listTracks(id);
+      if (mounted) {
+        setState(() {
+          _map = m;
+          _tracks = t;
+        });
+      }
+    } catch (_) {
+      // sem percurso é um estado válido, não um erro
+    }
+  }
+
+  /// Remove um trecho e recarrega o que depende dele.
+  ///
+  /// O traço some do mapa e a distância total encolhe; as memórias da jornada
+  /// não são tocadas — o backend guarda percurso e memória em tabelas distintas
+  /// justamente para que apagar um caminho não apague o que se viveu nele.
+  Future<void> _deleteTrack(JourneyTrack t) async {
+    try {
+      await Api.instance.deleteTrack(t.journeyId, t.id);
+      await _loadMap(t.journeyId);
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      if (e.isUnauthorized) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      // Trecho que já não existe (toque duplo, lista desatualizada) não é falha:
+      // o resultado que a pessoa queria já aconteceu. Só recarrega, em vez de
+      // acusar um erro que ela não pode resolver.
+      if (e.isNotFound) {
+        await _loadMap(t.journeyId);
+        return;
+      }
+      setState(() => _error = e.message);
+    }
+  }
+
   Future<void> _load() async {
     try {
       final data = await Api.instance.getJourney(widget.journeyId);
       if (mounted) setState(() => _journey = data);
+      await _loadMap(widget.journeyId);
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
@@ -62,6 +120,12 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _recorder?.dispose();
+    super.dispose();
   }
 
   Future<void> _openAdd() async {
@@ -123,7 +187,16 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                   const SizedBox(height: 16),
                   _lifecycleActions(j),
                   InlineError(_error),
-                  if (j.points.isNotEmpty) ...[
+                  // Gravar percurso só faz sentido com a jornada em andamento:
+                  // um capítulo encerrado não recebe caminho novo.
+                  if (j.status == 'active') ...[
+                    const SizedBox(height: 20),
+                    TrackPanel(
+                      recorder: _recorder ??= TrackRecorder(journeyId: j.id),
+                      onFinished: () => _loadMap(j.id),
+                    ),
+                  ],
+                  if (j.points.isNotEmpty || (_map?.hasRealTrack ?? false)) ...[
                     const SizedBox(height: 20),
                     AtlasMap(
                       data: MapResponse(loosePoints: const [], journeys: [
@@ -134,9 +207,25 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                             points: j.points,
                             route: j.route),
                       ]),
+                      trackLines: _map?.trackLines,
                       onSelect: (id) => Navigator.of(context).pushNamed('/memory', arguments: id),
                       height: 300,
                     ),
+                    if ((_map?.distanceMeters ?? 0) > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          '${AtlasDomain.formatDistance(_map!.distanceMeters)} percorridos',
+                          style: monoLabel(11),
+                        ),
+                      ),
+                  ],
+                  // Fora do bloco do mapa de propósito: os trechos precisam ser
+                  // vistos e removidos mesmo numa jornada encerrada, quando o
+                  // painel de gravação já não aparece.
+                  if (_tracks.isNotEmpty) ...[
+                    const SizedBox(height: 26),
+                    TrackList(tracks: _tracks, onDelete: _deleteTrack),
                   ],
                   Padding(
                     padding: const EdgeInsets.only(top: 26, bottom: 10),

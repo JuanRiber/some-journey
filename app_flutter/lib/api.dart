@@ -343,6 +343,55 @@ class Api {
     if (r.statusCode >= 400) throw ApiError(r.statusCode, _detail(r));
   }
 
+  // ---- Percurso real (GPS) ----
+
+  /// Abre um trecho de gravação. O backend recusa com 409 se já houver um
+  /// trecho aberto nesta jornada — dois gravadores simultâneos embaralhariam
+  /// a ordem dos pontos.
+  Future<JourneyTrack> startTrack(String journeyId, {String source = 'gps_live'}) async =>
+      JourneyTrack.fromJson(await _request(
+        'POST',
+        '/journeys/$journeyId/tracks/start',
+        body: {'source': source},
+        authed: true,
+      ));
+
+  /// Envia um LOTE de pontos. O backend aceita até 1000 por requisição.
+  Future<void> addTrackPoints(
+    String journeyId,
+    String trackId,
+    List<Map<String, dynamic>> points,
+  ) =>
+      _request(
+        'POST',
+        '/journeys/$journeyId/tracks/$trackId/points',
+        body: {'points': points},
+        authed: true,
+      );
+
+  Future<JourneyTrack> finishTrack(String journeyId, String trackId) async =>
+      JourneyTrack.fromJson(await _request(
+        'POST',
+        '/journeys/$journeyId/tracks/$trackId/finish',
+        authed: true,
+      ));
+
+  Future<List<JourneyTrack>> listTracks(String journeyId) async {
+    final data = await _request('GET', '/journeys/$journeyId/tracks', authed: true);
+    if (data is! List) return [];
+    return data
+        .map((e) => JourneyTrack.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> deleteTrack(String journeyId, String trackId) =>
+      _request('DELETE', '/journeys/$journeyId/tracks/$trackId', authed: true);
+
+  /// Mapa da jornada: percurso real + memórias + rastro simbólico.
+  Future<JourneyMap> journeyMap(String journeyId) async =>
+      JourneyMap.fromJson(
+          await _request('GET', '/journeys/$journeyId/map', authed: true));
+
   // ---- Jornadas ----
   /// Uma página de jornadas, da mais recente para a mais antiga.
   Future<Page<Journey>> listJourneys({int? limit, String? cursor}) =>

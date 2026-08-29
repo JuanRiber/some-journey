@@ -66,5 +66,7 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>O Some Journey usa sua localização para desenhar o percurso real da jornada e para marcar onde cada memória aconteceu.</string>
 </dict>
 </plist>

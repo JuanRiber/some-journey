@@ -32,13 +32,21 @@ from app.core.pagination import (
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
-from app.schemas.memory import MemoryCreate, MemoryRead, MemoryUpdate
+from app.schemas.memory import (
+    MemoryCreate,
+    MemoryMusicIn,
+    MemoryRead,
+    MemoryUpdate,
+)
 from app.services import memory_service
 from app.services.memory_service import (
+    DuplicateMusicError,
     InvalidImageError,
     MemoryImageNotFoundError,
+    MemoryMusicNotFoundError,
     MemoryNotFoundError,
     TooManyImagesError,
+    TooManyTracksError,
 )
 
 router = APIRouter(prefix="/memories", tags=["memories"])
@@ -213,4 +221,55 @@ def delete_memory_image(
             image_id=image_id,
         )
     except (MemoryNotFoundError, MemoryImageNotFoundError):
+        raise _not_found
+
+
+@router.post(
+    "/{memory_id}/music",
+    response_model=MemoryRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_memory_music(
+    memory_id: uuid.UUID,
+    data: MemoryMusicIn,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MemoryRead:
+    """Anexa a canção que estava tocando.
+
+    O corpo é o snapshot da faixa que o app obteve do catálogo — a API não
+    consulta provedor nenhum. 409 se a faixa já está nesta memória ou se o teto
+    por memória foi atingido; 404 se a memória não é do usuário."""
+    try:
+        return memory_service.add_music(
+            db, user_id=current_user.id, memory_id=memory_id, data=data
+        )
+    except MemoryNotFoundError:
+        raise _not_found
+    except DuplicateMusicError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This track is already on the memory.",
+        )
+    except TooManyTracksError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This memory already has the maximum number of tracks.",
+        )
+
+
+@router.delete("/{memory_id}/music/{music_id}", response_model=MemoryRead)
+def delete_memory_music(
+    memory_id: uuid.UUID,
+    music_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MemoryRead:
+    """Remove UMA faixa da memória. 404 se a memória ou a faixa não são do
+    usuário — o mesmo 404 dos dois casos, como no resto da API."""
+    try:
+        return memory_service.remove_music(
+            db, user_id=current_user.id, memory_id=memory_id, music_id=music_id
+        )
+    except (MemoryNotFoundError, MemoryMusicNotFoundError):
         raise _not_found

@@ -60,7 +60,7 @@ para contá-las no cliente violaria a paginação que acabamos de introduzir.
 | Km registrados | 🟡 derivável | PostGIS nos tracks + haversine dos pontos (a lógica já existe em `features/atlas/atlas_domain.dart`) |
 | Jornada atual + progresso | 🟡 derivável | jornada `active` + contagem de pontos |
 | Atividade recente | 🟡 derivável | `created_at` de memórias/jornadas, ordenado |
-| Músicas salvas | ⛔ **falta** | precisa da tabela `memory_music` (a entidade/adapter já existe no app) |
+| Músicas salvas | ✅ existe | tabela `memory_music` + `stats.tracks` em `GET /me/profile` |
 | **Cidades / países / continentes** | ⛔ **BLOQUEADOR** | **hoje o app NÃO guarda o lugar** — só `latitude`/`longitude`. O rótulo do LocationPicker é display-only e é descartado. |
 | Dias consecutivos de uso | ⛔ **falta** | exige registro de atividade (ou derivar de `occurred_at`, o que mede a viagem, não o uso) |
 | Conquistas / nível | ⛔ **falta** | precisa de definição + persistência |

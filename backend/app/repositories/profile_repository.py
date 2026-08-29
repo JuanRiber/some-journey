@@ -18,7 +18,7 @@ from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Session
 
 from app.models.journey import Journey, JourneyMemory
-from app.models.memory import Memory, MemoryImage
+from app.models.memory import Memory, MemoryImage, MemoryMusic
 
 
 def _active_memories(user_id: uuid.UUID):
@@ -76,6 +76,21 @@ def photo_count(db: Session, *, user_id: uuid.UUID) -> int:
             select(func.count(MemoryImage.id))
             .join(Memory, Memory.id == MemoryImage.memory_id)
             .where(MemoryImage.deleted_at.is_(None), *_active_memories(user_id))
+        )
+        or 0
+    )
+
+
+def music_count(db: Session, *, user_id: uuid.UUID) -> int:
+    """Faixas vivas de memórias vivas — o "56 músicas" do cartão do viajante.
+
+    Mesmo join das fotos, pela mesma razão: a faixa pertence à memória, e o
+    dono está na memória."""
+    return int(
+        db.scalar(
+            select(func.count(MemoryMusic.id))
+            .join(Memory, Memory.id == MemoryMusic.memory_id)
+            .where(MemoryMusic.deleted_at.is_(None), *_active_memories(user_id))
         )
         or 0
     )

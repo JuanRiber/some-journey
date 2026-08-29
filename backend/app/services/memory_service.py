@@ -16,12 +16,14 @@ from sqlalchemy.orm import Session
 from app.core import images, storage
 from app.core.pagination import encode_cursor
 from app.db.session import SessionLocal
-from app.models.memory import Memory, MemoryImage
+from app.models.memory import Memory, MemoryImage, MemoryMusic
 from app.repositories import memory_repository
 from app.services import geocoding
 from app.schemas.memory import (
     MemoryCreate,
     MemoryImageRead,
+    MemoryMusicIn,
+    MemoryMusicRead,
     MemoryRead,
     MemoryUpdate,
 )
@@ -50,8 +52,23 @@ class TooManyImagesError(Exception):
     """Excedeu o teto de fotos por memória — a rota traduz em 409."""
 
 
+class MemoryMusicNotFoundError(Exception):
+    """Faixa inexistente ou de memória de outro usuário — a rota traduz em 404."""
+
+
+class DuplicateMusicError(Exception):
+    """A faixa já está nesta memória — a rota traduz em 409."""
+
+
+class TooManyTracksError(Exception):
+    """Excedeu o teto de faixas por memória — a rota traduz em 409."""
+
+
 def _to_read(
-    memory: Memory, images: list[MemoryImage], signed: dict[str, str]
+    memory: Memory,
+    images: list[MemoryImage],
+    signed: dict[str, str],
+    music: list[MemoryMusic] | None = None,
 ) -> MemoryRead:
     """Converte o model (location = POINT(long, lat)) no DTO de saída (lat/long).
 
@@ -81,14 +98,30 @@ def _to_read(
         country=memory.country,
         country_code=memory.country_code,
         continent=memory.continent,
+        music=[
+            MemoryMusicRead(
+                id=t.id,
+                provider=t.provider,
+                external_id=t.external_id,
+                title=t.title,
+                artist=t.artist,
+                album=t.album,
+                artwork_url=t.artwork_url,
+                preview_url=t.preview_url,
+                external_url=t.external_url,
+                duration_ms=t.duration_ms,
+            )
+            for t in (music or [])
+        ],
     )
 
 
 def _read_with_images(db: Session, memory: Memory) -> MemoryRead:
-    """Lê as fotos da memória, assina-as e monta o DTO."""
+    """Lê fotos e faixas da memória, assina as fotos e monta o DTO."""
     images = memory_repository.list_images(db, memory_id=memory.id)
     signed = storage.sign_urls([img.image_path for img in images])
-    return _to_read(memory, images, signed)
+    music = memory_repository.list_music(db, memory_id=memory.id)
+    return _to_read(memory, images, signed, music)
 
 
 def create(db: Session, *, user_id: uuid.UUID, data: MemoryCreate) -> MemoryRead:
@@ -148,7 +181,15 @@ def reads_for(db: Session, memories: list[Memory]) -> list[MemoryRead]:
     by_memory: dict[uuid.UUID, list[MemoryImage]] = {}
     for img in images:
         by_memory.setdefault(img.memory_id, []).append(img)
-    return [_to_read(m, by_memory.get(m.id, []), signed) for m in memories]
+    # As faixas de todas as memórias da página numa consulta só — o mesmo
+    # cuidado que as fotos já tomavam contra o N+1.
+    music_by_memory = memory_repository.list_music_for(
+        db, memory_ids=[m.id for m in memories]
+    )
+    return [
+        _to_read(m, by_memory.get(m.id, []), signed, music_by_memory.get(m.id, []))
+        for m in memories
+    ]
 
 
 def list_for_user(
@@ -267,4 +308,68 @@ def remove_image(
     path = image.image_path
     memory_repository.soft_delete_image(db, image=image)
     storage.delete(path)
+    return _read_with_images(db, memory)
+
+
+# --- Música ----------------------------------------------------------------
+
+# Teto por memória. Uma lembrança tem uma trilha, não uma playlist: o limite
+# existe para o campo continuar sendo sobre a canção daquele momento.
+_MAX_TRACKS = 5
+
+
+def add_music(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    memory_id: uuid.UUID,
+    data: MemoryMusicIn,
+) -> MemoryRead:
+    """Anexa uma faixa à memória do usuário.
+
+    O backend NÃO consulta catálogo: recebe o snapshot que o app obteve do
+    provedor. Buscar exige rede e é do provedor; guardar é nosso — separar os
+    dois deixa o app trocar de catálogo sem que a API precise saber."""
+    memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
+    if memory is None:
+        raise MemoryNotFoundError
+
+    ja = memory_repository.find_music_track(
+        db,
+        memory_id=memory.id,
+        provider=data.provider,
+        external_id=data.external_id,
+    )
+    if ja is not None:
+        raise DuplicateMusicError
+
+    if memory_repository.count_music(db, memory_id=memory.id) >= _MAX_TRACKS:
+        raise TooManyTracksError
+
+    memory_repository.add_music(
+        db,
+        memory_id=memory.id,
+        data=data.model_dump(),
+        position=memory_repository.next_music_position(db, memory_id=memory.id),
+    )
+    return _read_with_images(db, memory)
+
+
+def remove_music(
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    memory_id: uuid.UUID,
+    music_id: uuid.UUID,
+) -> MemoryRead:
+    """Remove uma faixa (soft delete). A memória em si não é tocada."""
+    memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
+    if memory is None:
+        raise MemoryNotFoundError
+
+    track = memory_repository.get_music(db, memory_id=memory.id, music_id=music_id)
+    if track is None:
+        raise MemoryMusicNotFoundError
+
+    memory_repository.soft_delete_music(db, track=track)
     return _read_with_images(db, memory)

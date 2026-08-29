@@ -48,6 +48,18 @@ reverso e persistido — ver [`10-localizacao.md`](10-localizacao.md). Memórias
 Foto é opcional; usuário só envia para memória própria. Sem Supabase configurado, o upload
 responde **503** e a `image_url` volta nula.
 
+## Música da memória  (privadas)
+- ✅ `POST /memories/{id}/music` — anexa a canção que estava tocando (201)
+- ✅ `DELETE /memories/{id}/music/{music_id}` — remove uma faixa
+
+O corpo é o **snapshot** da faixa que o app obteve do catálogo: a API não
+consulta provedor nenhum. Buscar exige rede e é do provedor; guardar é nosso —
+separar os dois deixa o app trocar de catálogo sem que a API precise saber.
+
+A mesma faixa não entra duas vezes na mesma memória (**409**); o teto é de 5 por
+memória (**409**). As faixas viajam junto da memória em `GET /memories` e
+`GET /memories/{id}`, no campo `music`.
+
 ## Jornadas  (privadas)
 - ✅ `POST /journeys` — `{title, description?, mood?, is_private?, started_at?, ended_at?}` → 201 (nasce `draft`)
 - ✅ `GET /journeys` — lista (com `points_count`), **paginação keyset** (`?limit=&cursor=`)

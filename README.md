@@ -250,6 +250,8 @@ Todas as rotas exigem Bearer token.
 - `DELETE /memories/{memory_id}`
 - `POST /memories/{memory_id}/images` — upload `multipart/form-data`, ate **5 fotos** por memoria
 - `DELETE /memories/{memory_id}/images/{image_id}`
+- `POST /memories/{memory_id}/music` — anexa a cancao que estava tocando (ate **5** por memoria)
+- `DELETE /memories/{memory_id}/music/{music_id}`
 
 Sem Supabase configurado, o upload responde **503** e a `image_url` volta nula.
 
@@ -341,7 +343,8 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Perfil agregado (`GET /me/profile`) com passaporte, `@username`, avatar e bio
 - [x] Paginacao keyset em `/memories` e `/journeys`
 - [x] Migracoes versionadas (Alembic, 0001..0010)
-- [x] Testes automatizados — 218 no backend (pytest) e 86 no app (flutter test)
+- [x] Musica da memoria no backend (`memory_music`, snapshot da faixa, contagem no Perfil)
+- [x] Testes automatizados — 235 no backend (pytest) e 103 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Paridade do app Expo com o Flutter (falta Perfil e Configuracoes)

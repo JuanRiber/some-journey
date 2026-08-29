@@ -100,3 +100,25 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
 > Regra do backend registrada ao implementar a edição: `null` **não** limpa um
 > campo no `PATCH` — o repositório guarda cada atribuição com `is not None`, e
 > apagar um texto exige enviar string vazia. Mandar `null` falha em silêncio.
+
+### Código (música)
+- Migração `0011_memory_music` e a fatia vertical completa: a memória passa a
+  guardar **a canção que estava tocando**. O app já sabia buscar faixas desde
+  julho — o `MusicProvider` e o adapter do iTunes existiam — e não tinha onde
+  salvá-las.
+- Guardamos o **snapshot** da faixa, não uma referência ao catálogo. Catálogos
+  mudam de política, tiram faixas do ar e reorganizam ids; a lembrança de qual
+  música tocava não pode depender de um terceiro continuar existindo.
+- A API **não consulta provedor nenhum**: recebe o que o app obteve. Buscar
+  exige rede e é do provedor; guardar é nosso. Assim o app troca de catálogo
+  (Apple Music, Spotify) sem que a API precise saber.
+- A mesma faixa não entra duas vezes na mesma memória — regra que o `MusicTrack`
+  do app já expressava no `operator ==` e que agora o banco garante, por índice
+  único parcial. Parcial de propósito: remover e reanexar continua permitido.
+- `GET /me/profile` ganhou `stats.tracks`, fechando o "56 músicas" do cartão do
+  viajante previsto na [`09-perfil.md`](09-perfil.md).
+
+> Falta a tela. O seam do lado do app continua sem UI — de propósito: acrescentar
+> métodos Dart sem tela repetiria exatamente o padrão que esta sessão
+> diagnosticou (infraestrutura pronta e desligada, como o `PATCH /journeys/{id}`
+> que ficou um mês sem chamador).

@@ -59,6 +59,42 @@ class MemoryImageRead(BaseModel):
     url: str
 
 
+class MemoryMusicIn(BaseModel):
+    """Entrada do POST /memories/{id}/music — o snapshot da faixa escolhida.
+
+    O cliente manda o que o catálogo devolveu; o backend não consulta provedor
+    nenhum. Isso mantém a busca (que exige rede e é do provedor) separada do
+    ato de guardar (que é nosso), e deixa o app trocar de catálogo sem que a
+    API precise saber."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(default="itunes", min_length=1, max_length=20)
+    external_id: str = Field(min_length=1, max_length=64)
+    title: str = Field(min_length=1, max_length=200)
+    artist: str = Field(min_length=1, max_length=200)
+    album: str | None = Field(default=None, max_length=200)
+    artwork_url: str | None = None
+    preview_url: str | None = None
+    external_url: str | None = None
+    duration_ms: int | None = Field(default=None, ge=0, le=86_400_000)
+
+
+class MemoryMusicRead(BaseModel):
+    """Uma faixa da memória. Mesmo formato que o `MusicTrack` do app espera."""
+
+    id: uuid.UUID
+    provider: str
+    external_id: str
+    title: str
+    artist: str
+    album: str | None
+    artwork_url: str | None
+    preview_url: str | None
+    external_url: str | None
+    duration_ms: int | None
+
+
 class MemoryRead(BaseModel):
     """Saída: o que a API devolve de uma memória. Sem user_id, sem location
     crua, sem image_path — o service constrói este DTO a partir do model."""
@@ -73,6 +109,9 @@ class MemoryRead(BaseModel):
     # Fotos (URLs assinadas), na ordem. image_url = a primeira (capa), mantido
     # por compatibilidade com o cliente atual.
     images: list[MemoryImageRead] = []
+    # As faixas viajam junto da memória: quem abre uma lembrança quer ver a
+    # música com ela, não fazer uma segunda requisição para descobrir.
+    music: list[MemoryMusicRead] = []
     image_url: str | None = None
     # O LUGAR (preenchido por geocodificação em segundo plano; nulo enquanto não
     # resolve). `place_label` é o que a UI mostra; os demais alimentam Passaporte,

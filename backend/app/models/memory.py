@@ -162,3 +162,69 @@ class MemoryImage(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MemoryMusic(Base):
+    """A canção que estava tocando naquele lugar.
+
+    Guarda um SNAPSHOT da faixa, não uma referência ao catálogo: título,
+    artista, álbum, capa e duração ficam gravados aqui. Catálogos mudam de
+    política, tiram faixas do ar e reorganizam ids — a lembrança de qual música
+    tocava não pode depender de um terceiro continuar existindo.
+
+    `provider` + `external_id` ficam junto para reabrir a faixa no serviço
+    enquanto ela existir; o registro sobrevive sem isso.
+
+    Uma memória pode ter VÁRIAS faixas (o teto é imposto no service), mas nunca
+    a mesma duas vezes — índice único parcial garante isso no banco.
+    """
+
+    __tablename__ = "memory_music"
+
+    __table_args__ = (
+        Index(
+            "ix_memory_music_memory_active",
+            "memory_id",
+            "position",
+            postgresql_where=sql_text("deleted_at IS NULL"),
+        ),
+        Index(
+            "uq_memory_music_track_active",
+            "memory_id",
+            "provider",
+            "external_id",
+            unique=True,
+            postgresql_where=sql_text("deleted_at IS NULL"),
+        ),
+        Index(
+            "ix_memory_music_active",
+            "memory_id",
+            postgresql_where=sql_text("deleted_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        primary_key=True,
+        server_default=sql_text("gen_random_uuid()"),
+    )
+    memory_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("memories.id", ondelete="CASCADE"),
+    )
+    provider: Mapped[str] = mapped_column(String(20))
+    external_id: Mapped[str] = mapped_column(String(64))
+
+    title: Mapped[str] = mapped_column(String(200))
+    artist: Mapped[str] = mapped_column(String(200))
+    album: Mapped[str | None] = mapped_column(String(200))
+    artwork_url: Mapped[str | None] = mapped_column(Text)
+    preview_url: Mapped[str | None] = mapped_column(Text)
+    external_url: Mapped[str | None] = mapped_column(Text)
+    duration_ms: Mapped[int | None] = mapped_column()
+
+    position: Mapped[int] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

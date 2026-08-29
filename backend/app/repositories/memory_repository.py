@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.location import Location
 from app.models.journey import JourneyMemory
-from app.models.memory import Memory, MemoryImage
+from app.models.memory import Memory, MemoryImage, MemoryMusic
 
 # bbox geográfico no formato (min_lng, min_lat, max_lng, max_lat) em WGS84.
 Bbox = tuple[float, float, float, float]
@@ -311,4 +311,114 @@ def soft_delete(db: Session, *, memory: Memory) -> None:
         )
         .values(deleted_at=func.now())
     )
+    db.commit()
+
+
+# --- Música ----------------------------------------------------------------
+
+
+def add_music(
+    db: Session,
+    *,
+    memory_id: uuid.UUID,
+    data: dict,
+    position: int,
+) -> MemoryMusic:
+    """Anexa uma faixa. A unicidade (mesma faixa duas vezes) é do índice."""
+    track = MemoryMusic(memory_id=memory_id, position=position, **data)
+    db.add(track)
+    db.commit()
+    db.refresh(track)
+    return track
+
+
+def list_music(db: Session, *, memory_id: uuid.UUID) -> list[MemoryMusic]:
+    """As faixas ativas de uma memória, na ordem em que foram anexadas."""
+    return list(
+        db.scalars(
+            select(MemoryMusic)
+            .where(
+                MemoryMusic.memory_id == memory_id,
+                MemoryMusic.deleted_at.is_(None),
+            )
+            .order_by(MemoryMusic.position, MemoryMusic.created_at)
+        )
+    )
+
+
+def list_music_for(
+    db: Session, *, memory_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[MemoryMusic]]:
+    """As faixas de VÁRIAS memórias de uma vez.
+
+    Existe para a listagem não cair em N+1: uma página de 30 memórias faria 30
+    consultas se cada uma buscasse as próprias faixas."""
+    if not memory_ids:
+        return {}
+    linhas = db.scalars(
+        select(MemoryMusic)
+        .where(
+            MemoryMusic.memory_id.in_(memory_ids),
+            MemoryMusic.deleted_at.is_(None),
+        )
+        .order_by(MemoryMusic.position, MemoryMusic.created_at)
+    )
+    saida: dict[uuid.UUID, list[MemoryMusic]] = {}
+    for linha in linhas:
+        saida.setdefault(linha.memory_id, []).append(linha)
+    return saida
+
+
+def get_music(
+    db: Session, *, memory_id: uuid.UUID, music_id: uuid.UUID
+) -> MemoryMusic | None:
+    return db.scalars(
+        select(MemoryMusic).where(
+            MemoryMusic.id == music_id,
+            MemoryMusic.memory_id == memory_id,
+            MemoryMusic.deleted_at.is_(None),
+        )
+    ).first()
+
+
+def find_music_track(
+    db: Session, *, memory_id: uuid.UUID, provider: str, external_id: str
+) -> MemoryMusic | None:
+    """A mesma faixa já anexada a esta memória, se houver."""
+    return db.scalars(
+        select(MemoryMusic).where(
+            MemoryMusic.memory_id == memory_id,
+            MemoryMusic.provider == provider,
+            MemoryMusic.external_id == external_id,
+            MemoryMusic.deleted_at.is_(None),
+        )
+    ).first()
+
+
+def count_music(db: Session, *, memory_id: uuid.UUID) -> int:
+    return (
+        db.scalar(
+            select(func.count())
+            .select_from(MemoryMusic)
+            .where(
+                MemoryMusic.memory_id == memory_id,
+                MemoryMusic.deleted_at.is_(None),
+            )
+        )
+        or 0
+    )
+
+
+def next_music_position(db: Session, *, memory_id: uuid.UUID) -> int:
+    maior = db.scalar(
+        select(func.max(MemoryMusic.position)).where(
+            MemoryMusic.memory_id == memory_id,
+            MemoryMusic.deleted_at.is_(None),
+        )
+    )
+    return (maior or 0) + 1
+
+
+def soft_delete_music(db: Session, *, track: MemoryMusic) -> None:
+    track.deleted_at = func.now()
     db.commit()

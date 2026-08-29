@@ -8,7 +8,8 @@ timestamps são `TIMESTAMPTZ`. Gerida por migrations Alembic (`0001`..`0010`, ve
 ```
 User
  ├── Memories            (pontos no mapa; podem ser soltos)
- │      └── MemoryImages      (até 5 fotos por memória)
+ │      ├── MemoryImages      (até 5 fotos por memória)
+ │      └── MemoryMusic       (até 5 faixas por memória)
  ├── Journeys            (trajetórias)
  │      ├── JourneyMemories   (vínculo ordenado jornada ↔ memória)
  │      │      └── Memory
@@ -80,6 +81,29 @@ Memória é um **ponto geográfico com significado**. Existe sozinha ou conectad
 
 > **Até 5 fotos por memória** (teto em `memory_service._MAX_IMAGES`). A API devolve
 > `image_url` assinada e temporária para cada uma.
+
+## memory_music
+| Campo | Tipo | Notas |
+|---|---|---|
+| id | UUID | PK |
+| memory_id | UUID | FK → memories (CASCADE) |
+| provider | varchar(20) | origem da faixa (`itunes`, `spotify`…) |
+| external_id | varchar(64) | id da faixa **no provedor**, para reabrir depois |
+| title / artist | varchar(200) | obrigatórios: sem eles a linha não lembra nada |
+| album | varchar(200) \| null | |
+| artwork_url / preview_url / external_url | text \| null | snapshot do provedor |
+| duration_ms | int \| null | |
+| position | int | ordem em que foram anexadas |
+| created_at | timestamptz | |
+| deleted_at | timestamptz \| null | soft delete |
+
+> Guardamos o **snapshot** da faixa, não uma referência ao catálogo: catálogos
+> mudam de política, tiram faixas do ar e reorganizam ids, e a lembrança de qual
+> música tocava não pode depender de um terceiro continuar existindo.
+>
+> Índice único parcial em `(memory_id, provider, external_id)` — a mesma faixa
+> não entra duas vezes na mesma memória. Parcial `WHERE deleted_at IS NULL`:
+> remover e reanexar depois continua permitido. Teto de **5 faixas** no service.
 
 ## journeys
 | Campo | Tipo | Notas |

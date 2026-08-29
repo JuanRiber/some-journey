@@ -58,6 +58,7 @@ def get_profile(db: Session, *, user: User) -> ProfileRead:
             countries=memory_counts["countries"],
             continents=memory_counts["continents"],
             photos=profile_repository.photo_count(db, user_id=user_id),
+            tracks=profile_repository.music_count(db, user_id=user_id),
             tracked_meters=profile_repository.tracked_meters(db, user_id=user_id),
             active_days=profile_repository.active_days(db, user_id=user_id),
             pending_geocode=memory_counts["pending_geocode"],

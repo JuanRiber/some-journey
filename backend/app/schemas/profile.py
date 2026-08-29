@@ -53,6 +53,7 @@ class ProfileStats(BaseModel):
     countries: int
     continents: int
     photos: int
+    tracks: int
     tracked_meters: float
     active_days: int
     # Transparência operacional: quantas memórias ainda esperam geocodificação

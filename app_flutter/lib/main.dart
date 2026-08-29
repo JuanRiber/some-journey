@@ -7,6 +7,7 @@ import 'design/tokens.dart';
 import 'screens/change_password.dart';
 import 'screens/forgot_password.dart';
 import 'screens/journey_detail.dart';
+import 'screens/journey_edit.dart';
 import 'screens/journey_new.dart';
 import 'screens/journeys.dart';
 import 'screens/login.dart';
@@ -79,6 +80,8 @@ class SomeJourneyApp extends StatelessWidget {
             page = MemoryNewScreen(journeyId: id);
           case '/journey':
             page = JourneyDetailScreen(journeyId: id!);
+          case '/journey-edit':
+            page = JourneyEditScreen(journeyId: id!);
         }
         if (page == null) return null;
         final built = page;

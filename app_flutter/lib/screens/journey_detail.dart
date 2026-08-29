@@ -66,6 +66,15 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
   /// O traço some do mapa e a distância total encolhe; as memórias da jornada
   /// não são tocadas — o backend guarda percurso e memória em tabelas distintas
   /// justamente para que apagar um caminho não apague o que se viveu nele.
+  /// Abre a edição e recarrega se algo mudou. A tela devolve `true` só quando
+  /// gravou de fato — voltar sem mexer não custa uma requisição.
+  Future<void> _openEdit(String id) async {
+    final mudou =
+        await Navigator.of(context).pushNamed('/journey-edit', arguments: id);
+    if (!mounted || mudou != true) return;
+    await _load();
+  }
+
   Future<void> _deleteTrack(JourneyTrack t) async {
     try {
       await Api.instance.deleteTrack(t.journeyId, t.id);
@@ -162,6 +171,19 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                       Expanded(child: Text(j.title, style: serif(27))),
                       const SizedBox(width: 10),
                       StatusBadge(j.status),
+                      // Editar mora no cabeçalho, junto do que se edita. Antes,
+                      // consertar um título só era possível apagando a jornada
+                      // e refazendo — o que desfaz os vínculos com as memórias.
+                      Semantics(
+                        button: true,
+                        label: 'Editar jornada',
+                        child: IconButton(
+                          onPressed: () => _openEdit(j.id),
+                          icon: const Icon(Icons.edit_outlined,
+                              size: 19, color: SJColors.inkSoft),
+                          tooltip: 'Editar',
+                        ),
+                      ),
                     ],
                   ),
                   if ((j.description ?? '').isNotEmpty)
@@ -171,7 +193,7 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                           style:
                               const TextStyle(color: SJColors.inkSoft, fontSize: 14, height: 1.5)),
                     ),
-                  if (j.mood != null)
+                  if ((j.mood ?? '').isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
                       child: Text(j.mood!,

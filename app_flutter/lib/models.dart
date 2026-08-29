@@ -19,6 +19,13 @@ class Memory {
   final List<MemoryImage> images;
   final String? imageUrl;
 
+  /// A canção que estava tocando. Vem junto da memória de propósito: quem abre
+  /// a lembrança quer ver a música com ela, não fazer uma segunda requisição.
+  ///
+  /// Cada item carrega o `id` do vínculo (para remover) além do snapshot da
+  /// faixa — por isso não é uma lista de [MusicTrack] pura.
+  final List<SavedTrack> music;
+
   Memory({
     required this.id,
     required this.title,
@@ -28,6 +35,7 @@ class Memory {
     required this.occurredAt,
     required this.createdAt,
     required this.images,
+    this.music = const [],
     this.imageUrl,
   });
 
@@ -42,8 +50,64 @@ class Memory {
         images: ((j['images'] ?? []) as List)
             .map((e) => MemoryImage.fromJson(e as Map<String, dynamic>))
             .toList(),
+        music: ((j['music'] ?? []) as List)
+            .map((e) => SavedTrack.fromJson(e as Map<String, dynamic>))
+            .toList(),
         imageUrl: j['image_url'] as String?,
       );
+}
+
+/// Uma faixa JÁ anexada a uma memória.
+///
+/// Diferente do `MusicTrack` do catálogo: além do snapshot, carrega o [id] do
+/// vínculo no nosso banco — é ele que a remoção usa. Um resultado de busca não
+/// tem esse id; só ganha um ao ser guardado.
+class SavedTrack {
+  final String id;
+  final String provider;
+  final String externalId;
+  final String title;
+  final String artist;
+  final String? album;
+  final String? artworkUrl;
+  final String? previewUrl;
+  final String? externalUrl;
+  final int? durationMs;
+
+  SavedTrack({
+    required this.id,
+    required this.provider,
+    required this.externalId,
+    required this.title,
+    required this.artist,
+    this.album,
+    this.artworkUrl,
+    this.previewUrl,
+    this.externalUrl,
+    this.durationMs,
+  });
+
+  factory SavedTrack.fromJson(Map<String, dynamic> j) => SavedTrack(
+        id: j['id'] as String,
+        provider: (j['provider'] ?? 'itunes') as String,
+        externalId: (j['external_id'] ?? '') as String,
+        title: (j['title'] ?? '') as String,
+        artist: (j['artist'] ?? '') as String,
+        album: j['album'] as String?,
+        artworkUrl: j['artwork_url'] as String?,
+        previewUrl: j['preview_url'] as String?,
+        externalUrl: j['external_url'] as String?,
+        durationMs: (j['duration_ms'] as num?)?.toInt(),
+      );
+
+  /// "3:42" — mesma regra do catálogo, para a lista lida igual antes e depois
+  /// de guardar.
+  String get durationLabel {
+    final ms = durationMs;
+    if (ms == null || ms <= 0) return '';
+    final total = ms ~/ 1000;
+    return '${total ~/ 60}:${(total % 60).toString().padLeft(2, '0')}';
+  }
 }
 
 class Journey {

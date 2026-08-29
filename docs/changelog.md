@@ -118,7 +118,8 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
 - `GET /me/profile` ganhou `stats.tracks`, fechando o "56 músicas" do cartão do
   viajante previsto na [`09-perfil.md`](09-perfil.md).
 
-> Falta a tela. O seam do lado do app continua sem UI — de propósito: acrescentar
-> métodos Dart sem tela repetiria exatamente o padrão que esta sessão
-> diagnosticou (infraestrutura pronta e desligada, como o `PATCH /journeys/{id}`
-> que ficou um mês sem chamador).
+- A tela veio junto: busca no catálogo pela folha inferior, a trilha no detalhe
+  da lembrança e a remoção. O seam que existia desde julho fecha aqui — o app
+  deixa de ter um provedor de música que não leva a lugar nenhum.
+- A busca **espera a digitação pausar** (350ms). Sem isso, escrever "caetano"
+  dispararia sete requisições a um catálogo público para uma única intenção.

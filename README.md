@@ -343,8 +343,8 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Perfil agregado (`GET /me/profile`) com passaporte, `@username`, avatar e bio
 - [x] Paginacao keyset em `/memories` e `/journeys`
 - [x] Migracoes versionadas (Alembic, 0001..0010)
-- [x] Musica da memoria no backend (`memory_music`, snapshot da faixa, contagem no Perfil)
-- [x] Testes automatizados — 235 no backend (pytest) e 103 no app (flutter test)
+- [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
+- [x] Testes automatizados — 235 no backend (pytest) e 110 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Paridade do app Expo com o Flutter (falta Perfil e Configuracoes)

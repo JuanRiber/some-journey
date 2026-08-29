@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../models.dart';
+import '../features/music/memory_music_section.dart';
 import '../theme.dart';
 import '../widgets/photo_viewer.dart';
 
@@ -150,6 +151,21 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                     style: const TextStyle(
                                         color: SJColors.ink, fontSize: 16, height: 1.55)),
                               ),
+                            // A trilha vem DEPOIS do texto e das fotos: a
+                            // música acompanha a lembrança, não a anuncia.
+                            const Padding(
+                              padding: EdgeInsets.only(top: 28),
+                              child: Divider(color: SJColors.line, height: 1),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 22),
+                              child: MemoryMusicSection(
+                                memoryId: m.id,
+                                tracks: m.music,
+                                onChanged: (atualizada) =>
+                                    setState(() => _memory = atualizada),
+                              ),
+                            ),
                             const Padding(
                               padding: EdgeInsets.only(top: 28),
                               child: Divider(color: SJColors.line, height: 1),

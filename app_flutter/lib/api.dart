@@ -343,6 +343,20 @@ class Api {
     if (r.statusCode >= 400) throw ApiError(r.statusCode, _detail(r));
   }
 
+  // ---- Música da memória ----
+
+  /// Anexa a canção que estava tocando.
+  ///
+  /// O corpo é o snapshot que veio do catálogo — a API não consulta provedor
+  /// nenhum. 409 quando a faixa já está na memória ou o teto de 5 foi atingido.
+  Future<Memory> addMemoryMusic(String memoryId, Map<String, dynamic> track) async =>
+      Memory.fromJson(await _request('POST', '/memories/$memoryId/music',
+          body: track, authed: true));
+
+  Future<Memory> removeMemoryMusic(String memoryId, String musicId) async =>
+      Memory.fromJson(await _request(
+          'DELETE', '/memories/$memoryId/music/$musicId', authed: true));
+
   // ---- Percurso real (GPS) ----
 
   /// Abre um trecho de gravação. O backend recusa com 409 se já houver um

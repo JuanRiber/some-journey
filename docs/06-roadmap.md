@@ -34,8 +34,8 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ a fazer. (Progresso detalhado no [`cha
 ## V3
 - Jornadas compartilhadas.
 - Marcar pessoas / conexões humanas.
-- 🟡 Música associada à memória — backend pronto (`memory_music`, endpoints e
-  contagem no Perfil). Falta a tela: o app já busca faixas no iTunes.
+- ✅ Música associada à memória — `memory_music` no backend, busca no iTunes e a
+  trilha no detalhe da lembrança (até 5 faixas). Movida da V3 para entregue.
 - Áudio ambiente.
 
 ## V4

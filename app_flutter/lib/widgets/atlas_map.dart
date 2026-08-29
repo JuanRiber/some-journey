@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../design/basemap.dart';
+import '../design/sj_theme.dart';
+import '../design/tokens.dart';
 import '../models.dart';
-import '../theme.dart';
 
-/// Mapa do atlas em PAPEL: tiles claros (CARTO Positron), que casam com o creme
-/// da interface e deixam a cartografia parecer um mapa impresso — o fundo é
-/// discreto para os pins e rastros (a memória) serem a informação. Pins vinho
+/// Mapa do atlas em PAPEL: as telhas do OpenStreetMap passam pelo filtro de
+/// [SJBasemap] e chegam na cor do tema — sépia sobre creme no claro, tinta
+/// pálida sobre meia-noite no escuro. O fundo é discreto de propósito: os pins
+/// e os rastros (a memória) é que são a informação. Pins vinho
 /// (jornadas) e azul-lago (pontos soltos), rastros em vinho. A câmera é contida
 /// a UM único mundo (sem cópias laterais vazias — o worldCopyJump do app web).
 class AtlasMap extends StatelessWidget {
@@ -32,6 +35,9 @@ class AtlasMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // O mapa passa a seguir o tema: no atlas noturno, um retângulo creme
+    // brilhante no meio da tela escura pareceria um erro de renderização.
+    final esquema = SJTheme.of(context);
     final markers = <Marker>[];
     final polylines = <Polyline>[];
     final all = <LatLng>[];
@@ -43,20 +49,20 @@ class AtlasMap extends StatelessWidget {
           polylines.add(Polyline(
             points: route.coordinates.map((c) => LatLng(c[1], c[0])).toList(),
             // Rastro simbólico da jornada: vinho (a cor da ação/jornada).
-            color: SJColors.wine.withValues(alpha: 0.75),
+            color: esquema.primary.withValues(alpha: 0.75),
             strokeWidth: 3,
           ));
         }
         for (final p in j.points) {
           final pos = LatLng(p.latitude, p.longitude);
           all.add(pos);
-          markers.add(_pin(pos, SJColors.wine, p.memoryId));
+          markers.add(_pin(pos, esquema.primary, esquema, p.memoryId));
         }
       }
       for (final p in data!.loosePoints) {
         final pos = LatLng(p.latitude, p.longitude);
         all.add(pos);
-        markers.add(_pin(pos, SJColors.cyan, p.memoryId));
+        markers.add(_pin(pos, esquema.secondary, esquema, p.memoryId));
       }
     }
 
@@ -68,7 +74,7 @@ class AtlasMap extends StatelessWidget {
         points: pontos,
         // Ciano (o acento de "lugar/percurso"), mais grosso que o simbólico:
         // o caminho real é o protagonista quando existe.
-        color: SJColors.cyanDeep.withValues(alpha: 0.9),
+        color: esquema.secondary.withValues(alpha: 0.9),
         strokeWidth: 4.5,
       ));
     }
@@ -83,12 +89,16 @@ class AtlasMap extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        border: Border.all(color: SJColors.frame, width: 3),
+        border: Border.all(color: esquema.frame, width: 3),
         borderRadius: BorderRadius.circular(3),
-        color: SJColors.sand,
+        color: esquema.bgDeep,
       ),
       clipBehavior: Clip.antiAlias,
-      child: FlutterMap(
+      // O selo de atribuição fica SOBRE o mapa, não dentro dele: `children` do
+      // FlutterMap é uma lista de CAMADAS, e um widget comum ali confunde o
+      // pipeline de camadas.
+      child: Stack(children: [
+        FlutterMap(
         options: MapOptions(
           initialCenter: center,
           initialZoom: all.isEmpty ? 3 : 4,
@@ -99,25 +109,20 @@ class AtlasMap extends StatelessWidget {
           cameraConstraint: CameraConstraint.contain(
             bounds: LatLngBounds(const LatLng(-85, -180), const LatLng(85, 180)),
           ),
-          backgroundColor: SJColors.sand,
+          backgroundColor: esquema.bgDeep,
         ),
         children: [
-          TileLayer(
-            // Positron = base clara e silenciosa (papel). Trocar por dark_all
-            // quando o modo escuro por tela chegar.
-            urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-            subdomains: const ['a', 'b', 'c', 'd'],
-            retinaMode: RetinaMode.isHighDensity(context),
-            userAgentPackageName: 'app.somejourney',
-          ),
+          SJBasemap.layer(context, esquema),
           PolylineLayer(polylines: polylines),
           MarkerLayer(markers: markers),
         ],
-      ),
+        ),
+        SJBasemap.selo(esquema),
+      ]),
     );
   }
 
-  Marker _pin(LatLng pos, Color color, String memoryId) => Marker(
+  Marker _pin(LatLng pos, Color color, SJScheme s, String memoryId) => Marker(
         point: pos,
         width: 20,
         height: 20,
@@ -129,10 +134,10 @@ class AtlasMap extends StatelessWidget {
               shape: BoxShape.circle,
               // Anel creme: destaca o pin sobre a base clara sem endurecer o
               // desenho; a sombra é muito suave (nada de preto duro no papel).
-              border: Border.all(color: const Color(0xFFFBF8F1), width: 2),
+              border: Border.all(color: s.surface, width: 2),
               boxShadow: [
                 BoxShadow(
-                  color: SJColors.ink.withValues(alpha: 0.22),
+                  color: s.shadow.withValues(alpha: 0.22),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),

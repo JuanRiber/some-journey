@@ -3,6 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+
+import '../design/basemap.dart';
+import '../design/sj_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
@@ -172,13 +175,7 @@ class _LocationPickerState extends State<LocationPicker> {
               onTap: (_, pos) => _select(pos.latitude, pos.longitude, null),
             ),
             children: [
-              TileLayer(
-                // Base clara (Positron): casa com o papel da interface.
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-                subdomains: const ['a', 'b', 'c', 'd'],
-                retinaMode: RetinaMode.isHighDensity(context),
-                userAgentPackageName: 'app.somejourney',
-              ),
+              SJBasemap.layer(context, SJTheme.of(context)),
               if (_picked != null)
                 MarkerLayer(markers: [
                   Marker(

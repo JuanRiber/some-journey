@@ -8,6 +8,7 @@ AtlasPoint p(double lat, double lng, {String id = 'm', DateTime? at}) =>
     AtlasPoint(memoryId: id, latitude: lat, longitude: lng, occurredAt: at);
 
 void main() {
+  _testesDoTracado();
   group('enquadramento', () {
     test('null sem pontos (a UI cai na visão ampla)', () {
       expect(AtlasDomain.boundsOf(const []), isNull);
@@ -125,6 +126,69 @@ void main() {
       expect(AtlasDomain.formatDistance(820), '820 m');
       expect(AtlasDomain.formatDistance(12400), '12,4 km');
       expect(AtlasDomain.formatDistance(2430000), '2.430 km');
+    });
+  });
+}
+
+// ── O rastro sendo desenhado ────────────────────────────────────────────────
+//
+// A ponta da linha avança interpolando o segmento atual. Sem isso, um rastro de
+// quatro pontos cresceria em quatro saltos — parece régua, não pena.
+void _testesDoTracado() {
+  group('partialLine', () {
+    final linha = [
+      [0.0, 0.0],
+      [10.0, 0.0],
+      [20.0, 0.0],
+      [30.0, 0.0],
+    ];
+
+    test('em t=0 não há nada desenhado', () {
+      expect(AtlasDomain.partialLine(linha, 0), isEmpty);
+    });
+
+    test('em t=1 a linha está inteira', () {
+      expect(AtlasDomain.partialLine(linha, 1), linha);
+    });
+
+    test('na metade, a ponta cai no meio geométrico', () {
+      final meio = AtlasDomain.partialLine(linha, 0.5);
+      expect(meio.last[0], closeTo(15, 0.001),
+          reason: 'a ponta interpola, não salta para o próximo vértice');
+    });
+
+    test('a ponta avança continuamente, sem degraus', () {
+      double? anterior;
+      for (var i = 1; i <= 20; i++) {
+        final p = AtlasDomain.partialLine(linha, i / 20);
+        if (p.isEmpty) continue;
+        final x = p.last[0];
+        if (anterior != null) {
+          expect(x, greaterThanOrEqualTo(anterior));
+          expect(x - anterior, lessThan(4),
+              reason: 'um salto grande denunciaria avanço de vértice em vértice');
+        }
+        anterior = x;
+      }
+    });
+
+    test('nunca devolve uma polilinha de um ponto só', () {
+      for (var i = 0; i <= 40; i++) {
+        final p = AtlasDomain.partialLine(linha, i / 40);
+        expect(p.length, isNot(1), reason: 'um ponto não desenha linha');
+      }
+    });
+
+    test('linha curta demais passa intacta', () {
+      expect(AtlasDomain.partialLine([[1.0, 2.0]], 0.5), hasLength(1));
+    });
+
+    test('preserva a ordem [lng, lat] que vem da API', () {
+      final p = AtlasDomain.partialLine([
+        [-38.52, -3.73],
+        [-38.50, -3.71],
+      ], 1);
+      expect(p.first, [-38.52, -3.73]);
     });
   });
 }

@@ -214,6 +214,38 @@ abstract final class AtlasDomain {
     return total;
   }
 
+  /// O rastro desenhado até a fração [t] de seu comprimento — a linha *sendo
+  /// traçada*, não revelada de uma vez.
+  ///
+  /// O último segmento é INTERPOLADO em vez de aparecer inteiro. Sem isso, um
+  /// rastro de poucos pontos cresceria aos saltos, como quem risca a régua de
+  /// marco em marco; interpolando, a ponta avança como uma pena sobre o papel.
+  ///
+  /// Recebe e devolve coordenadas `[lng, lat]` (a ordem do GeoJSON, que é a que
+  /// chega da API) para não obrigar quem chama a converter duas vezes.
+  static List<List<double>> partialLine(List<List<double>> line, double t) {
+    if (line.length < 2 || t >= 1) return line;
+    if (t <= 0) return const [];
+
+    // Quantos segmentos já foram percorridos, e quanto do atual.
+    final total = line.length - 1;
+    final avanco = total * t;
+    final inteiros = avanco.floor();
+    final resto = avanco - inteiros;
+
+    final saida = line.sublist(0, inteiros + 1);
+    if (resto > 0 && inteiros < total) {
+      final a = line[inteiros], b = line[inteiros + 1];
+      saida.add([
+        a[0] + (b[0] - a[0]) * resto,
+        a[1] + (b[1] - a[1]) * resto,
+      ]);
+    }
+    // Uma linha de um ponto só não desenha nada; devolve vazio para a camada
+    // não receber uma polilinha degenerada.
+    return saida.length < 2 ? const [] : saida;
+  }
+
   /// Haversine entre dois pontos, em metros.
   static double distanceMeters(AtlasPoint a, AtlasPoint b) =>
       haversineMeters(a.latitude, a.longitude, b.latitude, b.longitude);

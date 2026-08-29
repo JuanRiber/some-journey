@@ -1,5 +1,7 @@
 # Some Journey
 
+[![CI](https://github.com/JuanRiber/some-journey/actions/workflows/ci.yml/badge.svg)](https://github.com/JuanRiber/some-journey/actions/workflows/ci.yml)
+
 Uma plataforma de cartografia humana: transforma deslocamentos, memorias e conexoes em jornadas visuais vivas.
 
 A vida deixa rastros. O Some Journey registra esses rastros e une lugar, tempo, atmosfera, pessoas, musica, memoria e narrativa em uma experiencia visual baseada em mapa.
@@ -68,6 +70,7 @@ some-journey/
 |   |-- src/lib/               # API, auth, geo, config
 |   |-- src/theme/
 |   `-- package.json
+|-- .github/workflows/ci.yml   # integracao continua (backend + app)
 |-- docs/                      # visao, regras, modelagem, API, design system, perfil
 |-- e2e/                       # smoke Playwright do app web
 |-- infra/
@@ -338,11 +341,35 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Perfil agregado (`GET /me/profile`) com passaporte, `@username`, avatar e bio
 - [x] Paginacao keyset em `/memories` e `/journeys`
 - [x] Migracoes versionadas (Alembic, 0001..0010)
-- [x] Testes automatizados (pytest) — 214 testes
+- [x] Testes automatizados — 218 no backend (pytest) e 86 no app (flutter test)
+- [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Paridade do app Expo com o Flutter (falta Perfil e Configuracoes)
 - [ ] Tracking em segundo plano (exige dev build)
 - [ ] Mapa Mapbox ou provedor nativo
+
+---
+
+## Integracao continua
+
+O GitHub Actions roda a cada push na `main` e em todo pull request
+(`.github/workflows/ci.yml`), em dois trabalhos paralelos:
+
+- **Backend** — `pytest` contra um servico `postgis/postgis:16-3.4` na porta
+  5433, a mesma imagem e a mesma porta do `infra/docker-compose.yml`. Depois,
+  `alembic upgrade head`, `downgrade base` e `upgrade head` num banco limpo, que
+  e o unico jeito de pegar uma migration quebrada antes do deploy (o boot em
+  producao roda `upgrade head`).
+- **App Flutter** — `flutter analyze --fatal-infos` e `flutter test`, na versao
+  3.38.10 (Dart 3.10.9), a mesma do desenvolvimento.
+
+A suite nao precisa de `.env`: o `conftest.py` define `DATABASE_URL`,
+`JWT_SECRET_KEY` e `APP_ENV=test` antes de importar o app, cria o banco de teste
+e habilita o PostGIS.
+
+O E2E (Playwright) **nao** entra no CI: ele sobe o app Expo, que e o cliente
+secundario, e depende do backend no ar — custo e instabilidade altos para o que
+cobre.
 
 ---
 

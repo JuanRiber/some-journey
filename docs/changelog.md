@@ -78,3 +78,25 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
 > da memória continua obrigatório enquanto o texto é opcional, ao contrário do que
 > o produto pede. Inverter isso muda o contrato da API e afeta os dois clientes —
 > é decisão de produto, não limpeza de documentação.
+
+## 2026-08-29
+
+### Documentação
+- README: nova seção **Integração contínua** e badge do workflow; `.github/` na
+  árvore do projeto; contagem de testes corrigida (218 no backend, 86 no app).
+
+### Código
+- Integração contínua no GitHub Actions (`.github/workflows/ci.yml`): 218 testes
+  de backend contra `postgis/postgis:16-3.4` e 86 do app com
+  `flutter analyze --fatal-infos` + `flutter test`, em paralelo.
+- O trabalho de backend também roda `upgrade head` → `downgrade base` →
+  `upgrade head` em banco limpo. Isso fecha o **critério 1** de
+  [`10-localizacao.md`](10-localizacao.md), que exigia o downgrade validado em
+  banco limpo e nunca tinha sido conferido: o ciclo passa e as 8 tabelas voltam.
+- Paginação por keyset adotada pelo cliente Flutter, percurso real por GPS
+  (gravação, listagem e remoção) e edição de jornada — o `PATCH /journeys/{id}`
+  existia desde julho sem nenhum chamador.
+
+> Regra do backend registrada ao implementar a edição: `null` **não** limpa um
+> campo no `PATCH` — o repositório guarda cada atribuição com `is not None`, e
+> apagar um texto exige enviar string vazia. Mandar `null` falha em silêncio.

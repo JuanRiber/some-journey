@@ -1,0 +1,115 @@
+# Integração contínua do Some Journey.
+#
+# Existe porque o projeto tem 218 testes de backend e 86 de app, e até aqui
+# nada os rodava sozinho: quebrar algo e publicar dependia de alguém lembrar de
+# rodar na mão. Num repositório que faz deploy automático, isso é tempo demais
+# entre o erro e a descoberta.
+#
+# Os dois trabalhos são independentes e rodam em paralelo — um app quebrado não
+# esconde um backend verde, e vice-versa.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Um push novo no mesmo ramo cancela a execução anterior: só o último estado
+# interessa, e a fila do runner não é infinita.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+
+    services:
+      # A MESMA imagem do infra/docker-compose.yml. Testar contra outro Postgres
+      # ou outro PostGIS deixaria passar exatamente o tipo de erro que só
+      # aparece no banco: índice parcial, tipo geográfico, migration.
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_DB: some_journey
+          POSTGRES_USER: somejourney
+          POSTGRES_PASSWORD: somejourney_password
+        # 5433 no host para bater com a porta que o conftest usa por padrão —
+        # assim a suíte roda aqui sem variável de ambiente nenhuma.
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U somejourney -d some_journey"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # A mesma do backend/Dockerfile: o CI não deve aprovar numa versão
+          # que a produção não roda.
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Instalar dependências
+        run: pip install -r requirements-dev.txt
+
+      # O conftest cria o banco de teste e habilita o PostGIS sozinho, e define
+      # DATABASE_URL, JWT_SECRET_KEY e APP_ENV=test antes de importar o app.
+      # Não existe .env aqui, e é assim que tem de ser.
+      - name: Testes
+        run: pytest
+
+      # As migrations são a fonte da verdade do schema, mas a suíte monta as
+      # tabelas com create_all. Sem este passo, uma migration quebrada passaria
+      # despercebida até o deploy — que roda `alembic upgrade head` no boot.
+      - name: Migrations em banco limpo (upgrade e downgrade)
+        env:
+          DATABASE_URL: postgresql+psycopg://somejourney:somejourney_password@localhost:5433/some_journey
+          JWT_SECRET_KEY: chave-de-ci-com-pelo-menos-32-bytes-aqui
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+  flutter:
+    name: App Flutter (analyze + test)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: app_flutter
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          # Fixa na versão de desenvolvimento. O pubspec pede Dart >= 3.10.9, e
+          # o Dart subiu o mínimo de macOS para 14 a partir do 3.11 — em quem
+          # desenvolve num Mac mais antigo, uma versão maior aqui aprovaria
+          # código que não roda na máquina de quem escreve.
+          flutter-version: '3.38.10'
+          channel: stable
+          cache: true
+
+      - name: Dependências
+        run: flutter pub get
+
+      # --fatal-infos porque o projeto está em zero avisos hoje: manter assim é
+      # barato, recuperar depois de acumular não é.
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      - name: Testes
+        run: flutter test

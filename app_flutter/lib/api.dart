@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,11 +30,47 @@ class ApiError implements Exception {
   String toString() => message;
 }
 
+/// Nome do header em que o backend devolve o cursor da próxima página.
+const nextCursorHeader = 'X-Next-Cursor';
+
+/// Resultado de uma listagem paginada por keyset.
+///
+/// [nextCursor] nulo significa que esta é a última página — é assim que o
+/// backend sinaliza o fim, e não com uma contagem total.
+class Page<T> {
+  final List<T> items;
+  final String? nextCursor;
+
+  const Page(this.items, this.nextCursor);
+  const Page._empty()
+      : items = const [],
+        nextCursor = null;
+
+  bool get hasMore => nextCursor != null;
+}
+
 class Api {
   Api._();
   static final Api instance = Api._();
 
   String? _token;
+
+  /// Cliente HTTP. Injetável para que o contrato com o backend — paginação por
+  /// cursor, tradução de erro, timeout — possa ser testado sem rede nem
+  /// servidor de pé. Em produção é o cliente padrão do pacote http.
+  http.Client _client = http.Client();
+
+  /// Troca o cliente HTTP (testes). Devolve o anterior, para restaurar depois.
+  @visibleForTesting
+  http.Client swapClient(http.Client client) {
+    final old = _client;
+    _client = client;
+    return old;
+  }
+
+  /// Esquece a sessão em memória (testes), sem tocar no armazenamento.
+  @visibleForTesting
+  void debugSetToken(String? token) => _token = token;
 
   /// Lê a sessão salva. Falha de armazenamento NÃO derruba o app: sem token, o
   /// bootstrap manda para o login (ver _Bootstrap em main.dart).
@@ -86,7 +123,11 @@ class Api {
     return 'Erro inesperado (${r.statusCode}).';
   }
 
-  Future<dynamic> _request(
+  /// Envia a requisição e devolve a RESPOSTA inteira.
+  ///
+  /// Existe separado de [_request] porque as listagens precisam do header
+  /// `X-Next-Cursor`, que se perde quando só o corpo é devolvido.
+  Future<http.Response> _send(
     String method,
     String path, {
     Object? body,
@@ -97,14 +138,14 @@ class Api {
     try {
       final headers = _headers(json: body != null, authed: authed);
       r = switch (method) {
-        'GET' => await http.get(uri, headers: headers).timeout(_timeout),
-        'POST' => await http
+        'GET' => await _client.get(uri, headers: headers).timeout(_timeout),
+        'POST' => await _client
             .post(uri, headers: headers, body: body == null ? null : jsonEncode(body))
             .timeout(_timeout),
-        'PATCH' => await http
+        'PATCH' => await _client
             .patch(uri, headers: headers, body: body == null ? null : jsonEncode(body))
             .timeout(_timeout),
-        'DELETE' => await http.delete(uri, headers: headers).timeout(_timeout),
+        'DELETE' => await _client.delete(uri, headers: headers).timeout(_timeout),
         _ => throw ArgumentError(method),
       };
     } on TimeoutException {
@@ -113,8 +154,53 @@ class Api {
       throw ApiError(0, 'Sem conexão com o servidor.');
     }
     if (r.statusCode >= 400) throw ApiError(r.statusCode, _detail(r));
+    return r;
+  }
+
+  Future<dynamic> _request(
+    String method,
+    String path, {
+    Object? body,
+    bool authed = false,
+  }) async {
+    final r = await _send(method, path, body: body, authed: authed);
     if (r.statusCode == 204 || r.bodyBytes.isEmpty) return null;
     return jsonDecode(utf8.decode(r.bodyBytes));
+  }
+
+  /// Acrescenta `limit`/`cursor` à rota, já codificados.
+  ///
+  /// O cursor é opaco (base64url com `-`, `_` e possível `=`), então ele PRECISA
+  /// passar por codificação de querystring — concatenar na mão corromperia o
+  /// padding e o backend responderia 400.
+  String _paged(String path, int? limit, String? cursor) {
+    final q = <String, String>{
+      if (limit != null) 'limit': '$limit',
+      'cursor': ?cursor,
+    };
+    if (q.isEmpty) return path;
+    return '$path?${Uri(queryParameters: q).query}';
+  }
+
+  /// Uma página de listagem: os itens e o cursor da PRÓXIMA página.
+  ///
+  /// O backend devolve um array JSON puro e sinaliza a continuação pelo header
+  /// `X-Next-Cursor`; sem o header, acabou.
+  Future<Page<T>> _page<T>(
+    String path,
+    T Function(Map<String, dynamic>) parse, {
+    int? limit,
+    String? cursor,
+  }) async {
+    final r = await _send('GET', _paged(path, limit, cursor), authed: true);
+    final data = r.bodyBytes.isEmpty ? null : jsonDecode(utf8.decode(r.bodyBytes));
+    if (data is! List) return const Page._empty();
+    // O pacote http normaliza nomes de header para minúsculas.
+    final next = r.headers[nextCursorHeader.toLowerCase()];
+    return Page(
+      data.map((e) => parse(e as Map<String, dynamic>)).toList(),
+      (next != null && next.isNotEmpty) ? next : null,
+    );
   }
 
   // ---- Auth ----
@@ -181,11 +267,13 @@ class Api {
       UserProfile.fromJson(await _request('GET', '/auth/me', authed: true));
 
   // ---- Memórias ----
-  Future<List<Memory>> listMemories() async {
-    final data = await _request('GET', '/memories', authed: true);
-    if (data is! List) return [];
-    return data.map((e) => Memory.fromJson(e as Map<String, dynamic>)).toList();
-  }
+  /// Uma página de memórias, da mais recente para a mais antiga.
+  ///
+  /// Passe [cursor] com o `nextCursor` da página anterior para continuar. Sem
+  /// paginar, a timeline mostrava só as 30 primeiras e escondia o resto sem
+  /// avisar — num app de preservar memórias, o pior tipo de falha.
+  Future<Page<Memory>> listMemories({int? limit, String? cursor}) =>
+      _page('/memories', Memory.fromJson, limit: limit, cursor: cursor);
 
   Future<Memory> getMemory(String id) async =>
       Memory.fromJson(await _request('GET', '/memories/$id', authed: true));
@@ -256,11 +344,9 @@ class Api {
   }
 
   // ---- Jornadas ----
-  Future<List<Journey>> listJourneys() async {
-    final data = await _request('GET', '/journeys', authed: true);
-    if (data is! List) return [];
-    return data.map((e) => Journey.fromJson(e as Map<String, dynamic>)).toList();
-  }
+  /// Uma página de jornadas, da mais recente para a mais antiga.
+  Future<Page<Journey>> listJourneys({int? limit, String? cursor}) =>
+      _page('/journeys', Journey.fromJson, limit: limit, cursor: cursor);
 
   Future<JourneyDetail> getJourney(String id) async =>
       JourneyDetail.fromJson(await _request('GET', '/journeys/$id', authed: true));

@@ -277,6 +277,14 @@ class _JourneysScreenState extends State<JourneysScreen> {
   List<Journey>? _journeys;
   String _error = '';
 
+  /// Cursor da próxima página; nulo quando a estante acabou.
+  String? _nextCursor;
+  bool _loadingMore = false;
+
+  /// Erro da PAGINAÇÃO, separado de [_error]: falhar ao buscar a próxima página
+  /// não pode apagar os capítulos já lidos.
+  String _moreError = '';
+
   @override
   void initState() {
     super.initState();
@@ -286,8 +294,14 @@ class _JourneysScreenState extends State<JourneysScreen> {
   Future<void> _load() async {
     setState(() => _error = '');
     try {
-      final data = await Api.instance.listJourneys();
-      if (mounted) setState(() => _journeys = data);
+      final page = await Api.instance.listJourneys();
+      if (mounted) {
+        setState(() {
+          _journeys = page.items;
+          _nextCursor = page.nextCursor;
+          _moreError = '';
+        });
+      }
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
@@ -295,6 +309,35 @@ class _JourneysScreenState extends State<JourneysScreen> {
         return;
       }
       setState(() => _error = e.message);
+    }
+  }
+
+  /// Busca a próxima página e ANEXA à estante.
+  Future<void> _loadMore() async {
+    final cursor = _nextCursor;
+    if (cursor == null || _loadingMore) return;
+    setState(() {
+      _loadingMore = true;
+      _moreError = '';
+    });
+    try {
+      final page = await Api.instance.listJourneys(cursor: cursor);
+      if (!mounted) return;
+      setState(() {
+        _journeys = [...?_journeys, ...page.items];
+        _nextCursor = page.nextCursor;
+        _loadingMore = false;
+      });
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      if (e.isUnauthorized) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      setState(() {
+        _moreError = e.message;
+        _loadingMore = false;
+      });
     }
   }
 
@@ -332,7 +375,15 @@ class _JourneysScreenState extends State<JourneysScreen> {
             onRefresh: _load,
             color: s.primary,
             backgroundColor: s.surface,
-            child: ListView(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) {
+                if (n.metrics.axis == Axis.vertical &&
+                    n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
+                  _loadMore();
+                }
+                return false;
+              },
+              child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(
                 SJSpace.screenX,
@@ -361,11 +412,42 @@ class _JourneysScreenState extends State<JourneysScreen> {
                       padding: const EdgeInsets.only(bottom: SJSpace.x6),
                       child: _chapterCard(journeys[i], i, s),
                     ),
+                if (_nextCursor != null) _more(s),
               ],
+            ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// Continuação da estante enquanto houver páginas. Em erro, mantém o que já
+  /// foi lido na tela e oferece o caminho de volta.
+  Widget _more(SJScheme s) {
+    if (_moreError.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: SJSpace.x6),
+        child: Column(
+          children: [
+            Text(
+              _moreError,
+              style: SJText.bodySm(color: s.inkSoft),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SJSpace.x4),
+            SJButton(
+              label: 'Carregar mais',
+              variant: SJButtonVariant.secondary,
+              onPressed: _loadMore,
+            ),
+          ],
+        ),
+      );
+    }
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: SJSpace.x8),
+      child: Center(child: SJSpinner()),
     );
   }
 

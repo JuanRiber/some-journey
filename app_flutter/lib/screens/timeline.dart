@@ -66,6 +66,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
   String _error = '';
   bool _loading = true;
 
+  /// Cursor da próxima página; nulo quando o álbum acabou.
+  String? _nextCursor;
+  bool _loadingMore = false;
+
+  /// Erro da PAGINAÇÃO, separado de [_error] de propósito: falhar ao buscar a
+  /// próxima página não pode apagar as páginas já lidas da tela.
+  String _moreError = '';
+
   /// Largura da goteira da espinha (fio + ponto) e o respiro até o conteúdo.
   static const double _railWidth = 22;
 
@@ -82,10 +90,12 @@ class _TimelineScreenState extends State<TimelineScreen> {
       if (_memories == null) _loading = true;
     });
     try {
-      final data = await Api.instance.listMemories();
+      final page = await Api.instance.listMemories();
       if (!mounted) return;
       setState(() {
-        _memories = data;
+        _memories = page.items;
+        _nextCursor = page.nextCursor;
+        _moreError = '';
         _loading = false;
       });
     } on ApiError catch (e) {
@@ -97,6 +107,38 @@ class _TimelineScreenState extends State<TimelineScreen> {
       setState(() {
         _error = e.message;
         _loading = false;
+      });
+    }
+  }
+
+  /// Busca a próxima página e ANEXA ao álbum.
+  ///
+  /// Sai cedo quando não há cursor (acabou) ou já há uma busca em voo — o
+  /// gatilho é de rolagem e dispara muitas vezes por segundo.
+  Future<void> _loadMore() async {
+    final cursor = _nextCursor;
+    if (cursor == null || _loadingMore) return;
+    setState(() {
+      _loadingMore = true;
+      _moreError = '';
+    });
+    try {
+      final page = await Api.instance.listMemories(cursor: cursor);
+      if (!mounted) return;
+      setState(() {
+        _memories = [...?_memories, ...page.items];
+        _nextCursor = page.nextCursor;
+        _loadingMore = false;
+      });
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      if (e.isUnauthorized) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      setState(() {
+        _moreError = e.message;
+        _loadingMore = false;
       });
     }
   }
@@ -120,7 +162,18 @@ class _TimelineScreenState extends State<TimelineScreen> {
         onRefresh: _load,
         color: s.primary,
         backgroundColor: s.surface,
-        child: CustomScrollView(
+        child: NotificationListener<ScrollNotification>(
+          // Antecipa a próxima página antes de bater o fim: a página seguinte
+          // costuma chegar antes de o dedo alcançar o fundo, e o álbum não dá
+          // aquele solavanco de lista que trava e destrava.
+          onNotification: (n) {
+            if (n.metrics.axis == Axis.vertical &&
+                n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
+              _loadMore();
+            }
+            return false;
+          },
+          child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
@@ -134,6 +187,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
             ),
             ..._body(s),
           ],
+          ),
         ),
       ),
     );
@@ -205,7 +259,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
       }
       children.add(_entry(s, m));
     }
-    children.add(_footer(s));
+    // O rodapé é o FIM do álbum: só entra quando não há mais o que carregar.
+    // Enquanto houver, o lugar dele é da continuação.
+    children.add(_nextCursor == null ? _footer(s) : _more(s));
 
     return [
       SliverPadding(
@@ -450,6 +506,37 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   /// Fecho do álbum: a página seguinte está em branco de propósito — e há um
   /// caminho claro para preenchê-la.
+  /// Continuação do álbum: enquanto há mais páginas, este é o pé da lista.
+  ///
+  /// Em erro NÃO some o que já foi lido — mostra o motivo e um caminho de volta,
+  /// porque a rolagem sozinha não daria ao leitor como tentar de novo.
+  Widget _more(SJScheme s) {
+    if (_moreError.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: SJSpace.x6),
+        child: Column(
+          children: [
+            Text(
+              _moreError,
+              style: SJText.bodySm(color: s.inkSoft),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SJSpace.x4),
+            SJButton(
+              label: 'Carregar mais',
+              variant: SJButtonVariant.secondary,
+              onPressed: _loadMore,
+            ),
+          ],
+        ),
+      );
+    }
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: SJSpace.x8),
+      child: Center(child: SJSpinner()),
+    );
+  }
+
   Widget _footer(SJScheme s) => Padding(
         padding: const EdgeInsets.only(top: SJSpace.x6),
         child: Column(

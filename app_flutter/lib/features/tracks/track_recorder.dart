@@ -68,6 +68,7 @@ class TrackRecorder extends ChangeNotifier {
   Future<void> start() async {
     if (_status == RecorderStatus.recording || isBusy) return;
     _set(RecorderStatus.preparing, error: '');
+    _orphan = false;
     try {
       await _source.ensurePermission();
       final track = await _api.startTrack(journeyId);
@@ -82,9 +83,12 @@ class TrackRecorder extends ChangeNotifier {
     } on LocationUnavailable catch (e) {
       _fail(e.message);
     } on ApiError catch (e) {
-      // 409: já existe um trecho aberto nesta jornada.
+      // 409: já existe um trecho aberto nesta jornada — normalmente de uma
+      // sessão que foi interrompida. Marca para a tela oferecer o encerramento
+      // em vez de deixar a pessoa presa.
+      _orphan = e.status == 409;
       _fail(e.status == 409
-          ? 'Já há uma gravação aberta nesta jornada. Encerre antes de começar outra.'
+          ? 'Ficou uma gravação aberta nesta jornada, de antes. Encerre-a para começar outra.'
           : e.message);
     } catch (_) {
       _fail('Não consegui iniciar a gravação.');
@@ -108,14 +112,42 @@ class TrackRecorder extends ChangeNotifier {
       // segue para finalizar mesmo assim
     }
     final id = _trackId;
-    _trackId = null;
     try {
       if (id != null) await _api.finishTrack(journeyId, id);
+      // O id só é esquecido quando o servidor CONFIRMA o fechamento. Zerá-lo
+      // antes, como estava, perdia a única referência para tentar de novo: o
+      // trecho ficava aberto para sempre e a próxima gravação batia em 409 sem
+      // saída nenhuma.
+      _trackId = null;
       _set(RecorderStatus.idle);
     } on ApiError catch (e) {
       _fail(e.message);
     }
   }
+
+  /// Encerra um trecho que ficou aberto de uma sessão anterior.
+  ///
+  /// Existe porque sair da tela no meio da gravação (ou perder a rede ao
+  /// encerrar) deixa o trecho `is_active` no servidor, e a próxima gravação
+  /// responde 409. Sem isto, a jornada ficava sem NENHUMA forma de gravar de
+  /// novo pelo app — um beco sem saída.
+  Future<void> closeOrphanTrack() async {
+    _set(RecorderStatus.finishing, error: '');
+    try {
+      final abertos = await _api.listTracks(journeyId);
+      for (final t in abertos.where((t) => t.isActive)) {
+        await _api.finishTrack(journeyId, t.id);
+      }
+      _trackId = null;
+      _set(RecorderStatus.idle);
+    } on ApiError catch (e) {
+      _fail(e.message);
+    }
+  }
+
+  /// Há um trecho aberto que impede uma nova gravação?
+  bool get hasOrphanTrack => _status == RecorderStatus.error && _orphan;
+  bool _orphan = false;
 
   void _onSample(TrackSample s) {
     final out = _core.offer(s);
@@ -175,6 +207,15 @@ class TrackRecorder extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
+    // Sair da tela no meio da gravação NÃO pode deixar o trecho aberto: a
+    // próxima gravação bateria em 409. `dispose` é síncrono, então o
+    // encerramento vai como melhor-esforço — e, se falhar, `closeOrphanTrack`
+    // continua sendo a saída pela tela.
+    final id = _trackId;
+    if (id != null) {
+      _trackId = null;
+      unawaited(_api.finishTrack(journeyId, id).then<void>((_) {}, onError: (_) {}));
+    }
     super.dispose();
   }
 }

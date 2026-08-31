@@ -55,6 +55,22 @@ class TrackPanel extends StatelessWidget {
               if (recorder.error.isNotEmpty) ...[
                 const SizedBox(height: SJSpace.x3),
                 Text(recorder.error, style: SJText.bodySm(color: s.danger)),
+                // Um trecho aberto de antes travaria TODA gravação futura desta
+                // jornada com 409. A saída tem de estar aqui: sem ela, a pessoa
+                // fica com um erro que não pode resolver de dentro do app.
+                if (recorder.hasOrphanTrack) ...[
+                  const SizedBox(height: SJSpace.x3),
+                  SJButton(
+                    label: 'Encerrar a gravação anterior',
+                    variant: SJButtonVariant.secondary,
+                    onPressed: recorder.isBusy
+                        ? null
+                        : () async {
+                            await recorder.closeOrphanTrack();
+                            onFinished();
+                          },
+                  ),
+                ],
               ],
               if (gravando && _aviso() != null) ...[
                 const SizedBox(height: SJSpace.x2),

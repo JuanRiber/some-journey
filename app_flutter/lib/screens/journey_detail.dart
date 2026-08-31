@@ -99,6 +99,12 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
   Future<void> _load() async {
     try {
       final data = await Api.instance.getJourney(widget.journeyId);
+      // Pausar ou finalizar a jornada PARA a gravação. Antes, o painel apenas
+      // sumia da tela e o gravador seguia vivo: GPS ligado e lotes subindo,
+      // sem nenhum botão à vista para interromper.
+      if (data.status != 'active' && (_recorder?.isRecording ?? false)) {
+        await _recorder!.stop();
+      }
       if (mounted) setState(() => _journey = data);
       await _loadMap(widget.journeyId);
     } on ApiError catch (e) {

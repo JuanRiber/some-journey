@@ -49,10 +49,26 @@ class FakeServer {
   final List<List<dynamic>> lotes = [];
   bool falharNosPontos = false;
 
+  /// Simula "já existe um trecho aberto nesta jornada".
+  bool conflitoNoStart = false;
+
+  /// Simula queda de rede no encerramento.
+  bool falharNoFinish = false;
+
+  /// Trechos que a listagem devolve (para o encerramento do órfão).
+  List<Map<String, dynamic>> abertos = const [];
+
   http.Client get client => MockClient((req) async {
         final p = req.url.path;
         rotas.add('${req.method} $p');
         if (p.endsWith('/tracks/start')) {
+          if (conflitoNoStart) {
+            return http.Response(
+              '{"detail":"Journey already has an open track."}',
+              409,
+              headers: {'content-type': 'application/json'},
+            );
+          }
           return http.Response(
             jsonEncode({
               'id': 'track-1',
@@ -74,7 +90,12 @@ class FakeServer {
           lotes.add(jsonDecode(req.body)['points'] as List);
           return http.Response('', 204);
         }
+        if (req.method == 'GET' && p.endsWith('/tracks')) {
+          return http.Response(jsonEncode(abertos), 200,
+              headers: {'content-type': 'application/json'});
+        }
         if (p.endsWith('/finish')) {
+          if (falharNoFinish) return http.Response('{"detail":"sem rede"}', 503);
           return http.Response(
             jsonEncode({
               'id': 'track-1',
@@ -261,5 +282,87 @@ void main() {
     expect(r.pointCount, 1, reason: 'parado não avança o percurso');
     await gps.fechar();
     r.dispose();
+  });
+
+  // ── Trechos que ficam abertos ─────────────────────────────────────────────
+  //
+  // O beco sem saída que estes testes fecham: sair da tela no meio da gravação
+  // (ou perder a rede ao encerrar) deixava o trecho `is_active` no servidor, e
+  // TODA gravação seguinte daquela jornada respondia 409 — sem nenhum controle
+  // no app capaz de encerrá-lo.
+
+  group('trecho que ficou aberto', () {
+    test('o id não se perde quando o encerramento falha', () async {
+      final fonte = FakeLocation();
+      final r = TrackRecorder(journeyId: 'j1', source: fonte);
+      await r.start();
+      fonte.mover(1);
+      await Future<void>.delayed(Duration.zero);
+
+      server.falharNoFinish = true;
+      await r.stop();
+
+      expect(r.error, isNotEmpty, reason: 'a falha precisa ser visível');
+      // Com a rede de volta, encerrar de novo tem de funcionar: se o id
+      // tivesse sido esquecido, não haveria o que encerrar.
+      server.falharNoFinish = false;
+      await r.stop();
+      expect(server.rotas.where((x) => x.endsWith('/finish')), hasLength(2));
+      expect(r.status, RecorderStatus.idle);
+    });
+
+    test('409 ao iniciar é sinalizado como trecho órfão', () async {
+      server.conflitoNoStart = true;
+      final r = TrackRecorder(journeyId: 'j1', source: FakeLocation());
+
+      await r.start();
+
+      expect(r.status, RecorderStatus.error);
+      expect(r.hasOrphanTrack, isTrue,
+          reason: 'a tela precisa saber que existe uma saída');
+      expect(r.error, contains('de antes'));
+    });
+
+    test('encerrar o órfão fecha os trechos ativos e destrava', () async {
+      server.conflitoNoStart = true;
+      server.abertos = [
+        {
+          'id': 'antigo',
+          'journey_id': 'j1',
+          'source': 'gps_live',
+          'started_at': '2026-08-28T10:00:00Z',
+          'ended_at': null,
+          'is_active': true,
+          'point_count': 9,
+          'distance_m': 120,
+          'created_at': '2026-08-28T10:00:00Z',
+        }
+      ];
+      final r = TrackRecorder(journeyId: 'j1', source: FakeLocation());
+      await r.start();
+
+      await r.closeOrphanTrack();
+
+      expect(server.rotas, contains('POST /journeys/j1/tracks/antigo/finish'));
+      expect(r.status, RecorderStatus.idle);
+      expect(r.error, isEmpty);
+    });
+
+    test('sair da tela encerra o trecho no servidor', () async {
+      final fonte = FakeLocation();
+      final r = TrackRecorder(journeyId: 'j1', source: fonte);
+      await r.start();
+      fonte.mover(1);
+      await Future<void>.delayed(Duration.zero);
+
+      r.dispose();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(
+        server.rotas.any((x) => x.endsWith('/finish')),
+        isTrue,
+        reason: 'sem isto o trecho fica aberto e a próxima gravação dá 409',
+      );
+    });
   });
 }

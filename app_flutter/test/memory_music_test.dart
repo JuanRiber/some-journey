@@ -22,9 +22,13 @@ import 'package:some_journey/models.dart';
 
 /// Catálogo falso: conta as buscas e devolve o que o teste mandar.
 class _CatalogoFalso implements MusicProvider {
-  _CatalogoFalso(this.resultados);
+  _CatalogoFalso(this.resultados, {this.falhaNaPrimeira = false});
 
   final List<MusicTrack> resultados;
+
+  /// Faz a PRIMEIRA busca falhar — para exercitar a recuperação do erro.
+  final bool falhaNaPrimeira;
+
   int buscas = 0;
   final List<String> termos = [];
 
@@ -36,6 +40,9 @@ class _CatalogoFalso implements MusicProvider {
     if (query.trim().length < 2) return const [];
     buscas++;
     termos.add(query);
+    if (falhaNaPrimeira && buscas == 1) {
+      throw MusicSearchError('Não consegui buscar agora.');
+    }
     return resultados;
   }
 }
@@ -229,6 +236,34 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(catalogo.buscas, 0, reason: 'uma letra é ruído, não consulta');
+    });
+  });
+
+  group('recuperação de erro na busca', () {
+    testWidgets('uma busca que falha não trava as seguintes', (tester) async {
+      // O defeito: o erro antigo continuava na tela e, como o corpo testa erro
+      // ANTES de spinner, a segunda busca nunca mostrava carregamento.
+      final catalogo = _CatalogoFalso([_faixa], falhaNaPrimeira: true);
+      original = Api.instance.swapClient(MockClient((_) async =>
+          http.Response('{}', 200, headers: {'content-type': 'application/json'})));
+
+      await montar(tester, tracks: const [], provider: catalogo);
+      await tester.tap(find.text('Escolher a música'.toUpperCase()));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(EditableText).last, 'sozinho');
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Não consegui buscar'), findsOneWidget);
+
+      await tester.enterText(find.byType(EditableText).last, 'caetano');
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Não consegui buscar'), findsNothing,
+          reason: 'o erro velho não pode sobreviver à busca seguinte');
+      expect(find.text('Sozinho'), findsOneWidget,
+          reason: 'a segunda busca precisa chegar à tela');
     });
   });
 }

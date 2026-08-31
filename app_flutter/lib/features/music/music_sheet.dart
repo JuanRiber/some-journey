@@ -62,21 +62,33 @@ class _MusicSheetState extends State<_MusicSheet> {
       });
       return;
     }
-    setState(() => _buscando = true);
+    // Limpar o erro AQUI, e não só no ramo curto: sem isso, depois de uma
+    // busca que falhou a mensagem antiga continuava na tela e o spinner das
+    // buscas seguintes nunca aparecia (o corpo testa o erro antes do spinner).
+    setState(() {
+      _buscando = true;
+      _erro = '';
+    });
     _debounce = Timer(_pausa, () => _buscar(termo));
   }
 
+  /// Cresce a cada busca disparada. O debounce cancela o Timer, mas NÃO a
+  /// requisição já em voo — sem este contador, uma resposta lenta de 'cae'
+  /// podia chegar depois da de 'caetano' e sobrescrever o resultado certo.
+  int _geracao = 0;
+
   Future<void> _buscar(String termo) async {
+    final minha = ++_geracao;
     try {
       final achados = await widget.provider.search(termo);
-      if (!mounted) return;
+      if (!mounted || minha != _geracao) return;
       setState(() {
         _resultados = achados;
         _buscando = false;
         _erro = '';
       });
     } on MusicSearchError catch (e) {
-      if (!mounted) return;
+      if (!mounted || minha != _geracao) return;
       // Música é enfeite da memória, nunca bloqueio: a falha é uma frase calma,
       // e a lembrança segue registrável sem ela.
       setState(() {

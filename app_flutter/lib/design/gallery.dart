@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart' show Icons;
+import 'package:flutter/material.dart' show Icons, Slider;
 import 'package:flutter/widgets.dart';
 
+import '../features/hero/light_domain.dart';
 import 'components.dart';
 import 'sj_theme.dart';
 import 'tokens.dart';
@@ -137,9 +138,89 @@ class _GalleryPanel extends StatelessWidget {
                 ),
               ),
             ),
+
+            const _Block(
+              numeral: '09',
+              overline: 'HERÓI',
+              title: 'A viagem, em luz',
+              child: _LightGate(),
+            ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// # Portão de revisão da iluminação do herói.
+///
+/// Existe para uma decisão ser tomada ANTES de encomendar arte: a trilha de
+/// luz é aplicada à ilustração que já existe, com um controle de posição, para
+/// o dono julgar quente/frio/túnel/entardecer sem custo de asset.
+///
+/// O tinte aqui banha o cartaz inteiro, e não só o interior do vagão — na cena
+/// final ele atinge apenas o interior, porque a paisagem tem luz própria. Para
+/// aprovar a TRILHA, que é o que está em jogo, isto basta.
+class _LightGate extends StatefulWidget {
+  const _LightGate();
+
+  @override
+  State<_LightGate> createState() => _LightGateState();
+}
+
+class _LightGateState extends State<_LightGate> {
+  double _fase = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
+    final noturno = s.brightness == Brightness.dark;
+    final trilha =
+        noturno ? LightTrack.scenic.toNight() : LightTrack.scenic;
+    final luz = trilha.at(_fase);
+
+    // Que zona está mais perto — para o rótulo dizer onde o trem está.
+    final zona = trilha.zones.reduce((a, b) {
+      double dist(LightZone z) {
+        final d = (z.at - _fase).abs();
+        return d > 0.5 ? 1 - d : d;
+      }
+
+      return dist(a) <= dist(b) ? a : b;
+    });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(2),
+          child: AspectRatio(
+            aspectRatio: 2.25,
+            child: ColorFiltered(
+              colorFilter: ColorFilter.matrix(luz.colorMatrix),
+              child: Image.asset(
+                'assets/images/first-class-art.jpg',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: SJSpace.x3),
+        Slider(
+          value: _fase,
+          activeColor: s.primary,
+          onChanged: (v) => setState(() => _fase = v),
+        ),
+        Text(
+          '${zona.name} · luz ${(luz.exposure * 100).round()}% · '
+          'abajur ${(luz.lamp * 100).round()}% · '
+          '${luz.warmth >= 0 ? "quente" : "fria"}',
+          style: SJText.caption(color: s.inkSoft).copyWith(
+            fontFamily: SJType.mono,
+            fontFamilyFallback: SJType.monoFallback,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../design/components.dart';
-import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../widgets/api_error_view.dart';
 import '../features/profile/profile_models.dart';
 import 'profile_edit.dart';
 
@@ -37,7 +37,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   Profile? _profile;
-  String _error = '';
+  ApiError? _error;
 
   @override
   void initState() {
@@ -46,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _error = '');
+    setState(() => _error = null);
     try {
       final data = await Api.instance.getProfile();
       if (mounted) setState(() => _profile = data);
@@ -56,9 +56,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
-      setState(() => _error = e.message);
+      setState(() => _error = e);
     } catch (_) {
-      if (mounted) setState(() => _error = 'Não foi possível carregar seu perfil.');
+      // Não veio da API: é o parsing do perfil que quebrou aqui dentro. Fica
+      // como falha de requisição para a tela manter o próprio título.
+      if (mounted) {
+        setState(() => _error = ApiError(0, 'Não foi possível carregar seu perfil.',
+            kind: ApiFailure.request));
+      }
     }
   }
 
@@ -78,18 +83,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _body(SJScheme s) {
-    if (_error.isNotEmpty) {
+    final falha = _error;
+    if (falha != null) {
       return ListView(
         padding: const EdgeInsets.all(SJSpace.screenX),
         children: [
           _topBar(s),
           const SizedBox(height: SJSpace.x8),
-          SJEmptyState(
-            illustration: const SJIllustration(kind: SJIllustrationKind.error, size: 120),
-            title: 'Seu perfil não abriu',
-            body: _error,
-            actionLabel: 'Tentar de novo',
-            onAction: _load,
+          ApiErrorView(
+            error: falha,
+            fallbackTitle: 'Seu perfil não abriu',
+            onRetry: _load,
+            illustrationSize: 120,
           ),
         ],
       );

@@ -20,12 +20,62 @@ const apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://127.0.0.1
 const _timeout = Duration(seconds: 20);
 const _tokenKey = 'sj_access_token';
 
+/// Natureza da falha, para a tela saber que notícia dar.
+///
+/// Um 500 e um 422 chegavam aqui como a mesma coisa — um status e um texto — e
+/// a tela mostrava o texto. Só que "o servidor caiu" e "faltou o título" pedem
+/// reações opostas: a primeira passa sozinha e vale tentar de novo, a segunda
+/// só sai do lugar se a pessoa corrigir algo. Sem essa distinção o app oferecia
+/// "Tentar de novo" para erros que nunca vão passar.
+enum ApiFailure {
+  /// Não chegou a sair: sem rede, DNS que não resolve, conexão recusada.
+  offline,
+
+  /// Saiu, e ninguém respondeu dentro do tempo.
+  timeout,
+
+  /// O servidor está de pé mas não está atendendo — 502, 503, 504. É o formato
+  /// de um deploy no ar, de uma manutenção, ou do contêiner que morreu atrás da
+  /// borda: a borda responde, o serviço não.
+  unavailable,
+
+  /// O servidor recebeu, tentou e quebrou (500 e os demais 5xx).
+  serverError,
+
+  /// A requisição é que não serve (4xx): sessão expirada, campo inválido,
+  /// recurso que não existe.
+  request,
+}
+
 class ApiError implements Exception {
   final int status;
   final String message;
-  ApiError(this.status, this.message);
+
+  /// Deduzida do status quando não informada, para que os pontos que já
+  /// levantavam `ApiError` continuem corretos sem mudar de assinatura.
+  final ApiFailure kind;
+
+  /// Quanto o servidor pediu para esperar (header `Retry-After`), quando pede.
+  /// É o único sinal de manutenção programada que o HTTP oferece de fato.
+  final Duration? retryAfter;
+
+  ApiError(this.status, this.message, {ApiFailure? kind, this.retryAfter})
+      : kind = kind ?? kindOf(status);
+
+  static ApiFailure kindOf(int status) {
+    if (status == 0) return ApiFailure.offline;
+    if (status == 502 || status == 503 || status == 504) return ApiFailure.unavailable;
+    if (status >= 500) return ApiFailure.serverError;
+    return ApiFailure.request;
+  }
+
   bool get isUnauthorized => status == 401;
   bool get isNotFound => status == 404 || status == 422;
+
+  /// A culpa não é do que a pessoa pediu — é do servidor ou do caminho até ele.
+  /// Ou seja: tentar de novo é uma ação que faz sentido oferecer.
+  bool get isOutage => kind != ApiFailure.request;
+
   @override
   String toString() => message;
 }
@@ -109,6 +159,59 @@ class Api {
         if (authed && _token != null) 'Authorization': 'Bearer $_token',
       };
 
+  /// Traduz uma resposta de erro no `ApiError` que a tela vai mostrar.
+  ///
+  /// O corpo do servidor só é aproveitado em 4xx, onde a API escreve frases
+  /// pensadas para quem está usando o app ("Essa jornada já tem um trecho
+  /// aberto"). Em 5xx o que chega é "Internal Server Error" — ou a página HTML
+  /// que o proxy devolve quando o contêiner não sobe. É texto de
+  /// infraestrutura, em inglês, que não diz nada a quem está do outro lado e
+  /// ainda conta o que quebrou. Nesses casos a frase é nossa.
+  ApiError _errorFor(http.Response r) {
+    final kind = ApiError.kindOf(r.statusCode);
+    final espera = _retryAfter(r);
+    return switch (kind) {
+      ApiFailure.unavailable => ApiError(
+          r.statusCode,
+          'O servidor está fora do ar no momento. Tente de novo ${_quando(espera)}.',
+          kind: kind,
+          retryAfter: espera,
+        ),
+      ApiFailure.serverError => ApiError(
+          r.statusCode,
+          'Algo quebrou do nosso lado ao atender seu pedido. Tente de novo em instantes.',
+          kind: kind,
+        ),
+      _ => ApiError(r.statusCode, _detail(r), kind: kind),
+    };
+  }
+
+  /// Lê o `Retry-After` em SEGUNDOS.
+  ///
+  /// O header também admite uma data HTTP, que é ignorada de propósito: parsear
+  /// data depende de `dart:io`, que não existe no alvo web, e um valor mal lido
+  /// viraria uma promessa errada na tela. Sem número, a frase fica genérica.
+  Duration? _retryAfter(http.Response r) {
+    final bruto = r.headers['retry-after'];
+    if (bruto == null) return null;
+    final segundos = int.tryParse(bruto.trim());
+    if (segundos == null || segundos <= 0) return null;
+    return Duration(seconds: segundos);
+  }
+
+  /// A espera em palavras. Sem número do servidor, "em instantes" — que promete
+  /// pouco de propósito, porque nós não sabemos.
+  String _quando(Duration? espera) {
+    if (espera == null) return 'em instantes';
+    if (espera.inMinutes < 1) return 'em alguns segundos';
+    if (espera.inMinutes < 60) {
+      final m = espera.inMinutes;
+      return 'em $m ${m == 1 ? 'minuto' : 'minutos'}';
+    }
+    final h = espera.inHours;
+    return 'em $h ${h == 1 ? 'hora' : 'horas'}';
+  }
+
   /// Extrai a mensagem do corpo {"detail": ...} (string ou lista do Pydantic).
   String _detail(http.Response r) {
     try {
@@ -149,11 +252,12 @@ class Api {
         _ => throw ArgumentError(method),
       };
     } on TimeoutException {
-      throw ApiError(0, 'O servidor demorou a responder. Tente de novo.');
+      throw ApiError(0, 'O servidor demorou a responder. Tente de novo.',
+          kind: ApiFailure.timeout);
     } catch (_) {
       throw ApiError(0, 'Sem conexão com o servidor.');
     }
-    if (r.statusCode >= 400) throw ApiError(r.statusCode, _detail(r));
+    if (r.statusCode >= 400) throw _errorFor(r);
     return r;
   }
 
@@ -297,7 +401,7 @@ class Api {
   Future<dynamic> _uploadJson(
       String path, List<int> bytes, String filename, String mimeType) async {
     final r = await _sendMultipart(path, bytes, filename, mimeType);
-    if (r.statusCode >= 400) throw ApiError(r.statusCode, _detail(r));
+    if (r.statusCode >= 400) throw _errorFor(r);
     if (r.bodyBytes.isEmpty) return null;
     return jsonDecode(utf8.decode(r.bodyBytes));
   }
@@ -316,7 +420,8 @@ class Api {
     try {
       return await http.Response.fromStream(await req.send().timeout(_timeout));
     } on TimeoutException {
-      throw ApiError(0, 'O upload demorou demais. Tente de novo.');
+      throw ApiError(0, 'O upload demorou demais. Tente de novo.',
+          kind: ApiFailure.timeout);
     } catch (_) {
       throw ApiError(0, 'Sem conexão com o servidor.');
     }
@@ -336,11 +441,12 @@ class Api {
     try {
       r = await http.Response.fromStream(await req.send().timeout(_timeout));
     } on TimeoutException {
-      throw ApiError(0, 'O upload demorou demais. Tente de novo.');
+      throw ApiError(0, 'O upload demorou demais. Tente de novo.',
+          kind: ApiFailure.timeout);
     } catch (_) {
       throw ApiError(0, 'Sem conexão com o servidor.');
     }
-    if (r.statusCode >= 400) throw ApiError(r.statusCode, _detail(r));
+    if (r.statusCode >= 400) throw _errorFor(r);
   }
 
   // ---- Música da memória ----

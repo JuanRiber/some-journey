@@ -6,6 +6,7 @@ import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../models.dart';
+import '../widgets/api_error_view.dart';
 
 // ---------------------------------------------------------------------------
 // Vocabulário compartilhado da lane de jornadas
@@ -275,7 +276,7 @@ class JourneysScreen extends StatefulWidget {
 
 class _JourneysScreenState extends State<JourneysScreen> {
   List<Journey>? _journeys;
-  String _error = '';
+  ApiError? _error;
 
   /// Cursor da próxima página; nulo quando a estante acabou.
   String? _nextCursor;
@@ -292,7 +293,7 @@ class _JourneysScreenState extends State<JourneysScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _error = '');
+    setState(() => _error = null);
     try {
       final page = await Api.instance.listJourneys();
       if (mounted) {
@@ -308,7 +309,7 @@ class _JourneysScreenState extends State<JourneysScreen> {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
-      setState(() => _error = e.message);
+      setState(() => _error = e);
     }
   }
 
@@ -400,7 +401,7 @@ class _JourneysScreenState extends State<JourneysScreen> {
                 const SizedBox(height: SJSpace.x2),
                 Text(_headline(journeys), style: journeyMoodStyle(s)),
                 const SizedBox(height: SJSpace.x8),
-                if (_error.isNotEmpty)
+                if (_error != null)
                   _errorState(s)
                 else if (journeys == null)
                   _loadingState()
@@ -496,12 +497,10 @@ class _JourneysScreenState extends State<JourneysScreen> {
     onAction: _openNew,
   );
 
-  Widget _errorState(SJScheme s) => SJEmptyState(
-    illustration: const SJIllustration(kind: SJIllustrationKind.error),
-    title: 'Não foi possível abrir suas jornadas',
-    body: _error,
-    actionLabel: 'Tentar de novo',
-    onAction: _load,
+  Widget _errorState(SJScheme s) => ApiErrorView(
+    error: _error!,
+    fallbackTitle: 'Não foi possível abrir suas jornadas',
+    onRetry: _load,
   );
 
   /// Um capítulo. Com capa, a FOTO manda (o texto só complementa dentro do

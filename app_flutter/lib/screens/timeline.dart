@@ -6,6 +6,7 @@ import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../models.dart';
+import '../widgets/api_error_view.dart';
 
 const _meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
@@ -63,7 +64,7 @@ class TimelineScreen extends StatefulWidget {
 
 class _TimelineScreenState extends State<TimelineScreen> {
   List<Memory>? _memories;
-  String _error = '';
+  ApiError? _error;
   bool _loading = true;
 
   /// Cursor da próxima página; nulo quando o álbum acabou.
@@ -85,7 +86,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   Future<void> _load() async {
     setState(() {
-      _error = '';
+      _error = null;
       // Esqueleto só na primeira carga: num refresh o álbum antigo continua lá.
       if (_memories == null) _loading = true;
     });
@@ -105,7 +106,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
         return;
       }
       setState(() {
-        _error = e.message;
+        _error = e;
         _loading = false;
       });
     }
@@ -196,16 +197,15 @@ class _TimelineScreenState extends State<TimelineScreen> {
   /// Corpo por estado. Vazio/erro ocupam o resto da viewport (centralizados) —
   /// um estado vazio encostado no topo parece bug, não convite.
   List<Widget> _body(SJScheme s) {
-    if (_error.isNotEmpty) {
+    final falha = _error;
+    if (falha != null) {
       return [
         SliverFillRemaining(
           hasScrollBody: false,
-          child: SJEmptyState(
-            illustration: const SJIllustration(kind: SJIllustrationKind.error),
-            title: 'Não conseguimos abrir seu álbum.',
-            body: _error,
-            actionLabel: 'Tentar de novo',
-            onAction: _load,
+          child: ApiErrorView(
+            error: falha,
+            fallbackTitle: 'Não conseguimos abrir seu álbum.',
+            onRetry: _load,
           ),
         ),
       ];
@@ -303,7 +303,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
   /// "156 memórias".
   String _narrative() {
     final memories = _memories;
-    if (memories == null || memories.isEmpty || _error.isNotEmpty) {
+    if (memories == null || memories.isEmpty || _error != null) {
       return 'As memórias do seu atlas em ordem viva.';
     }
     if (memories.length == 1) return 'A primeira página do seu álbum.';

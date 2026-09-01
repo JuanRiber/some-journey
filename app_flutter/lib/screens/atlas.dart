@@ -6,6 +6,7 @@ import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../models.dart';
+import '../widgets/api_error_view.dart';
 import '../widgets/atlas_map.dart';
 
 /// # Atlas — a capa do produto (aba padrão pós-login)
@@ -42,7 +43,7 @@ class AtlasScreen extends StatefulWidget {
 
 class _AtlasScreenState extends State<AtlasScreen> {
   MapResponse? _map;
-  String _error = '';
+  ApiError? _error;
   bool _loading = true;
 
   @override
@@ -53,7 +54,7 @@ class _AtlasScreenState extends State<AtlasScreen> {
 
   Future<void> _load() async {
     setState(() {
-      _error = '';
+      _error = null;
       // Só mostramos o esqueleto quando ainda não há mapa em tela; num
       // pull-to-refresh o conteúdo antigo fica visível (o indicador já informa).
       if (_map == null) _loading = true;
@@ -72,7 +73,7 @@ class _AtlasScreenState extends State<AtlasScreen> {
         return;
       }
       setState(() {
-        _error = e.message;
+        _error = e;
         _loading = false;
       });
     }
@@ -118,17 +119,13 @@ class _AtlasScreenState extends State<AtlasScreen> {
                   ),
                   sliver: SliverToBoxAdapter(child: _header(s)),
                 ),
-                if (_error.isNotEmpty)
+                if (_error != null)
                   SliverFillRemaining(
                     hasScrollBody: false,
-                    child: SJEmptyState(
-                      illustration: const SJIllustration(
-                        kind: SJIllustrationKind.error,
-                      ),
-                      title: 'Não conseguimos abrir seu atlas.',
-                      body: _error,
-                      actionLabel: 'Tentar de novo',
-                      onAction: _load,
+                    child: ApiErrorView(
+                      error: _error!,
+                      fallbackTitle: 'Não conseguimos abrir seu atlas.',
+                      onRetry: _load,
                     ),
                   )
                 else if (_loading)
@@ -212,9 +209,9 @@ class _AtlasScreenState extends State<AtlasScreen> {
             ],
           ),
           const SizedBox(height: SJSpace.x2),
-          if (_loading && _error.isEmpty)
+          if (_loading && _error == null)
             _SkeletonBar(scheme: s, width: 240)
-          else if (_error.isEmpty && _map != null && _map!.totalPoints > 0)
+          else if (_error == null && _map != null && _map!.totalPoints > 0)
             Text(_narrative(_map!), style: _diaryItalic(s)),
         ],
       );

@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:some_journey/api.dart';
+import 'package:some_journey/design/components.dart';
 import 'package:some_journey/features/music/memory_music_section.dart';
 import 'package:some_journey/features/music/music_provider.dart';
 import 'package:some_journey/models.dart';
@@ -257,11 +258,20 @@ void main() {
       expect(find.textContaining('Não consegui buscar'), findsOneWidget);
 
       await tester.enterText(find.byType(EditableText).last, 'caetano');
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.pumpAndSettle();
+      // UMA frame, antes do debounce: o estado de carregamento é assumido assim
+      // que a pessoa digita. É aqui que o defeito aparecia — e é por isso que o
+      // spinner é a afirmação, e não o resultado. Afirmar só o resultado deixa
+      // passar a versão quebrada, porque a busca que vem depois limpa o erro
+      // sozinha ao dar certo.
+      await tester.pump();
 
+      expect(find.byType(SJSpinner), findsOneWidget,
+          reason: 'o erro velho escondia o carregamento das buscas seguintes');
       expect(find.textContaining('Não consegui buscar'), findsNothing,
           reason: 'o erro velho não pode sobreviver à busca seguinte');
+
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester.pumpAndSettle();
       expect(find.text('Sozinho'), findsOneWidget,
           reason: 'a segunda busca precisa chegar à tela');
     });

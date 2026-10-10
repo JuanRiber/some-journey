@@ -96,8 +96,10 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                       : ListView(
                           padding: const EdgeInsets.fromLTRB(28, 8, 28, 48),
                           children: [
-                            Text(m.title, style: serif(28, height: 1.2)),
-                            const SizedBox(height: 8),
+                            if (m.hasTitle) ...[
+                              Text(m.title, style: serif(28, height: 1.2)),
+                              const SizedBox(height: 8),
+                            ],
                             Row(
                               children: [
                                 Container(

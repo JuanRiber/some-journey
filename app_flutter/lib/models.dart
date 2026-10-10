@@ -8,6 +8,13 @@ class MemoryImage {
       MemoryImage(id: j['id'] as String, url: j['url'] as String);
 }
 
+/// Uma memória pode não ter título.
+///
+/// O título deixou de ser obrigatório porque exigir um rótulo para guardar uma
+/// lembrança trocava o conteúdo pelo índice: a pessoa era obrigada a inventar
+/// "Praia" e podia deixar em branco justamente o que aconteceu. Vazio é "" e
+/// não null, igual ao texto — dois jeitos de dizer "não tem" viram dois
+/// caminhos em cada tela.
 class Memory {
   final String id;
   final String title;
@@ -25,6 +32,9 @@ class Memory {
   /// Cada item carrega o `id` do vínculo (para remover) além do snapshot da
   /// faixa — por isso não é uma lista de [MusicTrack] pura.
   final List<SavedTrack> music;
+
+  /// Título em branco não é erro: é uma memória que dispensou rótulo.
+  bool get hasTitle => title.trim().isNotEmpty;
 
   Memory({
     required this.id,
@@ -159,6 +169,9 @@ class JourneyPoint {
   final double longitude;
   final String occurredAt;
   final int? position;
+
+  /// Título em branco não é erro: é uma memória que dispensou rótulo.
+  bool get hasTitle => title.trim().isNotEmpty;
 
   JourneyPoint({
     required this.memoryId,

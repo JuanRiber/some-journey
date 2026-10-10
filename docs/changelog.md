@@ -123,3 +123,31 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   deixa de ter um provedor de música que não leva a lugar nenhum.
 - A busca **espera a digitação pausar** (350ms). Sem isso, escrever "caetano"
   dispararia sete requisições a um catálogo público para uma única intenção.
+
+## 2026-10-10
+
+### Regras de negócio
+- O **título da memória passou a ser opcional**, resolvendo a divergência aberta
+  desde 28/06. A intenção de produto sempre foi essa; a API é que exigia
+  `title` não vazio. Exigir um rótulo para poder guardar uma lembrança trocava o
+  conteúdo pelo índice: a pessoa era obrigada a inventar "Praia" e podia deixar
+  em branco justamente o que aconteceu.
+- Ausente é `""`, não nulo — a mesma convenção do texto. Dois jeitos de dizer
+  "não tem" viram dois caminhos em cada tela, e a coluna é `NOT NULL`, então
+  nenhuma migration foi necessária.
+- No `PATCH`, string vazia **apaga** o título e `null` não mexe nele, como já
+  valia para os demais campos.
+- A mudança é **retrocompatível**: a API passou a aceitar mais, não a exigir
+  mais. Nenhum cliente existente quebra.
+- Continua em aberto a outra metade da divergência: o **texto** deveria ser o
+  núcleo da memória e segue opcional. Torná-lo obrigatório quebraria os dois
+  clientes e invalidaria o acervo já gravado com `text = ""` — decisão que
+  precisa vir antes do código.
+
+### Documentação
+- [`01-regras-negocio.md`](01-regras-negocio.md): título registrado como
+  opcional; a entrada do texto passou a explicar o que falta decidir.
+- [`03-api-planejada.md`](03-api-planejada.md): o exemplo de criar memória agora
+  diz que obrigatórios mesmo são o local e o `occurred_at`.
+- README: a linha do título saiu de **Divergencias conhecidas**; a do texto
+  ficou, reescrita.

@@ -15,10 +15,13 @@
 - Precisa de **localização** (latitude/longitude). **(impl.)**
 - Precisa de **data do acontecimento** (`occurred_at`), separada de `created_at`. **(impl.)**
 - **Texto** deveria ser o núcleo da memória; **hoje a API o trata como opcional**
-  (`text` tem default `""`, máx. 5000 chars) — o inverso do título. **(impl. — divergência)**
+  (`text` tem default `""`, máx. 5000 chars). Com o título agora opcional, os dois
+  são dispensáveis: uma memória pode ser só data e lugar. Tornar o texto
+  obrigatório segue em aberto — quebraria os clientes e o acervo já gravado.
+  **(impl. — divergência)**
 - **Foto** é opcional; até **5 por memória**. **(impl.)**
-- **Título**: a intenção do produto é ser opcional; **hoje a API exige título não vazio**
-  (1–120 chars). Reavaliar quando for o caso. **(impl. — divergência)**
+- **Título**: **opcional**, até 120 chars. Ausente é `""`, não nulo — a mesma
+  convenção do texto, para não haver dois jeitos de dizer "não tem". **(impl.)**
 - Pode ser vinculada a uma jornada **depois** de criada. **(impl.)**
 - Excluir uma jornada **não apaga** as memórias. **(impl.)**
 - Exclusão é **soft delete** (`deleted_at`). **(impl.)**

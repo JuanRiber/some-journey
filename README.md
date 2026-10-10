@@ -384,7 +384,7 @@ seis meses.
 
 | Divergencia | Situacao |
 | --- | --- |
-| Titulo da memoria e obrigatorio; texto e opcional | O produto pede o contrario: o texto e o nucleo da memoria e o titulo deveria ser opcional. Hoje `MemoryCreate` exige `title` e aceita `text` vazio. Ver `01-regras-negocio.md`. |
+| Texto da memoria e opcional | O produto pede que o texto seja o nucleo da memoria. O titulo ja deixou de ser obrigatorio; exigir o texto quebraria os dois clientes e o acervo ja gravado, entao segue em aberto. Ver `01-regras-negocio.md`. |
 | Uma memoria por jornada | Limite do MVP, garantido por indice unico parcial em `journey_memories.memory_id`. A modelagem ja suporta varias jornadas — basta trocar a constraint. |
 | `memories.image_path` | Coluna legada da epoca de uma foto so; as fotos atuais vivem em `memory_images`. |
 | Mapa em Mapbox | Planejado. Hoje o Flutter usa `flutter_map` com tiles OSM/CartoDB e o backend entrega pins e rastros independente do provedor visual. |

@@ -456,18 +456,24 @@ class _TimelineScreenState extends State<TimelineScreen> {
     return SJCard(
       padding: const EdgeInsets.all(SJSpace.x5),
       onTap: () => _openMemory(m.id),
-      semanticLabel: '${m.title}, ${_dayMonth(m.occurredAt)}',
+      // Sem titulo, o rotulo acessivel e a data — nunca uma virgula solta.
+      semanticLabel: m.hasTitle
+          ? '${m.title}, ${_dayMonth(m.occurredAt)}'
+          : _dayMonth(m.occurredAt),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SJOverline(_dayMonth(m.occurredAt)),
           const SizedBox(height: SJSpace.x2),
-          Text(
-            m.title,
-            style: SJText.h2(color: s.ink),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
+          // O cartao ja abre com a data no overline: sem titulo ele some, em
+          // vez de deixar uma linha em branco que parece defeito.
+          if (m.hasTitle)
+            Text(
+              m.title,
+              style: SJText.h2(color: s.ink),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           if (excerpt.isNotEmpty) ...[
             const SizedBox(height: SJSpace.x2),
             Text(

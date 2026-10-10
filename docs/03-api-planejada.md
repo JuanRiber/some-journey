@@ -115,7 +115,8 @@ para contá-las. Ver [`09-perfil.md`](09-perfil.md).
 
 ## Exemplos de payload
 
-Criar memória (`text` é opcional hoje; ver a divergência em [`01-regras-negocio.md`](01-regras-negocio.md)):
+Criar memória (`title` e `text` são opcionais; obrigatórios mesmo são local e
+`occurred_at` — ver [`01-regras-negocio.md`](01-regras-negocio.md)):
 ```json
 {
   "title": "Lugar que encontrei caminhando",

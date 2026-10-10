@@ -21,6 +21,18 @@ class JourneyDetailScreen extends StatefulWidget {
   State<JourneyDetailScreen> createState() => _JourneyDetailScreenState();
 }
 
+/// Data curta para identificar uma memória sem título.
+///
+/// Numérica de propósito: a tabela de meses já está repetida em seis arquivos
+/// deste app e um sétimo não ajudaria ninguém. `occurred_at` é canonicamente o
+/// DIA em UTC, então formatamos pelas partes UTC — pelo fuso do aparelho a data
+/// vazaria para o dia anterior.
+String _diaCurto(String iso) {
+  final d = DateTime.parse(iso).toUtc();
+  return '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/${d.year}';
+}
+
 class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
   JourneyDetail? _journey;
   String _error = '';
@@ -391,8 +403,11 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(p.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: serif(16)),
-                    const SizedBox(height: 2),
+                    if (p.hasTitle) ...[
+                      Text(p.title,
+                          maxLines: 1, overflow: TextOverflow.ellipsis, style: serif(16)),
+                      const SizedBox(height: 2),
+                    ],
                     Text(
                       '${p.latitude.toStringAsFixed(3)}, ${p.longitude.toStringAsFixed(3)}',
                       style: const TextStyle(color: SJColors.inkSoft, fontSize: 12),
@@ -456,7 +471,11 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                     child: Row(
                       children: [
                         Expanded(
-                          child: Text(m.title,
+                          // Esta lista existe para ESCOLHER uma memória entre
+                          // outras, e o título é o único discriminador. Sem ele
+                          // a linha fica anônima e a escolha vira sorteio —
+                          // então aqui, e só aqui, a data entra no lugar.
+                          child: Text(m.hasTitle ? m.title : _diaCurto(m.occurredAt),
                               maxLines: 1, overflow: TextOverflow.ellipsis, style: serif(16)),
                         ),
                         TextButton(

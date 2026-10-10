@@ -23,8 +23,15 @@ class MemoryCreate(BaseModel):
     # extra="forbid": bloqueia campos não declarados (ex.: image_path, user_id).
     model_config = ConfigDict(extra="forbid")
 
-    title: str = Field(min_length=1, max_length=120)
-    # Descrição OPCIONAL: uma memória precisa só de título + data + local.
+    # Título OPCIONAL: uma memória precisa de data e lugar, não de um rótulo.
+    # Exigir um obrigava a pessoa a inventar uma etiqueta ("Praia", "Jantar")
+    # para poder guardar a lembrança — pedia o índice e dispensava o conteúdo.
+    # Vazio é "" e não NULL, pela mesma razão que `text`: a coluna é NOT NULL, e
+    # dois jeitos de dizer "não tem" (NULL e "") viram dois caminhos em cada
+    # cliente.
+    title: str = Field(default="", max_length=120)
+    # Descrição OPCIONAL: o texto ainda não é exigido. Ver a divergência aberta
+    # em docs/01-regras-negocio.md — o produto quer o texto como núcleo.
     text: str = Field(default="", max_length=5000)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
@@ -38,7 +45,9 @@ class MemoryUpdate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    title: str | None = Field(default=None, min_length=1, max_length=120)
+    # Sem min_length: string vazia LIMPA o título. É a convenção do PATCH aqui —
+    # `null` não mexe no campo, `""` apaga.
+    title: str | None = Field(default=None, max_length=120)
     text: str | None = Field(default=None, max_length=5000)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)

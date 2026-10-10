@@ -34,10 +34,6 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
 
   Future<void> _onSave() async {
     setState(() => _error = '');
-    if (_title.text.trim().isEmpty) {
-      setState(() => _error = 'Dê um título à memória.');
-      return;
-    }
     if (_lat == null || _lng == null) {
       setState(() => _error = 'Escolha um local: busque ou toque no mapa.');
       return;

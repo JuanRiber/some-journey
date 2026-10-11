@@ -451,7 +451,11 @@ class Api {
       contentType: parts.length == 2 ? MediaType(parts[0], parts[1]) : null,
     ));
     try {
-      return await http.Response.fromStream(await req.send().timeout(apiUploadTimeout));
+      // Pelo cliente injetável, e NÃO por `req.send()`: aquele fabrica um
+      // cliente próprio lá dentro, que `swapClient` não alcança — é o que
+      // deixava todo envio de imagem fora do alcance de um teste.
+      final enviada = await _client.send(req).timeout(apiUploadTimeout);
+      return await http.Response.fromStream(enviada);
     } on TimeoutException {
       throw ApiError(0, 'O upload demorou demais. Tente de novo.',
           kind: ApiFailure.timeout);
@@ -558,6 +562,30 @@ class Api {
 
   Future<Journey> updateJourney(String id, Map<String, dynamic> patch) async =>
       Journey.fromJson(await _request('PATCH', '/journeys/$id', body: patch, authed: true));
+
+  /// Define a capa da jornada e devolve a jornada já atualizada, com a URL
+  /// assinada pronta para a lista — sem segunda leitura.
+  ///
+  /// O [mimeType] vai no multipart por educação, mas NÃO é o que decide: o
+  /// backend fareja os magic bytes do conteúdo (`sniff_image_type`) e recusa
+  /// com 400 o que não for JPEG, PNG ou WebP, por mais que o cabeçalho prometa.
+  /// Acima de 5 MB (`MAX_IMAGE_BYTES`) a resposta é 413 — por isso quem escolhe
+  /// a foto reduz antes de enviar.
+  Future<Journey> setJourneyCover(
+    String id,
+    List<int> bytes,
+    String filename,
+    String mimeType,
+  ) async =>
+      Journey.fromJson(
+          await _uploadJson('/journeys/$id/cover', bytes, filename, mimeType));
+
+  /// Tira a capa ESCOLHIDA (idempotente). A jornada não fica necessariamente
+  /// sem capa: o backend volta ao automático — a primeira foto do rastro —, e é
+  /// por isso que a resposta pode trazer `cover_image_url` preenchida mesmo
+  /// depois de remover.
+  Future<Journey> removeJourneyCover(String id) async =>
+      Journey.fromJson(await _request('DELETE', '/journeys/$id/cover', authed: true));
 
   Future<void> deleteJourney(String id) => _request('DELETE', '/journeys/$id', authed: true);
 

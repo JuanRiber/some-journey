@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
 import '../design/components.dart';
@@ -20,6 +21,12 @@ import '../models.dart';
 ///
 /// O ciclo de vida (iniciar, pausar, concluir) NÃO mora aqui: são transições
 /// com regra própria, e vivem no detalhe da jornada.
+///
+/// A capa também mora aqui, e fora do formulário: ela salva no próprio gesto de
+/// escolher, como a foto do perfil. É upload, não campo — segurá-la até o
+/// "Salvar" só criaria um estado em que a imagem já subiu e a tela finge que
+/// não. A lista de jornadas desenha essa capa desde sempre; até agora nenhuma
+/// tela sabia defini-la, e o campo só podia chegar vazio.
 
 /// Monta o corpo do PATCH com o que REALMENTE mudou.
 ///
@@ -71,8 +78,14 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
   Journey? _original;
   bool _isPrivate = true;
   bool _saving = false;
+  bool _enviandoCapa = false;
   String _error = '';
   String _loadError = '';
+
+  /// A capa já foi gravada no servidor, mesmo que nenhum campo tenha mudado.
+  /// É o que faz a tela de detalhe recarregar ao voltar: sem isso, quem só
+  /// trocou a foto continuaria vendo a capa antiga até a próxima leitura.
+  bool _capaMudou = false;
 
   @override
   void initState() {
@@ -138,9 +151,10 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
       mood: _mood.text,
       isPrivate: _isPrivate,
     );
-    // Nada mudou: voltar é a resposta honesta, não uma requisição vazia.
+    // Nada mudou nos campos: voltar é a resposta honesta, não uma requisição
+    // vazia. Ainda assim a capa pode ter mudado — ela não passa pelo PATCH.
     if (patch.isEmpty) {
-      Navigator.of(context).pop(false);
+      Navigator.of(context).pop(_capaMudou);
       return;
     }
 
@@ -160,6 +174,84 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
         _error = e.message;
         _saving = false;
       });
+    }
+  }
+
+  /// Escolhe a capa e já envia.
+  ///
+  /// Reduz ANTES de subir: o teto do backend é 5 MB e uma foto de câmera passa
+  /// disso com folga — o 413 chegaria depois de a pessoa ter esperado o envio
+  /// inteiro. 2048 é generoso para uma capa que ocupa a largura da tela.
+  Future<void> _escolherCapa() async {
+    final o = _original;
+    if (o == null) return;
+    final escolhida = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 85,
+    );
+    if (escolhida == null) return;
+    setState(() {
+      _error = '';
+      _enviandoCapa = true;
+    });
+    try {
+      final bytes = await escolhida.readAsBytes();
+      final atualizada = await Api.instance.setJourneyCover(
+        o.id,
+        bytes,
+        escolhida.name,
+        // O backend decide o tipo pelos bytes; isto é só o que o aparelho diz.
+        escolhida.mimeType ?? 'image/jpeg',
+      );
+      if (!mounted) return;
+      setState(() {
+        _original = atualizada;
+        _capaMudou = true;
+      });
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      if (e.isUnauthorized) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Não foi possível enviar a capa.');
+    } finally {
+      if (mounted) setState(() => _enviandoCapa = false);
+    }
+  }
+
+  /// Tira a capa escolhida. Pode não esvaziar a foto: sem capa própria, o
+  /// backend volta a mostrar a primeira imagem do rastro. Por isso o que vale
+  /// é a jornada que ele devolve, e não um `null` otimista daqui.
+  Future<void> _removerCapa() async {
+    final o = _original;
+    if (o == null) return;
+    setState(() {
+      _error = '';
+      _enviandoCapa = true;
+    });
+    try {
+      final atualizada = await Api.instance.removeJourneyCover(o.id);
+      if (!mounted) return;
+      setState(() {
+        _original = atualizada;
+        _capaMudou = true;
+      });
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      if (e.isUnauthorized) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Não foi possível remover a capa.');
+    } finally {
+      if (mounted) setState(() => _enviandoCapa = false);
     }
   }
 
@@ -196,7 +288,9 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
                   button: true,
                   label: 'Voltar',
                   child: IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
+                    // Leva a notícia da capa: ela já foi gravada, e o detalhe
+                    // precisa recarregar mesmo sem nenhum campo ter mudado.
+                    onPressed: () => Navigator.of(context).maybePop(_capaMudou),
                     icon: Icon(Icons.arrow_back, color: s.ink, size: 22),
                   ),
                 ),
@@ -248,6 +342,8 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
           ),
         ),
         const SizedBox(height: SJSpace.x6),
+        _capa(s),
+        const SizedBox(height: SJSpace.x6),
         SJTextField(
           label: 'Nome da jornada',
           controller: _title,
@@ -291,6 +387,85 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
           onPressed: (_saving || !_dirty) ? null : _onSave,
         ),
       ];
+
+  /// A capa, no formato em que ela vai aparecer na lista de jornadas (4:3) —
+  /// para que a escolha seja feita vendo o enquadramento real, e não uma
+  /// miniatura que esconde o corte.
+  Widget _capa(SJScheme s) {
+    final url = _original?.coverImageUrl;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          button: true,
+          label: url == null ? 'Escolher capa' : 'Trocar a capa',
+          child: SJPressable(
+            onTap: _enviandoCapa ? null : _escolherCapa,
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: s.surfaceAlt,
+                  borderRadius: BorderRadius.circular(SJRadius.md),
+                  border: Border.all(color: s.line),
+                ),
+                child: _dentroDaCapa(s, url),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: SJSpace.x2),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SJButton(
+              label: url == null ? 'Escolher capa' : 'Trocar capa',
+              variant: SJButtonVariant.text,
+              onPressed: _enviandoCapa ? null : _escolherCapa,
+            ),
+            // Sem foto nenhuma não há o que remover — e o botão some em vez de
+            // ficar aceso para uma ação que não faria nada.
+            if (url != null)
+              SJButton(
+                label: 'Remover',
+                variant: SJButtonVariant.text,
+                onPressed: _enviandoCapa ? null : _removerCapa,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _dentroDaCapa(SJScheme s, String? url) {
+    if (_enviandoCapa) return const Center(child: SJSpinner());
+    if (url == null) {
+      return Center(
+        child: Text(
+          'Toque para escolher uma capa',
+          style: SJText.caption(color: s.inkFaint),
+        ),
+      );
+    }
+    // A URL é assinada e TEMPORÁRIA: pode expirar com a tela aberta. Por isso
+    // há saída para o erro — e ela não pode ser uma exceção na pintura, que o
+    // Flutter reportaria no console e deixaria um retângulo vazio sem explicação.
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      loadingBuilder: (_, child, progress) =>
+          progress == null ? child : const Center(child: SJSpinner()),
+      errorBuilder: (_, _, _) => Center(
+        child: Text(
+          'A capa não carregou agora.',
+          style: SJText.caption(color: s.inkFaint),
+        ),
+      ),
+    );
+  }
 
   Widget _privacidade(SJScheme s) => Container(
         padding: const EdgeInsets.all(SJSpace.x4),

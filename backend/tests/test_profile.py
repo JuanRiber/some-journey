@@ -2,6 +2,8 @@
 
 from datetime import UTC, datetime
 
+import pytest
+
 from app.db.session import SessionLocal
 from app.domain.continents import CONTINENTS_IN_ORDER
 from app.domain.location import Location
@@ -148,6 +150,48 @@ def test_o_perfil_e_do_dono_e_de_mais_ninguem(client, auth_headers):
 
     assert client.get("/me/profile", headers=mine).json()["stats"]["memories"] == 1
     assert client.get("/me/profile", headers=theirs).json()["stats"]["memories"] == 0
+
+
+# Rastro de GPS com coordenadas fixas: duas pernas de 0,001° em latitude e
+# 0,001° em longitude a ~3,73° S. No WGS84 cada perna mede 156,74 m — o total de
+# 313,48 m sai da conta das coordenadas, não de uma execução da suíte.
+TRACK_PTS = [
+    {"latitude": -3.7320, "longitude": -38.5260, "recorded_at": "2026-07-07T10:00:00Z"},
+    {"latitude": -3.7330, "longitude": -38.5270, "recorded_at": "2026-07-07T10:01:00Z"},
+    {"latitude": -3.7340, "longitude": -38.5280, "recorded_at": "2026-07-07T10:02:00Z"},
+]
+TRACK_METERS = 313.48
+
+
+def _track(client, headers, title="Caminhada"):
+    """Grava um percurso real: jornada -> trecho aberto -> lote de pontos GPS.
+
+    Uma jornada por trecho porque só um trecho fica aberto por jornada de cada
+    vez — é o que permite somar dois trechos no mesmo perfil."""
+    jid = client.post("/journeys", json={"title": title}, headers=headers).json()["id"]
+    track = client.post(f"/journeys/{jid}/tracks/start", headers=headers).json()
+    r = client.post(
+        f"/journeys/{jid}/tracks/{track['id']}/points",
+        json={"points": TRACK_PTS},
+        headers=headers,
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_metros_percorridos_somam_os_trechos_do_dono(client, auth_headers):
+    """Até aqui `tracked_meters` só era conferido na conta vazia, valendo zero —
+    e zero é também o que devolve uma soma que nunca encontra os pontos. O número
+    precisa bater com a distância real dos dois trechos, e o perfil de quem não
+    andou precisa continuar em zero (a soma é por dono)."""
+    headers = auth_headers()
+    _track(client, headers, "Primeiro trecho")
+    _track(client, headers, "Segundo trecho")
+
+    stats = client.get("/me/profile", headers=headers).json()["stats"]
+    assert stats["tracked_meters"] == pytest.approx(2 * TRACK_METERS, rel=0.005)
+
+    alheio = client.get("/me/profile", headers=auth_headers()).json()["stats"]
+    assert alheio["tracked_meters"] == 0
 
 
 def test_dias_ativos_contam_dias_distintos(client, auth_headers):

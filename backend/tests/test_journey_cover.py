@@ -9,17 +9,23 @@ from sqlalchemy import select
 JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
 
 
-def _storage_on(monkeypatch):
+def _storage_on(monkeypatch) -> list[str]:
+    """Liga o Storage sem rede e devolve a lista de caminhos REALMENTE enviados.
+
+    Com um upload no-op, "subiu" e "não subiu" são o mesmo nada; registrando o
+    caminho, um teste de recusa pode provar que o bucket ficou vazio."""
     from app.core import storage
 
+    uploaded: list[str] = []
     monkeypatch.setattr(storage, "enabled", lambda: True)
-    monkeypatch.setattr(storage, "upload", lambda *a, **k: None)
+    monkeypatch.setattr(storage, "upload", lambda path, *a, **k: uploaded.append(path))
     monkeypatch.setattr(storage, "delete", lambda *a, **k: None)
     monkeypatch.setattr(
         storage,
         "sign_urls",
         lambda paths, ttl=None: {p: f"https://signed.example/{p}" for p in paths},
     )
+    return uploaded
 
 
 def _journey(client, h, title="Fortaleza Nights"):
@@ -98,8 +104,12 @@ def test_cover_rejects_bad_type_and_other_user(client, auth_headers, monkeypatch
 
 def test_cover_rejects_spoofed_content_type(client, auth_headers, monkeypatch):
     """A validação é por MAGIC BYTES: um corpo que não é imagem é recusado mesmo
-    quando o cliente MENTE o Content-Type como image/jpeg."""
-    _storage_on(monkeypatch)
+    quando o cliente MENTE o Content-Type como image/jpeg.
+
+    O 400 por si só não diz ONDE a recusa aconteceu — recusar na porta e recusar
+    depois de o arquivo já ter subido dão o mesmo status. A garantia que importa
+    é a outra: um corpo inválido nunca vira objeto no bucket."""
+    uploaded = _storage_on(monkeypatch)
     h = auth_headers()
     jid = _journey(client, h)
     r = client.post(
@@ -108,6 +118,7 @@ def test_cover_rejects_spoofed_content_type(client, auth_headers, monkeypatch):
         headers=h,
     )
     assert r.status_code == 400
+    assert uploaded == [], "o corpo recusado não pode ter chegado ao Storage"
 
 
 def test_set_cover_rolls_back_storage_on_db_failure(client, auth_headers, monkeypatch):

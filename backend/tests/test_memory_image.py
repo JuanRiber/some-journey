@@ -25,14 +25,22 @@ def _memory(client, headers):
     return r.json()["id"]
 
 
-def _stub_storage(monkeypatch):
-    """Stuba o Storage (sem rede): upload no-op, assinatura fake, delete no-op."""
+def _stub_storage(monkeypatch) -> list[str]:
+    """Stuba o Storage (sem rede): assinatura fake, delete no-op e um upload que
+    REGISTRA o caminho em vez de descartá-lo.
+
+    O upload é o único efeito externo deste fluxo. Guardá-lo numa lista (que o
+    chamador recebe de volta) é o que permite a um teste provar que um arquivo
+    recusado não chegou ao bucket — com um upload no-op, subir e não subir são
+    indistinguíveis."""
     from app.core import storage
 
+    uploaded: list[str] = []
     monkeypatch.setattr(storage, "enabled", lambda: True)
-    monkeypatch.setattr(storage, "upload", lambda *a, **k: None)
+    monkeypatch.setattr(storage, "upload", lambda path, *a, **k: uploaded.append(path))
     monkeypatch.setattr(storage, "sign_urls", lambda paths, ttl=None: {p: f"https://signed/{p}" for p in paths})
     monkeypatch.setattr(storage, "delete", lambda *a, **k: None)
+    return uploaded
 
 
 def _add(client, headers, mid):
@@ -141,8 +149,12 @@ def test_remove_other_users_image_returns_404(client, auth_headers, monkeypatch)
 # --- validação por MAGIC BYTES (não confia no Content-Type) -----------------
 def test_add_lying_content_type_rejected_by_magic_bytes(client, auth_headers, monkeypatch):
     """Content-Type diz image/jpeg mas os bytes NÃO são imagem -> 400. A decisão
-    é pelos bytes farejados, não pelo header mentiroso do cliente."""
-    _stub_storage(monkeypatch)
+    é pelos bytes farejados, não pelo header mentiroso do cliente.
+
+    O status sozinho não separa os dois cenários que importam: recusar NA PORTA e
+    recusar depois de já ter enviado o arquivo dão 400 igual. O que distingue é o
+    bucket continuar vazio — por isso a lista de uploads entra na asserção."""
+    uploaded = _stub_storage(monkeypatch)
     h = auth_headers()
     mid = _memory(client, h)
     r = client.post(
@@ -151,6 +163,7 @@ def test_add_lying_content_type_rejected_by_magic_bytes(client, auth_headers, mo
         headers=h,
     )
     assert r.status_code == 400
+    assert uploaded == [], "o corpo recusado não pode ter chegado ao Storage"
 
 
 def test_detected_type_overrides_client_content_type(client, auth_headers, monkeypatch):

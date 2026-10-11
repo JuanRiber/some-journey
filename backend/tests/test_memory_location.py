@@ -105,13 +105,42 @@ def test_set_location_grava_todas_as_colunas_do_vo(client, auth_headers):
         assert saved.geohash and saved.geocoded_at is not None
 
 
-def test_job_ignora_memoria_apagada_entre_o_create_e_a_execucao(client, auth_headers):
-    """Corrida real: o usuário apaga logo após criar. O job não pode estourar."""
+def test_job_ignora_memoria_apagada_entre_o_create_e_a_execucao(
+    client, auth_headers, monkeypatch, caplog
+):
+    """Corrida real: o usuário apaga logo após criar. O job sai pela porta da
+    frente — não pelo `except`.
+
+    `geocode_memory` engole QUALQUER exceção para jamais derrubar o processo, e é
+    por isso que "não levantou" não prova nada: o teste passaria igual se a
+    função estourasse na primeira linha. O que prova é o caminho percorrido — o
+    `return` antecipado roda, o provedor NÃO chega a ser pedido (memória apagada
+    não justifica ida à rede) e nada é registrado como falha."""
+    import logging
     import uuid as _uuid
+
+    pedidos: list[str] = []
+
+    class Espia:
+        def reverse(self, latitude, longitude):
+            pedidos.append("reverse")
+            return Location(latitude=latitude, longitude=longitude)
+
+    def _get_provider():
+        pedidos.append("get_provider")
+        return Espia()
+
+    monkeypatch.setattr(geocoding, "get_provider", _get_provider)
 
     headers = auth_headers()
     me = client.get("/auth/me", headers=headers).json()
-    with SessionLocal() as db:
+
+    caplog.clear()
+    with caplog.at_level(logging.ERROR, logger="app.memory"):
         memory_service.geocode_memory(
             user_id=_uuid.UUID(me["id"]), memory_id=_uuid.uuid4()
-    )  # não levanta
+        )
+
+    assert pedidos == [], "memória apagada não pode custar uma chamada ao provedor"
+    engolidas = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert engolidas == [], "o except largo escondeu uma falha de verdade"

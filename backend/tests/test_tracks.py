@@ -1,11 +1,33 @@
 """Percurso real (GPS) das jornadas: trecho, pontos em lote, mapa GeoJSON,
 ownership e a fronteira com o mapa global (que NÃO expõe GPS bruto)."""
 
+import pytest
+
 PTS = [
     {"latitude": -3.7320, "longitude": -38.5260, "recorded_at": "2026-07-07T10:00:00Z"},
     {"latitude": -3.7330, "longitude": -38.5270, "accuracy": 8.0, "speed": 1.2, "recorded_at": "2026-07-07T10:01:00Z"},
     {"latitude": -3.7340, "longitude": -38.5280, "recorded_at": "2026-07-07T10:02:00Z"},
 ]
+
+# Distância esperada de PTS, em metros, CALCULADA a partir das coordenadas — não
+# copiada de uma execução da suíte. São duas pernas de 0,001° em latitude e
+# 0,001° em longitude a ~3,73° S; no WGS84 isso dá 110,58 m de arco meridiano e
+# 111,08 m de arco de paralelo por perna (156,74 m cada), 313,48 m no total.
+#
+# Por que não basta "> 0": o positivo passa igual se a medida sair em quilômetros
+# (0,3) ou se latitude e longitude forem trocadas na hora de montar o POINT — a
+# troca leva o rastro para 38,5° S, onde o paralelo encurta, e os mesmos pontos
+# passam a medir 282,3 m. Nenhum dos dois levanta exceção nem fica negativo.
+PTS_DISTANCE_M = 313.48
+
+# Mesma conta para o lote de `test_bulk_insert_persists_all_points`: 49 pernas de
+# 0,0005° em cada eixo, ~78,37 m por perna.
+BULK_DISTANCE_M = 3840.12
+
+# Tolerância relativa (0,5%). Folga suficiente para a diferença entre medir sobre
+# a esfera e sobre o elipsoide — que é escolha de implementação, não defeito — e
+# apertada o bastante para que qualquer um dos erros acima estoure.
+DISTANCE_REL_TOL = 0.005
 
 
 def _journey(client, h, title="Viagem AS"):
@@ -71,7 +93,7 @@ def test_add_points_increments_count_and_distance(client, auth_headers):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["point_count"] == 3
-    assert body["distance_m"] > 0
+    assert body["distance_m"] == pytest.approx(PTS_DISTANCE_M, rel=DISTANCE_REL_TOL)
 
 
 # 4
@@ -132,7 +154,7 @@ def test_journey_map_has_track_linestring(client, auth_headers):
     # GeoJSON usa [lng, lat]
     assert abs(coords[0][0] - (-38.526)) < 1e-6
     assert abs(coords[0][1] - (-3.732)) < 1e-6
-    assert body["distance_m"] > 0
+    assert body["distance_m"] == pytest.approx(PTS_DISTANCE_M, rel=DISTANCE_REL_TOL)
 
 
 # 8
@@ -225,7 +247,7 @@ def test_bulk_insert_persists_all_points(client, auth_headers):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["point_count"] == 50
-    assert body["distance_m"] > 0
+    assert body["distance_m"] == pytest.approx(BULK_DISTANCE_M, rel=DISTANCE_REL_TOL)
     # A geometria do mapa tem exatamente os 50 pontos, na ordem de captura.
     feats = client.get(f"/journeys/{jid}/map", headers=h).json()["tracks"]["features"]
     assert len(feats[0]["geometry"]["coordinates"]) == 50
@@ -282,4 +304,4 @@ def test_list_tracks_reports_count_and_distance(client, auth_headers):
     tracks = r.json()
     assert len(tracks) == 1
     assert tracks[0]["point_count"] == 3
-    assert tracks[0]["distance_m"] > 0
+    assert tracks[0]["distance_m"] == pytest.approx(PTS_DISTANCE_M, rel=DISTANCE_REL_TOL)

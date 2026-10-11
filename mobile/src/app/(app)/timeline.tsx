@@ -5,6 +5,7 @@ import { router, useFocusEffect } from "expo-router";
 import MemoryCover from "../../components/MemoryCover";
 import NotebookTop from "../../components/NotebookTop";
 import * as api from "../../lib/api";
+import { hasTitle } from "../../lib/memoryTitle";
 import { colors, mono, serif } from "../../theme/colors";
 
 const MESES = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
@@ -128,9 +129,14 @@ export default function TimelineScreen() {
                   <View style={s.card}>
                     <MemoryCover url={m.image_url} size={54} />
                     <View style={{ flex: 1 }}>
-                      <Text style={s.cardTitle} numberOfLines={1}>
-                        {m.title}
-                      </Text>
+                      {/* O cartão já é anunciado pela data, logo acima dele:
+                          sem título a linha some, em vez de abrir o cartão com
+                          um espaço vazio que parece memória corrompida. */}
+                      {hasTitle(m) ? (
+                        <Text style={s.cardTitle} numberOfLines={1}>
+                          {m.title}
+                        </Text>
+                      ) : null}
                       <View style={s.coordRow}>
                         <View style={s.pin} />
                         <Text style={s.coords}>
@@ -141,7 +147,13 @@ export default function TimelineScreen() {
                         onPress={() => router.push({ pathname: "/memory/[id]", params: { id: m.id } })}
                         hitSlop={6}
                         accessibilityRole="button"
-                        accessibilityLabel={`Abrir memória: ${m.title}`}
+                        accessibilityLabel={
+                          // Sem título, o rótulo acessível é a data — nunca um
+                          // "Abrir memória:" terminando em dois-pontos soltos.
+                          hasTitle(m)
+                            ? `Abrir memória: ${m.title}`
+                            : `Abrir memória de ${dayMonth(m.occurred_at)}`
+                        }
                       >
                         <Text style={s.open}>Abrir memória →</Text>
                       </Pressable>

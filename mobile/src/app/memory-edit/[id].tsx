@@ -82,10 +82,6 @@ export default function MemoryEditScreen() {
   async function onSave() {
     if (!id) return;
     setError("");
-    if (!title.trim()) {
-      setError("Dê um título à memória.");
-      return;
-    }
     if (!coords) {
       setError("Escolha um local: busque, use sua localização ou toque no mapa.");
       return;

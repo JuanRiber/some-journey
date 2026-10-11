@@ -28,7 +28,13 @@ export default function MemoryNewScreen() {
 
   async function onSave() {
     setError("");
-    if (!title.trim()) {
+    // Na memória avulsa o título é opcional (POST /memories tem default ""),
+    // mas o POST /journeys/{id}/memories ainda exige min_length=1
+    // (JourneyMemoryCreate, em backend/app/schemas/journey.py, ficou de fora
+    // da mudança). Avisar aqui dá a razão exata; sem isto o 422 chega como a
+    // mensagem genérica de validação e a pessoa não descobre o que faltou.
+    // Esta checagem some junto com aquele min_length.
+    if (journeyId && !title.trim()) {
       setError("Dê um título à memória.");
       return;
     }

@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 
 import * as api from "../../lib/api";
+import { hasTitle } from "../../lib/memoryTitle";
 import { colors, mono, serif } from "../../theme/colors";
 
 function formatFull(iso: string): string {
@@ -101,7 +102,10 @@ export default function MemoryDetailScreen() {
           <ActivityIndicator color={colors.cyan} style={{ marginTop: 48 }} />
         ) : (
           <>
-            <Text style={s.title}>{memory.title}</Text>
+            {/* A linha de meta logo abaixo já abre com coordenadas e data: sem
+                título o cabeçalho some, em vez de reservar uma faixa em branco
+                no alto da tela que lê como defeito. */}
+            {hasTitle(memory) ? <Text style={s.title}>{memory.title}</Text> : null}
             <View style={s.metaRow}>
               <View style={s.pin} />
               <Text style={s.meta}>

@@ -5,6 +5,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import AtlasMap from "../../components/AtlasMap";
 import * as api from "../../lib/api";
 import { STATUS_COLOR, STATUS_LABEL } from "../../lib/journeyStatus";
+import { hasTitle } from "../../lib/memoryTitle";
 import { useTrackRecorder } from "../../lib/useTrackRecorder";
 import { colors, mono, serif } from "../../theme/colors";
 
@@ -439,9 +440,14 @@ export default function JourneyDetailScreen() {
                   style={{ flex: 1 }}
                   onPress={() => router.push(`/memory/${p.memory_id}`)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Ver memória: ${p.title}`}
+                  accessibilityLabel={
+                    hasTitle(p) ? `Ver memória: ${p.title}` : `Ver memória de ${formatDate(p.occurred_at)}`
+                  }
                 >
-                  <Text style={s.pointTitle} numberOfLines={1}>{p.title}</Text>
+                  {/* A meta logo abaixo já traz coordenadas e data: sem título
+                      a linha some, em vez de empurrar a meta para baixo de um
+                      vazio. */}
+                  {hasTitle(p) ? <Text style={s.pointTitle} numberOfLines={1}>{p.title}</Text> : null}
                   <Text style={s.pointMeta}>
                     {p.latitude.toFixed(3)}, {p.longitude.toFixed(3)} • {formatDate(p.occurred_at)}
                   </Text>
@@ -491,12 +497,27 @@ export default function JourneyDetailScreen() {
                     {loose.map((m) => (
                       <View key={m.memory_id} style={s.looseRow}>
                         <View style={{ flex: 1 }}>
-                          <Text style={s.pointTitle} numberOfLines={1}>{m.title}</Text>
+                          {/* Mesma regra dos pontos: a meta abaixo identifica a
+                              memória pela data, então o título ausente apenas
+                              não ocupa espaço. */}
+                          {hasTitle(m) ? <Text style={s.pointTitle} numberOfLines={1}>{m.title}</Text> : null}
                           <Text style={s.pointMeta}>
                             {m.latitude.toFixed(3)}, {m.longitude.toFixed(3)} • {formatDate(m.occurred_at)}
                           </Text>
                         </View>
-                        <Pressable disabled={busy} onPress={() => addPoint(m.memory_id)} hitSlop={6} accessibilityLabel={`Adicionar ${m.title}`}>
+                        <Pressable
+                          disabled={busy}
+                          onPress={() => addPoint(m.memory_id)}
+                          hitSlop={6}
+                          accessibilityLabel={
+                            // No nome acessível o título é o único discriminador que
+                            // sobra: sem ele a lista vira uma fila de "+ Adicionar"
+                            // idênticos e escolher vira sorteio — a data entra no lugar.
+                            hasTitle(m)
+                              ? `Adicionar ${m.title}`
+                              : `Adicionar memória de ${formatDate(m.occurred_at)}`
+                          }
+                        >
                           <Text style={s.addPlus}>+ Adicionar</Text>
                         </Pressable>
                       </View>

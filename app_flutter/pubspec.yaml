@@ -27,6 +27,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Relógio falso nos testes de timeout: sem ele, exercer um teto de 75s
+  # custaria 75s de relógio real. Vem junto do flutter_test, mas é declarado
+  # aqui de propósito — depender do que é transitivo quebra sem aviso no dia
+  # em que o flutter_test deixar de trazê-lo.
+  fake_async: ^1.3.3
 
 flutter:
   uses-material-design: true

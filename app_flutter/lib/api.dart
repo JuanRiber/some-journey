@@ -1,8 +1,8 @@
 /// Cliente da API do Some Journey (FastAPI).
 ///
 /// Mesmo contrato do app Expo (mobile/src/lib/api.ts): Bearer token, erros
-/// como {"detail": ...}, timeout de 20s. Base URL via --dart-define=API_URL
-/// (padrão: backend local).
+/// como {"detail": ...}, e um teto de espera maior para upload que para leitura.
+/// Base URL via --dart-define=API_URL (padrão: backend local).
 library;
 
 import 'dart:async';
@@ -17,7 +17,40 @@ import 'features/profile/profile_models.dart';
 import 'models.dart';
 
 const apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://127.0.0.1:8000');
-const _timeout = Duration(seconds: 20);
+
+/// Quanto esperar por uma resposta antes de desistir.
+///
+/// Era 20s — herdado do cliente Expo, que já chutava "~20s por causa do cold
+/// start". O chute ficou curto: a API roda no plano FREE do Render, que desliga
+/// a instância quando ela fica ociosa, e o próprio painel do Render avisa que a
+/// primeira requisição depois disso "pode atrasar as requisições em 50 segundos
+/// ou mais". Ou seja, 20s não era um teto apertado — era a garantia de que a
+/// primeira tela depois de qualquer pausa SEMPRE falharia, mesmo com o servidor
+/// inteiro e a ponto de responder.
+///
+/// O que medimos aqui: com o servidor quente, 0,39s. Com ele desligado, 90s sem
+/// um único byte de volta. Então o teto precisa ficar entre dois erros opostos:
+/// abaixo dos 50s avisados, falhar é certo; muito acima, a pessoa fica olhando
+/// um spinner por uma falha que já estava decidida — porque quando o servidor
+/// está mesmo fora, nada chega, e esperar mais só adia a má notícia.
+///
+/// 75s é meia vez acima do piso que o Render avisa (margem para o "ou mais", já
+/// que 50s é o começo da faixa, não o fim) e ainda abaixo dos 90s em que vimos
+/// silêncio completo. Na prática a espera longa acontece UMA vez por período de
+/// ociosidade: depois que a instância sobe, a mesma chamada volta a custar
+/// décimos de segundo.
+const apiTimeout = Duration(seconds: 75);
+
+/// Teto do upload, separado de propósito.
+///
+/// O relógio do upload não cobre só a espera pelo servidor: cobre também os
+/// bytes subindo. Uma foto num uplink móvel ruim leva dezenas de segundos por
+/// si só, e isso se SOMA ao cold start — o upload pode ser justamente a primeira
+/// requisição depois da pausa. Usar [apiTimeout] aqui cancelaria envios que
+/// estavam progredindo bem. O cliente Expo já tratava os dois casos como
+/// grandezas diferentes (`API_TIMEOUT_MS * 3`); manter a proporção.
+const apiUploadTimeout = Duration(minutes: 3);
+
 const _tokenKey = 'sj_access_token';
 
 /// Natureza da falha, para a tela saber que notícia dar.
@@ -241,14 +274,14 @@ class Api {
     try {
       final headers = _headers(json: body != null, authed: authed);
       r = switch (method) {
-        'GET' => await _client.get(uri, headers: headers).timeout(_timeout),
+        'GET' => await _client.get(uri, headers: headers).timeout(apiTimeout),
         'POST' => await _client
             .post(uri, headers: headers, body: body == null ? null : jsonEncode(body))
-            .timeout(_timeout),
+            .timeout(apiTimeout),
         'PATCH' => await _client
             .patch(uri, headers: headers, body: body == null ? null : jsonEncode(body))
-            .timeout(_timeout),
-        'DELETE' => await _client.delete(uri, headers: headers).timeout(_timeout),
+            .timeout(apiTimeout),
+        'DELETE' => await _client.delete(uri, headers: headers).timeout(apiTimeout),
         _ => throw ArgumentError(method),
       };
     } on TimeoutException {
@@ -418,7 +451,7 @@ class Api {
       contentType: parts.length == 2 ? MediaType(parts[0], parts[1]) : null,
     ));
     try {
-      return await http.Response.fromStream(await req.send().timeout(_timeout));
+      return await http.Response.fromStream(await req.send().timeout(apiUploadTimeout));
     } on TimeoutException {
       throw ApiError(0, 'O upload demorou demais. Tente de novo.',
           kind: ApiFailure.timeout);
@@ -439,7 +472,7 @@ class Api {
     ));
     late http.Response r;
     try {
-      r = await http.Response.fromStream(await req.send().timeout(_timeout));
+      r = await http.Response.fromStream(await req.send().timeout(apiUploadTimeout));
     } on TimeoutException {
       throw ApiError(0, 'O upload demorou demais. Tente de novo.',
           kind: ApiFailure.timeout);

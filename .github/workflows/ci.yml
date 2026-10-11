@@ -64,6 +64,18 @@ jobs:
       - name: Instalar dependências
         run: pip install -r requirements-dev.txt
 
+      # Toda rota do backend precisa de alguém que a chame. Já aconteceu três
+      # vezes de uma capacidade subir testada, documentada e sem cliente —
+      # descobrir isso dependia de auditar rota por rota, na mão.
+      #
+      # A suíte abaixo cobra o MESMO veredito (tests/test_client_parity.py);
+      # este passo vem ANTES dela de propósito: rodando depois, o relatório
+      # nunca apareceria, porque o pytest já teria falhado primeiro e o log
+      # mostraria um assert no lugar da lista de rotas. Não toca o banco e não
+      # depende do serviço do Postgres.
+      - name: Paridade com os clientes
+        run: python -m scripts.check_client_parity
+
       # O conftest cria o banco de teste e habilita o PostGIS sozinho, e define
       # DATABASE_URL, JWT_SECRET_KEY e APP_ENV=test antes de importar o app.
       # Não existe .env aqui, e é assim que tem de ser.

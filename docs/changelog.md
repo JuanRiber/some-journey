@@ -151,3 +151,41 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   diz que obrigatórios mesmo são o local e o `occurred_at`.
 - README: a linha do título saiu de **Divergencias conhecidas**; a do texto
   ficou, reescrita.
+
+## 2026-10-11
+
+### Documentação
+- Criado [`11-convencoes.md`](11-convencoes.md), o primeiro documento voltado a
+  quem vai **contribuir** com o código e não a quem vai entender o produto.
+  Reúne as convenções que o `flutter analyze` aprova e o `pytest` deixa passar —
+  as que falham em silêncio. Até aqui elas só existiam em docstring de arquivo,
+  em corpo de commit e em teste escrito **depois** de a armadilha morder.
+- O critério de entrada está escrito no próprio documento, para a lista não virar
+  depósito de preferência de estilo: o analisador e a suíte não veem a regra,
+  errar não produz erro, e alguém já errou.
+- Cobertas: `null` que não limpa no `PATCH` · longitude primeiro no PostGIS e a
+  inversão na fronteira com o `flutter_map` · `occurred_at` como dia em UTC ·
+  design system sobre `package:flutter/widgets` · `EditableText` nos testes de
+  widget · caixa alta do `SJButton` · o contrato de listagem · as duas costuras
+  manuais do `conftest.py` · `auth_headers` como fábrica · README sem acento ·
+  português no comentário e inglês no identificador · ausência de formatador ·
+  domínio puro fora do Flutter · a versão do Flutter presa de propósito.
+
+> Três coisas foram encontradas ao conferir cada regra contra o código, e ficam
+> registradas aqui porque **não** foram corrigidas (nenhuma é mudança de
+> documentação):
+>
+> - `_TABLES`, no `backend/tests/conftest.py`, nomeia sete das nove tabelas.
+>   `memory_music` e `password_reset_tokens` só são limpas entre os testes
+>   porque o `TRUNCATE ... CASCADE` alcança quem tem FK para as listadas. Uma
+>   tabela nova sem esse vínculo vazaria linhas de um teste para o outro, em
+>   silêncio.
+> - O docstring de `app/core/pagination.py` diz que o contrato de cursor é
+>   "idêntico em todas as rotas de lista". Hoje só `GET /memories` e
+>   `GET /journeys` paginam; `GET /journeys/{id}/memories` e
+>   `GET /journeys/{id}/tracks` devolvem a lista inteira. É a intenção, não o
+>   estado.
+> - O README diz que o app principal pede Dart >= 3.12.2; o `pubspec.yaml` pede
+>   `^3.10.9` desde o commit que baixou a restrição para a versão realmente
+>   necessária. A contagem de testes do backend no README (214) também ficou
+>   para trás.

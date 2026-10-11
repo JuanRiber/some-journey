@@ -144,11 +144,54 @@ def test_password_change_advances_pcat_and_kills_prior_token(client):
     assert r.status_code == 204, r.text
 
     _uid, after = _load_user(client, email)
-    assert after >= before  # a coluna avançou (ou ao menos não retrocedeu)
+    # ESTRITAMENTE maior. Com `>=` este teste ficava verde mesmo com a coluna
+    # parada: ele ANUNCIAVA a invalidação de sessão sem exercer nada dela.
+    assert after > before, "trocar a senha precisa AVANÇAR password_changed_at"
 
     # Um token com pcat anterior à troca é recusado agora.
+    #
+    # O pcat é int em SEGUNDOS, então existe um ponto cego de um segundo: um
+    # token emitido dentro do mesmo segundo da troca sobrevive a ela. Por isso o
+    # controle aqui recua um segundo em vez de usar `before` cru — num teste,
+    # registro e troca caem no mesmo segundo quase sempre. Fechar essa janela
+    # exigiria pcat com precisão de milissegundos, o que muda o formato do
+    # token; trocar `<` por `<=` NÃO serve, derrubaria o token recém-emitido no
+    # login seguinte à troca.
     tok_before = create_access_token(uid, before - timedelta(seconds=1))
     assert (
         client.get("/auth/me", headers={"Authorization": f"Bearer {tok_before}"}).status_code
         == 401
+    )
+
+
+def test_reset_password_script_also_revokes_sessions(client):
+    """O script de reset é o caminho de remediação — e não revogava nada.
+
+    Com o cadastro fechado em produção (REGISTRATION_OPEN=false), trocar a senha
+    de alguém passa por `scripts.reset_password`. Ele chamava
+    `user_repository.set_password_hash` direto, por baixo do service onde a
+    regra morava, e a coluna `password_changed_at` não se mexia: a conta ficava
+    com senha nova e as sessões antigas seguiam vivas por até
+    ACCESS_TOKEN_EXPIRE_MINUTES. O operador fechava a porta e a janela
+    continuava aberta.
+
+    A asserção é na COLUNA, e não num token, de propósito: o pcat tem resolução
+    de um segundo, então um teste que mintasse um token aqui dependeria do
+    relógio para passar.
+    """
+    from scripts.reset_password import main
+
+    email, _h = _account(client)
+    _uid, before = _load_user(client, email)
+
+    main([email], "SenhaDeRemediacao123")
+
+    _uid2, after = _load_user(client, email)
+    assert after > before, "o script tem de avançar password_changed_at"
+    # E a senha nova vale de fato.
+    assert (
+        client.post(
+            "/auth/login", json={"email": email, "password": "SenhaDeRemediacao123"}
+        ).status_code
+        == 200
     )

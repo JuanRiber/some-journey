@@ -93,12 +93,11 @@ def change_password(
     """Troca a senha do usuário logado: confere a atual e grava a nova (hash).
     Levanta InvalidCredentialsError se a senha atual estiver errada.
 
-    Ao trocar, avança password_changed_at (func.now(), avaliado no servidor) — o
-    set_password_hash comita a mesma entidade, então a coluna vai junto no UPDATE.
-    Isso invalida NA HORA os tokens emitidos antes (claim pcat < novo valor)."""
+    Quem avança password_changed_at é o set_password_hash, no mesmo UPDATE do
+    hash — é lá que a regra vive, para nenhum chamador poder esquecê-la. Isso
+    invalida NA HORA os tokens emitidos antes (claim pcat < novo valor)."""
     if not verify_password(current_password, user.password_hash):
         raise InvalidCredentialsError()
-    user.password_changed_at = func.now()
     user_repository.set_password_hash(
         db, user=user, password_hash=hash_password(new_password)
     )

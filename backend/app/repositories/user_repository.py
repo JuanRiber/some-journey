@@ -110,9 +110,23 @@ def create(db: Session, *, name: str, email: str, password_hash: str) -> User:
 
 
 def set_password_hash(db: Session, *, user: User, password_hash: str) -> User:
-    """Atualiza o hash da senha de um usuário já carregado (usado pelo script de
-    reset). Recebe o hash JÁ pronto — quem gera é o service/security."""
+    """Troca o hash da senha e AVANÇA password_changed_at, no mesmo UPDATE.
+
+    As duas coisas andam juntas AQUI, e não em quem chama, porque senha trocada
+    sem pcat novo é uma conta que o dono pensa ter fechado e que segue aberta:
+    os tokens emitidos antes continuam valendo até expirar.
+
+    A regra morava só no service, e o script de reset alcançava este repositório
+    por baixo dele — a conta recebia senha nova e as sessões antigas sobreviviam
+    por até ACCESS_TOKEN_EXPIRE_MINUTES. Como esse script É o caminho de
+    remediação (o cadastro fica fechado em produção), o buraco estava justamente
+    em quem é chamado para fechar uma conta.
+
+    Recebe o hash JÁ pronto — quem gera é o service/security. func.now() é
+    avaliado no servidor, no mesmo UPDATE do hash.
+    """
     user.password_hash = password_hash
+    user.password_changed_at = func.now()
     db.commit()
     db.refresh(user)
     return user

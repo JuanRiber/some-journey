@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart' show Icons, Slider;
+import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/widgets.dart';
 
 import '../features/hero/light_domain.dart';
@@ -205,12 +205,13 @@ class _LightGateState extends State<_LightGate> {
             ),
           ),
         ),
-        const SizedBox(height: SJSpace.x3),
-        Slider(
-          value: _fase,
-          activeColor: s.primary,
+        const SizedBox(height: SJSpace.x4),
+        _FaseTrilho(
+          valor: _fase,
+          scheme: s,
           onChanged: (v) => setState(() => _fase = v),
         ),
+        const SizedBox(height: SJSpace.x3),
         Text(
           '${zona.name} · luz ${(luz.exposure * 100).round()}% · '
           'abajur ${(luz.lamp * 100).round()}% · '
@@ -521,6 +522,80 @@ class _SheetAndFab extends StatelessWidget {
         const SizedBox(width: SJSpace.x6),
         SJFab(icon: Icons.add, semanticLabel: 'Nova memória', onTap: () {}),
       ],
+    );
+  }
+}
+
+/// Trilho de posição da viagem.
+///
+/// Escrito à mão em vez de usar o `Slider` do Material por uma razão que o
+/// próprio arquivo já declarava: a galeria importa `material.dart` **apenas
+/// para `Icons`**. Um `Slider` aqui não só destoaria dos componentes ao lado
+/// como estoura em tempo de execução — ele exige um ancestral `Material`, que
+/// esta árvore não tem.
+class _FaseTrilho extends StatelessWidget {
+  const _FaseTrilho({
+    required this.valor,
+    required this.scheme,
+    required this.onChanged,
+  });
+
+  final double valor;
+  final SJScheme scheme;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, limites) {
+        final largura = limites.maxWidth;
+        void mover(Offset local) =>
+            onChanged((local.dx / largura).clamp(0.0, 1.0));
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (d) => mover(d.localPosition),
+          onHorizontalDragUpdate: (d) => mover(d.localPosition),
+          child: SizedBox(
+            height: 28,
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                // O trilho: um fio de tinta, como as réguas do caderno.
+                Container(
+                  height: 2,
+                  decoration: BoxDecoration(
+                    color: scheme.line,
+                    borderRadius: BorderRadius.circular(SJRadius.pill),
+                  ),
+                ),
+                // Marcas das zonas: onde cada ambiente começa na tira.
+                for (final z in LightTrack.scenic.zones)
+                  Align(
+                    alignment: Alignment(z.at * 2 - 1, 0),
+                    child: Container(
+                      width: 1,
+                      height: 9,
+                      color: scheme.inkFaint,
+                    ),
+                  ),
+                Align(
+                  alignment: Alignment(valor * 2 - 1, 0),
+                  child: Container(
+                    width: 13,
+                    height: 13,
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: scheme.surface, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

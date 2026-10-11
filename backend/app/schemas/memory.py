@@ -16,6 +16,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas._fields import AwareUtcDatetime
 
+# Teto das URLs de catálogo (capa, prévia e link do provedor). Eram os três
+# únicos campos de texto da API sem limite próprio, gravados em colunas Text: o
+# único freio era o MAX_JSON_BODY_BYTES, então cada POST enfiava quase 1 MB
+# nessas três colunas — cinco faixas por memória, memórias sem teto.
+# 2048 é o limite prático que navegadores e proxies aceitam numa URL: folga de
+# sobra para os ~100 caracteres que o iTunes devolve, e ainda assim um limite.
+MAX_URL_LENGTH = 2048
+
 
 class MemoryCreate(BaseModel):
     """Entrada do POST /memories."""
@@ -83,10 +91,41 @@ class MemoryMusicIn(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     artist: str = Field(min_length=1, max_length=200)
     album: str | None = Field(default=None, max_length=200)
-    artwork_url: str | None = None
-    preview_url: str | None = None
-    external_url: str | None = None
+    artwork_url: str | None = Field(default=None, max_length=MAX_URL_LENGTH)
+    preview_url: str | None = Field(default=None, max_length=MAX_URL_LENGTH)
+    external_url: str | None = Field(default=None, max_length=MAX_URL_LENGTH)
     duration_ms: int | None = Field(default=None, ge=0, le=86_400_000)
+
+    @model_validator(mode="after")
+    def _urls_sao_web(self) -> "MemoryMusicIn":
+        # Só http/https. Estes três valores saem daqui direto para dentro de
+        # widgets do app — a capa vira `Image.network`, e o link do provedor
+        # existe justamente para um dia reabrir a faixa —, então um
+        # `javascript:`, `file:` ou `data:` gravado hoje é uma arma carregada
+        # apontada para quem consumir o campo amanhã. Barrar na fronteira de
+        # escrita custa estas linhas; auditar para sempre todo widget que tocar
+        # no valor, não.
+        #
+        # A regra vale só na ENTRADA, e é por isso que ela é segura: o que já
+        # está gravado continua saindo pelo MemoryMusicRead, que não valida nada
+        # — nenhuma linha antiga deixa de ser legível. E o único caminho até
+        # aqui é um POST novo, que o app monta com o que o catálogo devolveu
+        # (sempre https).
+        #
+        # `http` segue aceito de propósito: a regra existe para excluir esquema
+        # que não é web, não para exigir TLS de um catálogo alheio.
+        for campo in ("artwork_url", "preview_url", "external_url"):
+            valor = getattr(self, campo)
+            # "" é "o provedor não informou" — o app já trata vazio como nulo na
+            # leitura. Recusar isso derrubaria uma faixa boa vinda de catálogo
+            # pobre, que é o caso que `test_so_titulo_e_artista_bastam` protege.
+            if not valor:
+                continue
+            # lower() porque o esquema é case-insensitive na RFC: "HTTPS://" é
+            # uma URL legítima e não pode virar 422.
+            if not valor.lower().startswith(("http://", "https://")):
+                raise ValueError(f"{campo} deve ser uma URL http ou https")
+        return self
 
 
 class MemoryMusicRead(BaseModel):

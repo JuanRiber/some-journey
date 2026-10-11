@@ -12,9 +12,17 @@ O que estes testes travam:
 - **Uma faixa não entra duas vezes** na mesma memória — a regra que o
   `MusicTrack` do app expressa no `operator ==` e que agora o banco garante.
 - **Ownership**, com o mesmo 404 do resto da API para inexistente e de terceiro.
+- **As URLs do catálogo têm teto e são de web.** Capa, prévia e link do provedor
+  eram os três únicos textos da API sem `max_length`, em colunas Text: só o
+  tamanho do corpo da requisição os segurava, e o app enfia esses valores direto
+  dentro de widgets.
 """
 
 import uuid
+
+import pytest
+
+from app.schemas.memory import MAX_URL_LENGTH
 
 
 def _memory(client, headers, title="Praia de Iracema"):
@@ -47,6 +55,10 @@ def _faixa(**over):
     }
     base.update(over)
     return base
+
+
+# Os três campos de URL do snapshot, exercitados pelos mesmos casos.
+_CAMPOS_URL = ("artwork_url", "preview_url", "external_url")
 
 
 class TestAnexar:
@@ -180,6 +192,114 @@ class TestTeto:
             headers=h,
         )
         assert r.status_code == 409
+
+
+class TestUrlDeCatalogo:
+    """Capa, prévia e link do provedor chegam prontos do catálogo e vão direto
+    para dentro de widgets do app. Entram com teto de tamanho e só como URL de
+    web."""
+
+    @pytest.mark.parametrize("campo", _CAMPOS_URL)
+    def test_url_acima_do_teto_e_422(self, client, auth_headers, campo):
+        h = auth_headers()
+        mid = _memory(client, h)
+        gigante = "https://example.com/" + "a" * MAX_URL_LENGTH
+
+        r = client.post(
+            f"/memories/{mid}/music", json=_faixa(**{campo: gigante}), headers=h
+        )
+
+        assert r.status_code == 422, r.text
+        detalhe = client.get(f"/memories/{mid}", headers=h).json()
+        assert detalhe["music"] == [], "recusa, não grava truncado"
+
+    @pytest.mark.parametrize("campo", _CAMPOS_URL)
+    def test_url_exatamente_no_teto_ainda_entra(self, client, auth_headers, campo):
+        """O limite é inclusivo: o teto é o maior valor aceito, não o primeiro
+        recusado — e o valor volta inteiro, sem corte."""
+        h = auth_headers()
+        mid = _memory(client, h)
+        prefixo = "https://example.com/"
+        no_limite = prefixo + "a" * (MAX_URL_LENGTH - len(prefixo))
+        assert len(no_limite) == MAX_URL_LENGTH
+
+        r = client.post(
+            f"/memories/{mid}/music", json=_faixa(**{campo: no_limite}), headers=h
+        )
+
+        assert r.status_code == 201, r.text
+        assert r.json()["music"][0][campo] == no_limite
+
+    def test_o_teto_e_largo_para_o_catalogo_e_estreito_para_o_abuso(self):
+        """Pino no número: uma URL de catálogo real passa longe do limite, e o
+        limite passa longe do 1 MB que o corpo da requisição ainda permite."""
+        assert MAX_URL_LENGTH == 2048
+        assert len(_faixa()["external_url"]) < MAX_URL_LENGTH
+
+    @pytest.mark.parametrize("campo", _CAMPOS_URL)
+    @pytest.mark.parametrize(
+        "valor",
+        [
+            "javascript:alert(1)",
+            "data:text/html;base64,PHNjcmlwdD4=",
+            "file:///etc/passwd",
+            "//example.com/capa.jpg",
+            "nem parece uma URL",
+        ],
+    )
+    def test_o_que_nao_e_http_e_422(self, client, auth_headers, campo, valor):
+        """A capa vira Image.network e o link existe para reabrir a faixa: o que
+        não for http/https não tem por que ser guardado."""
+        h = auth_headers()
+        mid = _memory(client, h)
+
+        r = client.post(
+            f"/memories/{mid}/music", json=_faixa(**{campo: valor}), headers=h
+        )
+
+        assert r.status_code == 422, r.text
+
+    def test_http_continua_aceito(self, client, auth_headers):
+        """A regra exclui esquema que não é web; não exige TLS de catálogo
+        alheio."""
+        h = auth_headers()
+        mid = _memory(client, h)
+
+        r = client.post(
+            f"/memories/{mid}/music",
+            json=_faixa(artwork_url="http://example.com/capa.jpg"),
+            headers=h,
+        )
+
+        assert r.status_code == 201, r.text
+
+    def test_esquema_em_maiusculas_nao_e_422(self, client, auth_headers):
+        """O esquema é case-insensitive na RFC: HTTPS:// é URL legítima e não
+        pode ser recusada por causa da caixa."""
+        h = auth_headers()
+        mid = _memory(client, h)
+
+        r = client.post(
+            f"/memories/{mid}/music",
+            json=_faixa(artwork_url="HTTPS://example.com/capa.jpg"),
+            headers=h,
+        )
+
+        assert r.status_code == 201, r.text
+
+    def test_vazio_do_catalogo_pobre_continua_passando(self, client, auth_headers):
+        """String vazia é o provedor não informando, não esquema inválido — o
+        app já lê vazio como nulo, e recusar derrubaria uma faixa boa."""
+        h = auth_headers()
+        mid = _memory(client, h)
+
+        r = client.post(
+            f"/memories/{mid}/music",
+            json=_faixa(artwork_url="", preview_url="", external_url=""),
+            headers=h,
+        )
+
+        assert r.status_code == 201, r.text
 
 
 class TestRemover:

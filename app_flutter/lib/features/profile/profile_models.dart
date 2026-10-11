@@ -61,6 +61,13 @@ class ProfileStats {
   final int countries;
   final int continents;
   final int photos;
+
+  /// Músicas salvas — `stats.tracks` no contrato. O nome vem da tabela
+  /// `memory_music` vista pelo servidor; no cartão do viajante a pessoa lê
+  /// "músicas". Não confundir com os TRECHOS gravados de uma jornada, que são
+  /// outra coisa inteira e chegam em [trackedMeters].
+  final int tracks;
+
   final double trackedMeters;
   final int activeDays;
 
@@ -76,6 +83,7 @@ class ProfileStats {
     required this.countries,
     required this.continents,
     required this.photos,
+    required this.tracks,
     required this.trackedMeters,
     required this.activeDays,
     required this.pendingGeocode,
@@ -89,6 +97,7 @@ class ProfileStats {
         countries: (j['countries'] ?? 0) as int,
         continents: (j['continents'] ?? 0) as int,
         photos: (j['photos'] ?? 0) as int,
+        tracks: (j['tracks'] ?? 0) as int,
         trackedMeters: ((j['tracked_meters'] ?? 0) as num).toDouble(),
         activeDays: (j['active_days'] ?? 0) as int,
         pendingGeocode: (j['pending_geocode'] ?? 0) as int,

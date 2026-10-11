@@ -20,7 +20,7 @@ import 'package:some_journey/features/profile/profile_models.dart';
 /// porque a máquina que gravou não roda em UTC — e é exatamente esse formato
 /// que o app recebe em produção.
 ///
-/// Os dez contadores de `stats` são todos DIFERENTES entre si de propósito: com
+/// Os onze contadores de `stats` são todos DIFERENTES entre si de propósito: com
 /// dois valores iguais, trocar duas chaves de lugar na leitura passaria batido.
 const _respostaReal = '''
 {
@@ -160,6 +160,7 @@ void main() {
       expect(s.countries, 5);
       expect(s.continents, 2);
       expect(s.photos, 9);
+      expect(s.tracks, 6);
       expect(s.activeDays, 8);
       expect(s.pendingGeocode, 1);
       expect(s.trackedMeters, closeTo(313.48, 0.01));
@@ -199,6 +200,7 @@ void main() {
       final p = Profile.fromJson(_contaNova());
 
       expect(p.stats.isEmpty, isTrue);
+      expect(p.stats.tracks, 0);
       expect(p.stats.trackedMeters, 0);
       expect(p.identity.username, isNull);
       expect(p.identity.bio, isNull);
@@ -301,12 +303,12 @@ void main() {
 
   group('contrato do servidor mudando', () {
     test('contador novo em stats não derruba a leitura', () {
-      // `tracks` (músicas salvas) entrou em `stats` depois que esta tela foi
-      // escrita e já vem na captura acima; o cliente ainda não expõe esse
-      // número, e ler o resto não pode depender disso. Vale para o próximo
-      // contador e para o próximo bloco de primeiro nível que chegarem.
+      // Foi assim que `tracks` (músicas salvas) chegou: o servidor passou a
+      // mandar e a tela seguiu lendo o resto sem saber do campo — hoje o
+      // cliente o expõe, e quem este teste protege é o PRÓXIMO contador, e o
+      // próximo bloco de primeiro nível, que apareçam antes de alguém mexer
+      // aqui.
       final carga = _real();
-      expect(_bloco(carga, 'stats')['tracks'], 6, reason: 'o servidor já manda');
       _bloco(carga, 'stats')['conquistas'] = 12;
       carga['collections_preview'] = {'total': 3};
 
@@ -323,6 +325,7 @@ void main() {
         ..remove('photos')
         ..remove('pending_geocode')
         ..remove('journeys_finished')
+        ..remove('tracks')
         ..remove('tracked_meters');
 
       final s = Profile.fromJson(carga).stats;
@@ -330,9 +333,29 @@ void main() {
       expect(s.photos, 0);
       expect(s.pendingGeocode, 0);
       expect(s.journeysFinished, 0);
+      expect(s.tracks, 0);
       expect(s.trackedMeters, 0);
       // E o que continuou vindo segue íntegro.
       expect(s.memories, 12);
+    });
+
+    test('músicas salvas não se confundem com os metros do percurso', () {
+      // Os dois campos nascem da mesma palavra: `tracks` são as FAIXAS salvas
+      // nas memórias (o "56 músicas" do cartão) e `tracked_meters` é o traço de
+      // GPS das jornadas. Lidos trocados, o cartão anunciaria 56 mil músicas e
+      // ninguém veria erro nenhum.
+      final carga = _real();
+      _bloco(carga, 'stats')
+        ..['tracks'] = 56
+        ..['tracked_meters'] = 56000.0;
+
+      final s = Profile.fromJson(carga).stats;
+
+      expect(s.tracks, 56);
+      expect(s.trackedMeters, 56000.0);
+      // E cada um segue para a sua linha do cartão: 56 músicas de um lado,
+      // 56 km percorridos do outro.
+      expect(Profile.fromJson(carga).trackedLabel, '56,0 km');
     });
 
     test('tracked_meters inteiro (sem casa decimal) continua sendo double', () {

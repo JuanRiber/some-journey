@@ -221,6 +221,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         (Icons.flag_outlined, '${stats.journeysFinished} jornadas concluídas'),
       if (stats.memories > 0)
         (Icons.photo_camera_outlined, '${stats.memories} memórias preservadas'),
+      if (stats.tracks > 0)
+        (Icons.music_note_outlined,
+            '${stats.tracks} ${stats.tracks == 1 ? "música" : "músicas"}'),
       if (stats.trackedMeters > 0)
         (Icons.timeline, '${p.trackedLabel} percorridos'),
       if (p.lastAdventure != null && p.lastAdventure!.label.isNotEmpty)

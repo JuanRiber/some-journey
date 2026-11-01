@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
+import '../features/photos/photo_picker.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
@@ -42,8 +43,10 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
   String _error = '';
 
   Future<void> _pickPhotos() async {
-    final imgs = await ImagePicker().pickMultiImage(limit: 5 - _picks.length);
-    if (imgs.isNotEmpty) setState(() => _picks.addAll(imgs.take(5 - _picks.length)));
+    final imgs = await SJPhoto.escolher(
+      restantes: SJPhoto.maxPorMemoria - _picks.length,
+    );
+    if (imgs.isNotEmpty) setState(() => _picks.addAll(imgs));
   }
 
   Future<void> _onSave() async {

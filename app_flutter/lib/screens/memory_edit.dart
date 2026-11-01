@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide MemoryImage;
 import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
+import '../features/photos/photo_picker.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
@@ -86,8 +87,10 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
 
   Future<void> _pickPhotos() async {
     final total = _saved.length + _picks.length;
-    final imgs = await ImagePicker().pickMultiImage(limit: 5 - total);
-    if (imgs.isNotEmpty) setState(() => _picks.addAll(imgs.take(5 - total)));
+    final imgs = await SJPhoto.escolher(
+      restantes: SJPhoto.maxPorMemoria - total,
+    );
+    if (imgs.isNotEmpty) setState(() => _picks.addAll(imgs));
   }
 
   Future<void> _onSave() async {

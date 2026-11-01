@@ -10,7 +10,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:some_journey/design/basemap.dart';
+import 'package:some_journey/design/tokens.dart';
 
 /// Quão longe duas cores estão, por canal. Comparar cor com `==` seria frágil:
 /// um erro de arredondamento de 1/255 não é um defeito.
@@ -27,6 +29,7 @@ Matcher _pertoDe(Color esperada, {int tolerancia = 3}) => predicate<Color>(
     );
 
 void main() {
+  _umFiltroSo();
   const branco = Color(0xFFFFFFFF);
   const preto = Color(0xFF000000);
 
@@ -104,6 +107,51 @@ void main() {
       expect(m[17], 0);
       expect(m[18], 1, reason: 'alfa preservado');
       expect(m[19], 0);
+    });
+  });
+}
+
+/// O filtro é UM, e envolve a camada de telhas inteira.
+///
+/// A versão anterior aplicava a cor no `tileBuilder`, ou seja, uma operação de
+/// filtro POR TELHA — vinte a quarenta `saveLayer` por quadro enquanto o mapa
+/// é arrastado. O motivo alegado era não tingir pins e rastros, e ele não se
+/// sustenta: essas camadas são IRMÃS da camada de telhas na lista de filhos do
+/// `FlutterMap`, nunca filhas dela.
+///
+/// O teste INSPECIONA o widget devolvido em vez de montá-lo: uma `TileLayer`
+/// não existe fora de um `FlutterMap` (ela chama `MapCamera.of`), e levantar
+/// um mapa inteiro aqui só traria pedidos de telha pela rede para dentro da
+/// suíte. A afirmação é sobre a forma da árvore, e a forma dá para ler parada.
+void _umFiltroSo() {
+  group('o filtro da base', () {
+    /// Captura o que `layer` devolve sem construir a camada.
+    Future<ColorFiltered> capturar(WidgetTester tester, SJScheme esquema) async {
+      late Widget camada;
+      await tester.pumpWidget(Builder(builder: (context) {
+        camada = SJBasemap.layer(context, esquema);
+        return const SizedBox.shrink();
+      }));
+      return camada as ColorFiltered;
+    }
+
+    testWidgets('é um só, e envolve a camada inteira', (tester) async {
+      final camada = await capturar(tester, sjLight);
+      final telhas = camada.child;
+
+      expect(telhas, isA<TileLayer>());
+      expect(
+        (telhas! as TileLayer).tileBuilder,
+        isNull,
+        reason: 'tileBuilder de volta significa um filtro POR TELHA de novo',
+      );
+    });
+
+    testWidgets('usa a rampa do esquema ativo', (tester) async {
+      for (final esquema in [sjLight, sjDark]) {
+        final camada = await capturar(tester, esquema);
+        expect(camada.colorFilter, SJBasemap.filtro(esquema));
+      }
     });
   });
 }

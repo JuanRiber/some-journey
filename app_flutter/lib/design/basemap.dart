@@ -117,19 +117,26 @@ class SJBasemap {
       s.brightness == Brightness.dark ? _escuro : _claro;
 
   /// A camada de telhas pronta, já na cor do tema.
-  static TileLayer layer(BuildContext context, SJScheme s) => TileLayer(
-        urlTemplate: tileUrl,
-        userAgentPackageName: userAgent,
-        // O OSM não serve telhas @2x, e a URL não tem o marcador {r}. Com
-        // retinaMode ligado, o flutter_map entra em modo SIMULADO: corta o
-        // tileSize pela metade e desloca o zoom — configuração errada para
-        // esta base. Desligado, ele pede as telhas 256px que existem de fato.
-        retinaMode: false,
-        // O filtro vai por telha (e não no mapa inteiro) para NÃO tingir os
-        // pins, os rastros e o rótulo de atribuição desenhados por cima.
-        tileBuilder: (context, tileWidget, tile) => ColorFiltered(
-          colorFilter: filtro(s),
-          child: tileWidget,
+  ///
+  /// O filtro é UM só, por fora da camada inteira — e não um por telha.
+  ///
+  /// Ele nasceu no `tileBuilder` para não tingir pins, rastros e atribuição,
+  /// o que é a preocupação certa pela via errada: essas camadas são IRMÃS da
+  /// camada de telhas na lista de filhos do `FlutterMap`, não filhas dela, e
+  /// por isso já ficam de fora de um filtro aplicado aqui. O que o por-telha
+  /// custava era real: cada telha visível virava uma operação de filtro
+  /// própria — vinte a quarenta `saveLayer` por quadro enquanto o dedo
+  /// arrasta o mapa, que é exatamente quando não há quadro sobrando.
+  static Widget layer(BuildContext context, SJScheme s) => ColorFiltered(
+        colorFilter: filtro(s),
+        child: TileLayer(
+          urlTemplate: tileUrl,
+          userAgentPackageName: userAgent,
+          // O OSM não serve telhas @2x, e a URL não tem o marcador {r}. Com
+          // retinaMode ligado, o flutter_map entra em modo SIMULADO: corta o
+          // tileSize pela metade e desloca o zoom — configuração errada para
+          // esta base. Desligado, ele pede as telhas 256px que existem de fato.
+          retinaMode: false,
         ),
       );
 

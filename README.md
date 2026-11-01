@@ -185,6 +185,22 @@ flutter analyze
 flutter test
 ```
 
+Build para a web:
+
+```bash
+flutter build web --no-web-resources-cdn
+```
+
+O `--no-web-resources-cdn` **nao e opcional**. Sem ele o Flutter copia o
+CanvasKit para dentro do build e mesmo assim o busca em `www.gstatic.com` a
+cada carga da pagina. Medido neste projeto, no mesmo navegador e no mesmo
+recurso: `canvaskit.wasm` passou de **3.088ms para 232ms**, e o `load` da
+pagina, de **3.136ms para 144ms**. Com o flag o app tambem abre sem internet.
+
+Nao use `--no-tree-shake-icons`: sem ele as fontes de icone caem de 1,9MB para
+13KB, e o build so passa quando todo `IconData` e const — ou seja, ele proprio
+verifica que nenhum icone some.
+
 ---
 
 ## API atual

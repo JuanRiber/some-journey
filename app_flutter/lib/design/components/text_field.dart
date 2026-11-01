@@ -33,6 +33,7 @@ class SJTextField extends StatefulWidget {
     this.enabled = true,
     this.autofocus = false,
     this.focusNode,
+    this.leading,
     this.trailing,
     this.onChanged,
     this.onSubmitted,
@@ -53,6 +54,12 @@ class SJTextField extends StatefulWidget {
   final bool enabled;
   final bool autofocus;
   final FocusNode? focusNode;
+
+  /// Widget à ESQUERDA dentro da caixa (ex.: envelope no e-mail, cadeado na
+  /// senha). É decoração semântica: diz do que é o campo antes de a pessoa
+  /// ler o rótulo, e por isso nasce em `inkFaint` — se competisse em peso com
+  /// o texto digitado, viraria ruído em todo formulário do app.
+  final Widget? leading;
 
   /// Widget à direita dentro da caixa (ex.: ícone de "mostrar senha").
   final Widget? trailing;
@@ -122,6 +129,13 @@ class _SJTextFieldState extends State<SJTextField> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              if (widget.leading != null) ...[
+                IconTheme.merge(
+                  data: IconThemeData(size: 18, color: s.inkFaint),
+                  child: widget.leading!,
+                ),
+                const SizedBox(width: SJSpace.x3),
+              ],
               Expanded(
                 child: CupertinoTextField(
                   controller: widget.controller,

@@ -41,6 +41,71 @@ class DesignGalleryScreen extends StatelessWidget {
 }
 
 /// Um painel completo do sistema num único modo (lê `SJTheme.of(context)`).
+/// Os dois ornamentos de papel, na opacidade cheia para conferência.
+///
+/// Em uso eles vivem em 0,3 e sangrando para fora da borda — aqui aparecem
+/// inteiros e opacos porque a bancada serve para ver o TRAÇO, que é o que se
+/// perde primeiro quando alguém mexe num raio ou numa espessura.
+class _Ornamentos extends StatelessWidget {
+  const _Ornamentos();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Wrap(
+      spacing: SJSpace.x6,
+      runSpacing: SJSpace.x6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        SJSeal(size: 120, opacity: 1),
+        SJSprig(size: 150, opacity: 1),
+        SJSprig(size: 150, opacity: 1, flip: true),
+      ],
+    );
+  }
+}
+
+/// O `SJBook` nos dois extremos da cerimônia, parado.
+///
+/// A bancada mostra ESTADOS, não filmes: é aqui que se confere se a capa e o
+/// papel continuam coerentes nos dois modos. O movimento entre um e outro é o
+/// que `test/book_test.dart` cobre quadro a quadro — captura de tela não pega
+/// sinal de giro trocado.
+class _Livro extends StatelessWidget {
+  const _Livro();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Fechado — a capa', style: SJText.caption(color: s.inkFaint)),
+        const SizedBox(height: SJSpace.x2),
+        const SizedBox(
+          height: 260,
+          child: SJBook(
+            openness: 0,
+            coverSubtitle: 'Criar conta',
+            left: SizedBox.shrink(),
+            right: SizedBox.shrink(),
+          ),
+        ),
+        const SizedBox(height: SJSpace.x6),
+        Text('Aberto — a folha dupla', style: SJText.caption(color: s.inkFaint)),
+        const SizedBox(height: SJSpace.x2),
+        SizedBox(
+          height: 260,
+          child: SJBook(
+            openness: 1,
+            left: Text('Obrigatórios', style: SJText.title(color: s.ink)),
+            right: Text('Opcionais', style: SJText.title(color: s.ink)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _GalleryPanel extends StatelessWidget {
   const _GalleryPanel({required this.modeLabel});
 
@@ -144,6 +209,20 @@ class _GalleryPanel extends StatelessWidget {
               overline: 'HERÓI',
               title: 'A viagem, em luz',
               child: _LightGate(),
+            ),
+
+            const _Block(
+              numeral: '10',
+              overline: 'CADERNO',
+              title: 'O livro',
+              child: _Livro(),
+            ),
+
+            const _Block(
+              numeral: '11',
+              overline: 'ORNAMENTO',
+              title: 'Carimbo e herbário',
+              child: _Ornamentos(),
             ),
           ],
         ),

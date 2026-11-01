@@ -2,11 +2,25 @@ import 'package:flutter/material.dart' hide MemoryImage;
 import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
+import '../design/components.dart';
+import '../design/sj_theme.dart';
+import '../design/tokens.dart';
 import '../models.dart';
-import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/date_field.dart';
 import '../widgets/location_picker.dart';
+
+/// Itálico serifado da linha de abertura — a mesma "voz de diário" da tela de
+/// criar, para editar e criar soarem como a mesma página. Composto só a partir
+/// dos tokens, nunca com tamanho escrito solto.
+TextStyle _diarioItalico(SJScheme s) => TextStyle(
+      fontFamily: SJType.serif,
+      fontFamilyFallback: SJType.serifFallback,
+      fontSize: SJType.bodySmSize,
+      height: SJType.bodySmLine / SJType.bodySmSize,
+      fontStyle: FontStyle.italic,
+      color: s.inkSoft,
+    );
 
 /// Editar memória: espelha a tela de criar, mas pré-carrega pelo id e salva com
 /// PATCH. 404/422 (inexistente, de outro dono ou UUID malformado) viram
@@ -120,6 +134,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -129,21 +144,20 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Text('← Voltar',
+                child: Text('← Voltar',
                     style: TextStyle(
-                        color: SJColors.ink, fontSize: 14, fontWeight: FontWeight.w500)),
+                        color: s.ink, fontSize: 14, fontWeight: FontWeight.w500)),
               ),
               const SizedBox(height: 12),
-              Text('Editar memória', style: serif(28)),
+              Text('Editar memória', style: SJText.h1(color: s.ink)),
               const SizedBox(height: 6),
-              Text('Ajuste o que precisar.',
-                  style: serif(14.5, color: SJColors.inkSoft, style: FontStyle.italic)),
+              Text('Ajuste o que precisar.', style: _diarioItalico(s)),
               if (_loadError.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(top: 32),
                   child: Text(_loadError,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: SJColors.danger, fontSize: 15)),
+                      style: TextStyle(color: s.danger, fontSize: 15)),
                 )
               else if (!_loaded)
                 const Padding(
@@ -171,7 +185,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                   }),
                 ),
                 const FieldLabel('Fotos (opcional, até 5)'),
-                _photoGrid(),
+                _photoGrid(s),
                 InlineError(_error),
                 const SizedBox(height: 20),
                 PrimaryButton(
@@ -186,23 +200,24 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     );
   }
 
-  Widget _photoGrid() {
+  Widget _photoGrid(SJScheme s) {
     final total = _saved.length + _picks.length;
     return Wrap(
       spacing: 10,
       runSpacing: 10,
       children: [
         for (final img in _saved)
-          _thumb(Image.network(img.url, width: 84, height: 84, fit: BoxFit.cover),
+          _thumb(s, Image.network(img.url, width: 84, height: 84, fit: BoxFit.cover),
               onRemove: () => _removeSaved(img.id)),
         for (var i = 0; i < _picks.length; i++)
           _thumb(
+            s,
             Image.network(_picks[i].path,
                 width: 84,
                 height: 84,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) =>
-                    Container(width: 84, height: 84, color: SJColors.sand)),
+                    Container(width: 84, height: 84, color: s.surfaceAlt)),
             onRemove: () => setState(() => _picks.removeAt(i)),
           ),
         if (total < 5)
@@ -214,7 +229,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
     );
   }
 
-  Widget _thumb(Widget image, {required VoidCallback onRemove}) => Stack(
+  Widget _thumb(SJScheme s, Widget image, {required VoidCallback onRemove}) => Stack(
         clipBehavior: Clip.none,
         children: [
           ClipRRect(borderRadius: BorderRadius.circular(4), child: image),
@@ -226,11 +241,11 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
               child: Container(
                 width: 22,
                 height: 22,
-                decoration: const BoxDecoration(color: SJColors.danger, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: s.danger, shape: BoxShape.circle),
                 alignment: Alignment.center,
-                child: const Text('×',
+                child: Text('×',
                     style: TextStyle(
-                        color: SJColors.ink, fontSize: 15, fontWeight: FontWeight.w700)),
+                        color: s.ink, fontSize: 15, fontWeight: FontWeight.w700)),
               ),
             ),
           ),

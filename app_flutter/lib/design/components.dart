@@ -6,13 +6,16 @@
 library;
 
 export 'components/badge.dart';
+export 'components/book.dart';
 export 'components/buttons.dart';
 export 'components/card.dart';
 export 'components/chip.dart';
 export 'components/empty_state.dart';
 export 'components/fab.dart';
 export 'components/overline.dart';
+export 'components/seal.dart';
 export 'components/section.dart';
 export 'components/sheet.dart';
+export 'components/sprig.dart';
 export 'components/text_field.dart';
 export 'components/type_styles.dart';

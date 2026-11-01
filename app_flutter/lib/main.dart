@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:some_journey/design/gallery.dart';
 
 import 'api.dart';
+import 'design/sj_theme.dart';
 import 'design/theme.dart';
+import 'design/theme_controller.dart';
 import 'design/tokens.dart';
 import 'screens/change_password.dart';
 import 'screens/forgot_password.dart';
@@ -19,16 +21,46 @@ import 'screens/register.dart';
 import 'screens/settings.dart';
 import 'screens/tabs.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SomeJourneyApp());
+
+  final tema = SjThemeController();
+  // A preferência de aparência é lida ANTES do primeiro quadro, senão quem
+  // escolheu o atlas noturno abre o app num estalo creme e vê a tela trocar na
+  // frente dele. Um segundo de teto: isto é cosmético, e esperar mais por
+  // cosmética é pior que começar claro. Se estourar, `loadSaved` continua
+  // correndo e o notifier corrige depois — tarde é melhor que nunca.
+  try {
+    await tema.loadSaved().timeout(const Duration(seconds: 1));
+  } catch (_) {
+    // Armazenamento indisponível (aba privada, política de site): modo padrão.
+  }
+
+  runApp(SomeJourneyApp(tema: tema));
 }
 
 class SomeJourneyApp extends StatelessWidget {
-  const SomeJourneyApp({super.key});
+  const SomeJourneyApp({super.key, required this.tema});
+
+  final SjThemeController tema;
 
   @override
   Widget build(BuildContext context) {
+    // `ListenableBuilder` por fora reconstrói o `MaterialApp` (que precisa do
+    // `themeMode` novo); `SjThemeScope` por dentro entrega o controlador às
+    // telas. Os dois, e nesta ordem: o escopo sozinho avisaria os dependentes
+    // mas não trocaria o tema, e o builder sozinho trocaria o tema sem dar a
+    // ninguém como mudá-lo.
+    return ListenableBuilder(
+      listenable: tema,
+      builder: (context, _) => SjThemeScope(
+        controller: tema,
+        child: _app(),
+      ),
+    );
+  }
+
+  Widget _app() {
     return MaterialApp(
       title: 'Some Journey',
       debugShowCheckedModeBanner: false,
@@ -39,7 +71,26 @@ class SomeJourneyApp extends StatelessWidget {
       // O modo escuro por tela chega na etapa editorial (SJTheme.of(context)).
       theme: buildSjTheme(sjLight),
       darkTheme: buildSjTheme(sjDark),
-      themeMode: ThemeMode.light,
+      themeMode: tema.mode,
+      // AQUI é onde o modo escuro passa a existir de verdade.
+      //
+      // `themeMode` sozinho trocaria só o Material por baixo. As telas leem
+      // `SJTheme.of(context)`, e sem ninguém provendo o esquema esse `of` cai
+      // no fallback claro — o app inteiro continuaria creme dentro de um tema
+      // escuro, sem erro nenhum. O `builder` embrulha o Navigator, então toda
+      // rota (inclusive o livro do cadastro, que é translúcida) nasce com o
+      // esquema certo.
+      //
+      // O esquema vem do `schemeFor` do próprio controlador, não de
+      // `Theme.of(context).brightness`: as duas respostas saem das mesmas duas
+      // entradas (modo escolhido + brilho da plataforma), mas o `AnimatedTheme`
+      // do Material interpola a sua durante a troca, e os nossos tokens não
+      // são interpoláveis — meia transição com cor lerped não é nem papel nem
+      // atlas.
+      builder: (context, child) => SJTheme(
+        scheme: tema.schemeFor(context),
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: const _Bootstrap(),
       // Rotas com argumento (id) são resolvidas em onGenerateRoute; as sem
       // argumento ficam no mapa estático.
@@ -54,7 +105,6 @@ class SomeJourneyApp extends StatelessWidget {
       // O login tem nome próprio; todo o app navega para '/login'.
       routes: {
         '/login': (_) => const LoginScreen(),
-        '/register': (_) => const RegisterScreen(),
         '/forgot': (_) => const ForgotPasswordScreen(),
         '/change-password': (_) => const ChangePasswordScreen(),
         '/tabs': (_) => const TabsScreen(),
@@ -69,6 +119,22 @@ class SomeJourneyApp extends StatelessWidget {
         '/design-gallery': (_) => const DesignGalleryScreen(),
       },
       onGenerateRoute: (settings) {
+        // O cadastro entra em cena como LIVRO, e por isso não pode ser uma
+        // rota comum: o `MaterialPageRoute` deslizaria o login para fora e
+        // apagaria a tela de baixo (`opaque: true`), deixando a capa subir
+        // contra o vazio. Aqui a rota é TRANSLÚCIDA e sem transição própria —
+        // o login continua pintado atrás, escurecendo, e a única animação é a
+        // do `SJBook`. Fica em onGenerateRoute porque o mapa `routes` só
+        // aceita construtores, não rotas com comportamento.
+        if (settings.name == '/register') {
+          return PageRouteBuilder<String?>(
+            settings: settings,
+            opaque: false,
+            transitionDuration: Duration.zero,
+            reverseTransitionDuration: Duration.zero,
+            pageBuilder: (_, _, _) => const RegisterScreen(),
+          );
+        }
         final id = settings.arguments as String?;
         Widget? page;
         switch (settings.name) {

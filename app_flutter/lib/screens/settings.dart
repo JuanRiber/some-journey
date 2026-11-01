@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
+import '../design/theme_controller.dart';
 import '../design/tokens.dart';
 
 /// # Configurações — estruturadas para crescer.
@@ -72,14 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const _Row(label: 'Excluir conta', soon: true),
             ]),
 
-            _Section(title: 'Aparência', children: [
-              // O tema JÁ existe nos dois modos (papel/atlas). Enquanto a
-              // alternância não é persistida por tela, mostramos o modo vigente
-              // em vez de um controle que mentiria sobre o que faz.
-              _Row(label: 'Papel (claro)', trailing: _current(s, true)),
-              _Row(label: 'Atlas (escuro)', trailing: _current(s, false), soon: true),
-              const _Row(label: 'Automático (sistema)', soon: true),
-            ]),
+            const _Section(title: 'Aparência', children: [_Aparencia()]),
 
             const _Section(title: 'Notificações', children: [
               _Row(label: 'Lembretes de revisita', soon: true),
@@ -145,12 +139,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
   }
+}
 
-  /// Marca o modo vigente sem prometer alternância que ainda não persiste.
-  Widget? _current(SJScheme s, bool isLight) =>
-      (s.brightness == Brightness.light) == isLight
-          ? const SJBadge('Em uso')
-          : null;
+/// Os três modos de aparência, como grupo de escolha.
+///
+/// Era um mostrador: os dois temas existiam desde sempre, mas nada ligava a
+/// preferência ao app, então a tela exibia o modo vigente com um selo "Em uso"
+/// e marcava os outros dois como "em breve". Agora que a escolha é real e
+/// persistida, o controle certo é rádio — selo diz o que É, rádio diz o que se
+/// PODE escolher, e a diferença entre os dois é exatamente o que mudou aqui.
+class _Aparencia extends StatelessWidget {
+  const _Aparencia();
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = SjThemeScope.of(context);
+    final s = SJTheme.of(context);
+    final escuro = s.brightness == Brightness.dark;
+    return Column(
+      children: [
+        const _Modo(mode: ThemeMode.light, label: 'Papel (claro)'),
+        const _Modo(mode: ThemeMode.dark, label: 'Atlas (escuro)'),
+        _Modo(
+          mode: ThemeMode.system,
+          label: 'Automático (sistema)',
+          // Só no automático a escolha não diz o resultado: "sistema" pode ser
+          // qualquer um dos dois, e a pessoa precisa saber em qual está.
+          nota: tema.mode == ThemeMode.system
+              ? 'Agora: ${escuro ? 'atlas (escuro)' : 'papel (claro)'}'
+              : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _Modo extends StatelessWidget {
+  const _Modo({required this.mode, required this.label, this.nota});
+
+  final ThemeMode mode;
+  final String label;
+  final String? nota;
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = SjThemeScope.of(context);
+    final s = SJTheme.of(context);
+    final ativo = tema.mode == mode;
+
+    return Semantics(
+      inMutuallyExclusiveGroup: true,
+      checked: ativo,
+      child: InkWell(
+        // O modo ativo não é tocável: tocar nele não faria nada, e um toque
+        // sem efeito é o jeito mais rápido de alguém achar que o app travou.
+        onTap: ativo ? null : () => tema.setMode(mode),
+        borderRadius: BorderRadius.circular(SJRadius.sm),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: SJSpace.x3),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: SJText.body(color: s.ink)),
+                    if (nota != null) ...[
+                      const SizedBox(height: SJSpace.x1),
+                      Text(nota!, style: SJText.caption(color: s.inkFaint)),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(
+                ativo ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                size: 20,
+                color: ativo ? s.primary : s.inkFaint,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _Section extends StatelessWidget {
@@ -176,11 +247,10 @@ class _Section extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({required this.label, this.onTap, this.trailing, this.soon = false});
+  const _Row({required this.label, this.onTap, this.soon = false});
 
   final String label;
   final VoidCallback? onTap;
-  final Widget? trailing;
 
   /// "em breve": visível (mostra o mapa do produto) mas NÃO clicável.
   final bool soon;
@@ -199,7 +269,6 @@ class _Row extends StatelessWidget {
               style: SJText.body(color: soon ? s.inkFaint : s.ink),
             ),
           ),
-          ?trailing,
           if (soon)
             Text('em breve', style: SJText.caption(color: s.inkFaint))
           else if (enabled)

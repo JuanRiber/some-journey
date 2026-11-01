@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../design/components.dart';
+import '../design/sj_theme.dart';
+import '../design/tokens.dart';
 import '../models.dart';
 import '../features/music/memory_music_section.dart';
-import '../theme.dart';
 import '../widgets/photo_viewer.dart';
 
 const _mesesLong = [
@@ -15,6 +17,21 @@ String _formatFull(String iso) {
   final d = DateTime.parse(iso).toUtc();
   return '${d.day.toString().padLeft(2, '0')} de ${_mesesLong[d.month - 1]} de ${d.year}';
 }
+
+/// Itálico serifado da frase afetiva do rodapé — a "voz de diário" da tela.
+///
+/// Composto só a partir dos tokens (família serifada + escala de corpo): o
+/// tamanho não pode ser escrito solto aqui, senão a próxima mudança de escala
+/// passaria por esta tela sem avisar. A cor é o acento, que é o papel que a
+/// paleta reserva ao caderno (couro no papel quente, ouro no atlas noturno).
+TextStyle _diarioItalico(SJScheme s) => TextStyle(
+      fontFamily: SJType.serif,
+      fontFamilyFallback: SJType.serifFallback,
+      fontSize: SJType.bodySize,
+      height: SJType.bodyLine / SJType.bodySize,
+      fontStyle: FontStyle.italic,
+      color: s.accent,
+    );
 
 /// Detalhe de uma memória. Segurança (espelha o app Expo): id de outro usuário,
 /// inexistente ou apagado vira 404; UUID malformado vira 422 — ambos aparecem
@@ -74,6 +91,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final m = _memory;
+    final s = SJTheme.of(context);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -83,21 +101,21 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
               padding: const EdgeInsets.fromLTRB(18, 4, 18, 6),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: _backButton(),
+                child: _backButton(s),
               ),
             ),
             Expanded(
               child: _error.isNotEmpty
                   ? Center(
                       child: Text(_error,
-                          style: const TextStyle(color: SJColors.danger, fontSize: 15)))
+                          style: TextStyle(color: s.danger, fontSize: 15)))
                   : m == null
                       ? const Center(child: CircularProgressIndicator())
                       : ListView(
                           padding: const EdgeInsets.fromLTRB(28, 8, 28, 48),
                           children: [
                             if (m.hasTitle) ...[
-                              Text(m.title, style: serif(28, height: 1.2)),
+                              Text(m.title, style: SJText.h1(color: s.ink)),
                               const SizedBox(height: 8),
                             ],
                             Row(
@@ -105,13 +123,13 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                 Container(
                                     width: 9,
                                     height: 9,
-                                    decoration: const BoxDecoration(
-                                        color: SJColors.wine, shape: BoxShape.circle)),
+                                    decoration: BoxDecoration(
+                                        color: s.primary, shape: BoxShape.circle)),
                                 const SizedBox(width: 7),
                                 Expanded(
                                   child: Text(
                                     '${m.latitude.toStringAsFixed(3)}, ${m.longitude.toStringAsFixed(3)} • ${_formatFull(m.occurredAt)}',
-                                    style: monoLabel(11),
+                                    style: SJText.overline(color: s.accent),
                                   ),
                                 ),
                               ],
@@ -135,7 +153,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                       child: Container(
                                         decoration: BoxDecoration(
                                             border: Border.all(
-                                                color: SJColors.frame, width: 3)),
+                                                color: s.frame, width: 3)),
                                         child: AspectRatio(
                                           aspectRatio: 4 / 3,
                                           child: Image.network(entry.value.url,
@@ -150,14 +168,14 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(top: 18),
                                 child: Text(m.text,
-                                    style: const TextStyle(
-                                        color: SJColors.ink, fontSize: 16, height: 1.55)),
+                                    style: TextStyle(
+                                        color: s.ink, fontSize: 16, height: 1.55)),
                               ),
                             // A trilha vem DEPOIS do texto e das fotos: a
                             // música acompanha a lembrança, não a anuncia.
-                            const Padding(
-                              padding: EdgeInsets.only(top: 28),
-                              child: Divider(color: SJColors.line, height: 1),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 28),
+                              child: Divider(color: s.line, height: 1),
                             ),
                             Padding(
                               padding: const EdgeInsets.only(top: 22),
@@ -168,24 +186,23 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                     setState(() => _memory = atualizada),
                               ),
                             ),
-                            const Padding(
-                              padding: EdgeInsets.only(top: 28),
-                              child: Divider(color: SJColors.line, height: 1),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 28),
+                              child: Divider(color: s.line, height: 1),
                             ),
                             Padding(
                               padding: const EdgeInsets.only(top: 18),
                               child: Text('“A vida deixa rastros.”',
                                   textAlign: TextAlign.center,
-                                  style: serif(16,
-                                      color: SJColors.bloom, style: FontStyle.italic)),
+                                  style: _diarioItalico(s)),
                             ),
                             const SizedBox(height: 30),
                             if (_confirmDelete)
                               Column(
                                 children: [
-                                  const Text('Apagar esta memória?',
+                                  Text('Apagar esta memória?',
                                       style: TextStyle(
-                                          color: SJColors.ink,
+                                          color: s.ink,
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600)),
                                   const SizedBox(height: 14),
@@ -194,7 +211,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                     children: [
                                       ElevatedButton(
                                         style: ElevatedButton.styleFrom(
-                                            backgroundColor: SJColors.danger,
+                                            backgroundColor: s.danger,
                                             padding: const EdgeInsets.symmetric(
                                                 horizontal: 22, vertical: 11)),
                                         onPressed: _deleting ? null : _onDelete,
@@ -206,9 +223,9 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                         onPressed: _deleting
                                             ? null
                                             : () => setState(() => _confirmDelete = false),
-                                        child: const Text('Cancelar',
+                                        child: Text('Cancelar',
                                             style: TextStyle(
-                                                color: SJColors.inkSoft, fontSize: 14)),
+                                                color: s.inkSoft, fontSize: 14)),
                                       ),
                                     ],
                                   ),
@@ -232,9 +249,8 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                               Center(
                                 child: TextButton(
                                   onPressed: () => setState(() => _confirmDelete = true),
-                                  child: const Text('Apagar memória',
-                                      style:
-                                          TextStyle(color: SJColors.danger, fontSize: 14)),
+                                  child: Text('Apagar memória',
+                                      style: TextStyle(color: s.danger, fontSize: 14)),
                                 ),
                               ),
                             ],
@@ -247,7 +263,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
     );
   }
 
-  Widget _backButton() => InkWell(
+  Widget _backButton(SJScheme s) => InkWell(
         onTap: () => Navigator.of(context).canPop()
             ? Navigator.of(context).pop()
             : Navigator.of(context).pushReplacementNamed('/tabs'),
@@ -256,12 +272,12 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: SJColors.card,
+            color: s.surface,
             shape: BoxShape.circle,
-            border: Border.all(color: SJColors.line),
+            border: Border.all(color: s.line),
           ),
           alignment: Alignment.center,
-          child: const Text('←', style: TextStyle(color: SJColors.ink, fontSize: 20)),
+          child: Text('←', style: TextStyle(color: s.ink, fontSize: 20)),
         ),
       );
 }

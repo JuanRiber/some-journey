@@ -14,6 +14,9 @@
 ///
 /// As cores foram escolhidas orgânicas (nada saturado) e checadas para contraste
 /// de texto (alvo WCAG AA 4.5:1 no corpo; overlines ≥3:1 por serem grandes/bold).
+/// "Checadas" era à mão, e à mão escapou: quem cobra esse piso agora é
+/// `test/contrast_test.dart`, que recalcula a razão de cada par tinta↔superfície
+/// nos dois modos. Mudou um valor aqui, é lá que o estrago aparece.
 library;
 
 import 'package:flutter/widgets.dart';
@@ -77,7 +80,13 @@ const SJScheme sjLight = SJScheme(
   surfaceAlt: Color(0xFFEFE7D7), // areia clara (inputs)
   ink: Color(0xFF2B2724), // marrom quase-preto quente
   inkSoft: Color(0xFF6E6353),
-  inkFaint: Color(0xFF9C917E),
+  // A tinta mais quieta do conjunto era também a única abaixo do piso: em
+  // #9C917E dava 2,73:1 sobre `bg` e 2,53:1 sobre `surfaceAlt` — e é justamente
+  // sobre `surfaceAlt` que ela escreve o placeholder dos campos. Escurecida o
+  // MÍNIMO para passar de 3:1 em todas as superfícies claras (3,37 / 3,12 /
+  // 3,61 / 3,01), mantendo o matiz (38°) e a distância para `inkSoft`: continua
+  // sendo a terciária, não virou uma segunda secundária.
+  inkFaint: Color(0xFF8C816E),
   line: Color(0x1A2B2724), // tinta a 10%
   frame: Color(0xFFC4AE86), // couro claro decorativo
   primary: Color(0xFF6E2C3A), // vinho profundo (ação)
@@ -174,6 +183,18 @@ abstract final class SJMotion {
   static const Duration base = Duration(milliseconds: 220);
   static const Duration slow = Duration(milliseconds: 360);
   static const Duration page = Duration(milliseconds: 420);
+
+  /// Cerimônia — abrir e fechar o livro do cadastro (`SJBook`).
+  ///
+  /// PORQUÊ a escala ganhou um degrau acima de `page`: as outras durações são
+  /// de TRANSIÇÃO, onde o tempo é custo e o alvo é não ser notado. Esta é de
+  /// ENCENAÇÃO — a única animação do app que o usuário deve ver acontecer.
+  /// Uma capa de livro tem massa; abri-la em 420ms parece uma carta de baralho
+  /// virando. O teto é o cadastro: passando de ~1s, quem só quer criar a conta
+  /// espera pela animação — e esse é o momento em que ela deixa de ser um
+  /// presente e vira pedágio.
+  static const Duration ceremony = Duration(milliseconds: 900);
+
   static const Cubic standard = Cubic(0.2, 0.0, 0.0, 1.0);
   static const Cubic enter = Cubic(0.05, 0.7, 0.1, 1.0);
   static const Cubic exit = Cubic(0.3, 0.0, 0.8, 0.15);

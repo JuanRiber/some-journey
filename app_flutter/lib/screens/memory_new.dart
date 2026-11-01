@@ -2,10 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
-import '../theme.dart';
+import '../design/components.dart';
+import '../design/sj_theme.dart';
+import '../design/tokens.dart';
 import '../widgets/common.dart';
 import '../widgets/date_field.dart';
 import '../widgets/location_picker.dart';
+
+/// Itálico serifado da linha de abertura — a "voz de diário" que apresenta o
+/// formulário. Composto só a partir dos tokens: tamanho e entrelinha saem da
+/// escala, para uma mudança na escala não deixar esta tela para trás.
+TextStyle _diarioItalico(SJScheme s) => TextStyle(
+      fontFamily: SJType.serif,
+      fontFamilyFallback: SJType.serifFallback,
+      fontSize: SJType.bodySmSize,
+      height: SJType.bodySmLine / SJType.bodySmSize,
+      fontStyle: FontStyle.italic,
+      color: s.inkSoft,
+    );
 
 /// Criar memória. `journeyId` opcional: quando presente, a memória já nasce
 /// vinculada à jornada (modo jornada — o ponto entra em sequência no rastro).
@@ -86,6 +100,7 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -95,15 +110,15 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
             children: [
               GestureDetector(
                 onTap: () => Navigator.of(context).pop(),
-                child: const Text('← Voltar',
+                child: Text('← Voltar',
                     style: TextStyle(
-                        color: SJColors.ink, fontSize: 14, fontWeight: FontWeight.w500)),
+                        color: s.ink, fontSize: 14, fontWeight: FontWeight.w500)),
               ),
               const SizedBox(height: 12),
-              Text('Nova memória', style: serif(28)),
+              Text('Nova memória', style: SJText.h1(color: s.ink)),
               const SizedBox(height: 6),
               Text('Um acontecimento, um lugar, um momento.',
-                  style: serif(14.5, color: SJColors.inkSoft, style: FontStyle.italic)),
+                  style: _diarioItalico(s)),
               const FieldLabel('Título'),
               TextField(
                 controller: _title,
@@ -129,7 +144,7 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
                 }),
               ),
               const FieldLabel('Fotos (opcional, até 5)'),
-              _photoGrid(),
+              _photoGrid(s),
               InlineError(_error),
               const SizedBox(height: 20),
               PrimaryButton(
@@ -143,7 +158,7 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
     );
   }
 
-  Widget _photoGrid() {
+  Widget _photoGrid(SJScheme s) {
     final remaining = 5 - _picks.length;
     return Wrap(
       spacing: 10,
@@ -160,7 +175,7 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
                     height: 84,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => Container(
-                        width: 84, height: 84, color: SJColors.sand)),
+                        width: 84, height: 84, color: s.surfaceAlt)),
               ),
               Positioned(
                 top: -6,
@@ -171,11 +186,11 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
                     width: 22,
                     height: 22,
                     decoration:
-                        const BoxDecoration(color: SJColors.danger, shape: BoxShape.circle),
+                        BoxDecoration(color: s.danger, shape: BoxShape.circle),
                     alignment: Alignment.center,
-                    child: const Text('×',
+                    child: Text('×',
                         style: TextStyle(
-                            color: SJColors.ink, fontSize: 15, fontWeight: FontWeight.w700)),
+                            color: s.ink, fontSize: 15, fontWeight: FontWeight.w700)),
                   ),
                 ),
               ),

@@ -200,13 +200,30 @@ class Api {
   /// que o proxy devolve quando o contêiner não sobe. É texto de
   /// infraestrutura, em inglês, que não diz nada a quem está do outro lado e
   /// ainda conta o que quebrou. Nesses casos a frase é nossa.
+  /// 503 numa rota de imagem NÃO é servidor fora do ar.
+  ///
+  /// O backend separa os dois casos de propósito — 502 quando a comunicação
+  /// com o storage falha, 503 quando ele nem está configurado — e a tela
+  /// estava contando a mesma história para os dois. Dizer "fora do ar" manda
+  /// a pessoa esperar por algo que não muda sozinho, e ainda acusa de queda um
+  /// servidor que está de pé respondendo todo o resto.
+  static bool _semStorage(http.Response r) {
+    final caminho = r.request?.url.path ?? '';
+    return caminho.endsWith('/images') ||
+        caminho.endsWith('/avatar') ||
+        caminho.endsWith('/cover');
+  }
+
   ApiError _errorFor(http.Response r) {
     final kind = ApiError.kindOf(r.statusCode);
     final espera = _retryAfter(r);
     return switch (kind) {
       ApiFailure.unavailable => ApiError(
           r.statusCode,
-          'O servidor está fora do ar no momento. Tente de novo ${_quando(espera)}.',
+          _semStorage(r)
+              ? 'As fotos estão indisponíveis aqui: o armazenamento de imagens '
+                  'não está configurado. O resto da memória salva normalmente.'
+              : 'O servidor está fora do ar no momento. Tente de novo ${_quando(espera)}.',
           kind: kind,
           retryAfter: espera,
         ),
@@ -392,7 +409,7 @@ class Api {
 
   /// Envia a foto de perfil e devolve o Perfil atualizado (com a URL assinada).
   Future<Profile> setAvatar(List<int> bytes, String filename, String mimeType) async =>
-      Profile.fromJson(await _uploadJson('/me/avatar', bytes, filename, mimeType));
+      Profile.fromJson(await _upload('/me/avatar', bytes, filename, mimeType));
 
   /// Remove a foto de perfil (idempotente): volta a mostrar as iniciais.
   Future<Profile> removeAvatar() async =>
@@ -423,48 +440,28 @@ class Api {
 
   Future<void> deleteMemory(String id) => _request('DELETE', '/memories/$id', authed: true);
 
+  /// Anexa uma foto à memória. A rota devolve a memória inteira, mas o corpo é
+  /// descartado de propósito: quem chama está num laço de várias fotos
+  /// (memory_edit, memory_new) e relê a memória uma vez no fim.
   Future<void> addMemoryImage(String id, List<int> bytes, String filename, String mimeType) =>
       _upload('/memories/$id/images', bytes, filename, mimeType);
 
   Future<void> deleteMemoryImage(String memoryId, String imageId) =>
       _request('DELETE', '/memories/$memoryId/images/$imageId', authed: true);
 
-  /// Upload multipart que DEVOLVE o corpo decodificado (o `_upload` abaixo
-  /// descarta a resposta; aqui o servidor devolve o recurso atualizado).
-  Future<dynamic> _uploadJson(
+  /// O ÚNICO envio multipart do cliente: avatar, capa da jornada e foto da
+  /// memória passam todos por aqui.
+  ///
+  /// Eram dois caminhos quase iguais, e a cópia não era inofensiva: só um deles
+  /// enviava pelo cliente injetável, então a foto da memória — o upload mais
+  /// usado do app — era o único que nenhum teste conseguia observar. Duas
+  /// cópias de uma correção é uma correção que vai ser aplicada só numa delas.
+  ///
+  /// Devolve o corpo já decodificado (null quando a resposta vem vazia): quem
+  /// precisa do recurso atualizado lê o retorno, e quem não precisa ignora —
+  /// como [addMemoryImage] faz, e como [_request] já fazia para `deleteMemory`.
+  Future<dynamic> _upload(
       String path, List<int> bytes, String filename, String mimeType) async {
-    final r = await _sendMultipart(path, bytes, filename, mimeType);
-    if (r.statusCode >= 400) throw _errorFor(r);
-    if (r.bodyBytes.isEmpty) return null;
-    return jsonDecode(utf8.decode(r.bodyBytes));
-  }
-
-  Future<http.Response> _sendMultipart(
-      String path, List<int> bytes, String filename, String mimeType) async {
-    final req = http.MultipartRequest('POST', Uri.parse('$apiUrl$path'));
-    req.headers.addAll(_headers(json: false, authed: true));
-    final parts = mimeType.split('/');
-    req.files.add(http.MultipartFile.fromBytes(
-      'file',
-      bytes,
-      filename: filename,
-      contentType: parts.length == 2 ? MediaType(parts[0], parts[1]) : null,
-    ));
-    try {
-      // Pelo cliente injetável, e NÃO por `req.send()`: aquele fabrica um
-      // cliente próprio lá dentro, que `swapClient` não alcança — é o que
-      // deixava todo envio de imagem fora do alcance de um teste.
-      final enviada = await _client.send(req).timeout(apiUploadTimeout);
-      return await http.Response.fromStream(enviada);
-    } on TimeoutException {
-      throw ApiError(0, 'O upload demorou demais. Tente de novo.',
-          kind: ApiFailure.timeout);
-    } catch (_) {
-      throw ApiError(0, 'Sem conexão com o servidor.');
-    }
-  }
-
-  Future<void> _upload(String path, List<int> bytes, String filename, String mimeType) async {
     final req = http.MultipartRequest('POST', Uri.parse('$apiUrl$path'));
     req.headers.addAll(_headers(json: false, authed: true));
     final parts = mimeType.split('/');
@@ -476,14 +473,25 @@ class Api {
     ));
     late http.Response r;
     try {
-      r = await http.Response.fromStream(await req.send().timeout(apiUploadTimeout));
+      // Pelo cliente injetável, e NÃO por `req.send()`: aquele fabrica um
+      // cliente próprio lá dentro, que `swapClient` não alcança — é o que
+      // deixava todo envio de imagem fora do alcance de um teste.
+      //
+      // O teto é o do upload, não o de leitura: aqui o relógio também cobre os
+      // bytes subindo, e [apiTimeout] cancelaria envio que ia bem.
+      final enviada = await _client.send(req).timeout(apiUploadTimeout);
+      r = await http.Response.fromStream(enviada);
     } on TimeoutException {
+      // Texto próprio: "o upload demorou" é outra notícia que "o servidor
+      // demorou a responder" — quem está esperando sabe que mandou uma foto.
       throw ApiError(0, 'O upload demorou demais. Tente de novo.',
           kind: ApiFailure.timeout);
     } catch (_) {
       throw ApiError(0, 'Sem conexão com o servidor.');
     }
     if (r.statusCode >= 400) throw _errorFor(r);
+    if (r.bodyBytes.isEmpty) return null;
+    return jsonDecode(utf8.decode(r.bodyBytes));
   }
 
   // ---- Música da memória ----
@@ -578,7 +586,7 @@ class Api {
     String mimeType,
   ) async =>
       Journey.fromJson(
-          await _uploadJson('/journeys/$id/cover', bytes, filename, mimeType));
+          await _upload('/journeys/$id/cover', bytes, filename, mimeType));
 
   /// Tira a capa ESCOLHIDA (idempotente). A jornada não fica necessariamente
   /// sem capa: o backend volta ao automático — a primeira foto do rastro —, e é

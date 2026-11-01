@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../design/components.dart';
+import '../design/sj_theme.dart';
+import '../design/tokens.dart';
 import '../features/atlas/atlas_domain.dart';
 import '../features/tracks/track_panel.dart';
 import '../features/tracks/track_recorder.dart';
 import '../models.dart';
-import '../theme.dart';
 import '../features/tracks/track_list.dart';
 import '../widgets/atlas_map.dart';
 import '../widgets/common.dart';
+// O vocabulário editorial da lane de jornadas (estado, período, atmosfera) mora
+// na estante: a abertura de um capítulo tem de falar com a MESMA voz da lista.
+import 'journeys.dart';
 
 /// Detalhe e gestão de uma jornada: ciclo de vida (iniciar/pausar/retomar/
 /// finalizar), pontos ordenados (reordenar/remover sem apagar a memória),
@@ -167,26 +172,27 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final j = _journey;
+    final s = SJTheme.of(context);
     return Scaffold(
       body: SafeArea(
         child: j == null
             ? (_error.isNotEmpty
-                ? _errorView()
+                ? _errorView(s)
                 : const Center(child: CircularProgressIndicator()))
             : ListView(
                 padding: const EdgeInsets.fromLTRB(24, 28, 24, 48),
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.of(context).pop(),
-                    child: const Text('← Voltar',
+                    child: Text('← Voltar',
                         style: TextStyle(
-                            color: SJColors.ink, fontSize: 14, fontWeight: FontWeight.w500)),
+                            color: s.ink, fontSize: 14, fontWeight: FontWeight.w500)),
                   ),
                   const SizedBox(height: 14),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: Text(j.title, style: serif(27))),
+                      Expanded(child: Text(j.title, style: SJText.h1(color: s.ink))),
                       const SizedBox(width: 10),
                       StatusBadge(j.status),
                       // Editar mora no cabeçalho, junto do que se edita. Antes,
@@ -197,8 +203,8 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                         label: 'Editar jornada',
                         child: IconButton(
                           onPressed: () => _openEdit(j.id),
-                          icon: const Icon(Icons.edit_outlined,
-                              size: 19, color: SJColors.inkSoft),
+                          icon: Icon(Icons.edit_outlined,
+                              size: 19, color: s.inkSoft),
                           tooltip: 'Editar',
                         ),
                       ),
@@ -209,23 +215,25 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(j.description!,
                           style:
-                              const TextStyle(color: SJColors.inkSoft, fontSize: 14, height: 1.5)),
+                              TextStyle(color: s.inkSoft, fontSize: 14, height: 1.5)),
                     ),
                   if ((j.mood ?? '').isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
-                      child: Text(j.mood!,
-                          style: serif(14.5, color: SJColors.bloom, style: FontStyle.italic)),
+                      // A atmosfera da jornada é o MESMO campo que a estante
+                      // desenha em `journeys.dart`: reusar o estilo de lá é o
+                      // que mantém a lane com uma voz só.
+                      child: Text(j.mood!, style: journeyMoodStyle(s)),
                     ),
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       '${j.pointsCount} ${j.pointsCount == 1 ? 'MEMÓRIA' : 'MEMÓRIAS'}${j.isPrivate ? '' : ' · PÚBLICA'}',
-                      style: monoLabel(11),
+                      style: SJText.overline(color: s.accent),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _lifecycleActions(j),
+                  _lifecycleActions(j, s),
                   InlineError(_error),
                   // Gravar percurso só faz sentido com a jornada em andamento:
                   // um capítulo encerrado não recebe caminho novo.
@@ -256,7 +264,7 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                         padding: const EdgeInsets.only(top: 10),
                         child: Text(
                           '${AtlasDomain.formatDistance(_map!.distanceMeters)} percorridos',
-                          style: monoLabel(11),
+                          style: SJText.overline(color: s.accent),
                         ),
                       ),
                   ],
@@ -269,16 +277,17 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                   ],
                   Padding(
                     padding: const EdgeInsets.only(top: 26, bottom: 10),
-                    child: Text('MEMÓRIAS (NA ORDEM DO RASTRO)', style: monoLabel(11)),
+                    child: Text('MEMÓRIAS (NA ORDEM DO RASTRO)',
+                        style: SJText.overline(color: s.accent)),
                   ),
                   if (j.points.isEmpty)
-                    const Text(
+                    Text(
                       'Esta jornada ainda está vazia. Adicione uma memória nova ou traga uma '
                       'memória que você já registrou para começar a construir este mapa.',
-                      style: TextStyle(color: SJColors.inkSoft, fontSize: 14, height: 1.45),
+                      style: TextStyle(color: s.inkSoft, fontSize: 14, height: 1.45),
                     )
                   else
-                    ...List.generate(j.points.length, (i) => _pointRow(j, i)),
+                    ...List.generate(j.points.length, (i) => _pointRow(j, i, s)),
                   if (j.status != 'finished') ...[
                     const SizedBox(height: 22),
                     PrimaryButton(
@@ -296,56 +305,56 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                       Center(
                         child: TextButton(
                           onPressed: _busy ? null : _openAdd,
-                          child: const Text('Trazer uma memória que já existe',
+                          child: Text('Trazer uma memória que já existe',
                               style: TextStyle(
-                                  color: SJColors.cyan,
+                                  color: s.secondary,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600)),
                         ),
                       )
                     else
-                      _looseBox(j),
+                      _looseBox(j, s),
                   ],
                   const SizedBox(height: 32),
-                  _deleteSection(j),
+                  _deleteSection(j, s),
                 ],
               ),
       ),
     );
   }
 
-  Widget _errorView() => Padding(
+  Widget _errorView(SJScheme s) => Padding(
         padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
               onTap: () => Navigator.of(context).pop(),
-              child: const Text('← Voltar',
+              child: Text('← Voltar',
                   style:
-                      TextStyle(color: SJColors.ink, fontSize: 14, fontWeight: FontWeight.w500)),
+                      TextStyle(color: s.ink, fontSize: 14, fontWeight: FontWeight.w500)),
             ),
             const SizedBox(height: 40),
             Center(
                 child:
-                    Text(_error, style: const TextStyle(color: SJColors.danger, fontSize: 15))),
+                    Text(_error, style: TextStyle(color: s.danger, fontSize: 15))),
           ],
         ),
       );
 
-  Widget _lifecycleActions(JourneyDetail j) {
+  Widget _lifecycleActions(JourneyDetail j, SJScheme s) {
     final buttons = <Widget>[];
     void add(String label, Future<Journey> Function(String) action, {bool outline = false}) {
       buttons.add(outline
           ? OutlinedButton(
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: SJColors.gold, width: 1.5),
-                foregroundColor: SJColors.gold,
+                side: BorderSide(color: s.accent, width: 1.5),
+                foregroundColor: s.accent,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 textStyle: TextStyle(
-                    fontFamily: monoFamily,
-                    fontFamilyFallback: monoFallback,
+                    fontFamily: SJType.mono,
+                    fontFamilyFallback: SJType.monoFallback,
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2),
@@ -371,30 +380,35 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
         add('Retomar', Api.instance.resumeJourney);
         add('Finalizar', Api.instance.finishJourney, outline: true);
       case 'finished':
-        return const Text('Jornada concluída.',
+        // Capítulo fechado em paz: o musgo é o papel que a paleta dá ao estado
+        // "concluída" (o mesmo selo que a estante usa em `journeys.dart`).
+        return Text('Jornada concluída.',
             style: TextStyle(
-                color: SJColors.cyanDeep, fontSize: 14, fontWeight: FontWeight.w600));
+                color: journeyStatusColor(j.status, s),
+                fontSize: 14,
+                fontWeight: FontWeight.w600));
     }
     return Wrap(spacing: 10, runSpacing: 10, children: buttons);
   }
 
-  Widget _pointRow(JourneyDetail j, int i) {
+  Widget _pointRow(JourneyDetail j, int i, SJScheme s) {
     final p = j.points[i];
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: SJColors.card,
+          color: s.surface,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: SJColors.line),
+          border: Border.all(color: s.line),
         ),
         child: Row(
           children: [
             SizedBox(
               width: 20,
               child: Text('${p.position ?? i + 1}',
-                  textAlign: TextAlign.center, style: serif(16, color: SJColors.cyan)),
+                  textAlign: TextAlign.center,
+                  style: SJText.title(color: s.secondary)),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -405,27 +419,29 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                   children: [
                     if (p.hasTitle) ...[
                       Text(p.title,
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: serif(16)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: SJText.title(color: s.ink)),
                       const SizedBox(height: 2),
                     ],
                     Text(
                       '${p.latitude.toStringAsFixed(3)}, ${p.longitude.toStringAsFixed(3)}',
-                      style: const TextStyle(color: SJColors.inkSoft, fontSize: 12),
+                      style: TextStyle(color: s.inkSoft, fontSize: 12),
                     ),
                   ],
                 ),
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.arrow_upward, size: 18, color: SJColors.cyan),
+              icon: Icon(Icons.arrow_upward, size: 18, color: s.secondary),
               onPressed: _busy || i == 0 ? null : () => _reorder(j, i, -1),
             ),
             IconButton(
-              icon: const Icon(Icons.arrow_downward, size: 18, color: SJColors.cyan),
+              icon: Icon(Icons.arrow_downward, size: 18, color: s.secondary),
               onPressed: _busy || i == j.points.length - 1 ? null : () => _reorder(j, i, 1),
             ),
             IconButton(
-              icon: const Icon(Icons.close, size: 18, color: SJColors.danger),
+              icon: Icon(Icons.close, size: 18, color: s.danger),
               onPressed: _busy
                   ? null
                   : () => _run(() => Api.instance.unlinkJourneyPoint(j.id, p.memoryId)),
@@ -445,29 +461,31 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
     return _run(() => Api.instance.reorderJourneyPoints(j.id, ids));
   }
 
-  Widget _looseBox(JourneyDetail j) {
+  Widget _looseBox(JourneyDetail j, SJScheme s) {
     final loose = _loose!;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0x1425B2C6),
+        // Um véu do azul-lago — a mesma cor que marca o ponto SOLTO no atlas,
+        // aqui só como fundo da caixa que os traz para dentro da jornada.
+        color: s.secondary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('MEMÓRIAS SOLTAS', style: monoLabel(11)),
+          Text('MEMÓRIAS SOLTAS', style: SJText.overline(color: s.accent)),
           const SizedBox(height: 10),
           if (loose.isEmpty)
-            const Text('Nenhuma memória solta para trazer.',
-                style: TextStyle(color: SJColors.inkSoft, fontSize: 14))
+            Text('Nenhuma memória solta para trazer.',
+                style: TextStyle(color: s.inkSoft, fontSize: 14))
           else
             ...loose.map((m) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                        color: SJColors.card, borderRadius: BorderRadius.circular(8)),
+                        color: s.surface, borderRadius: BorderRadius.circular(8)),
                     child: Row(
                       children: [
                         Expanded(
@@ -476,7 +494,9 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                           // a linha fica anônima e a escolha vira sorteio —
                           // então aqui, e só aqui, a data entra no lugar.
                           child: Text(m.hasTitle ? m.title : _diaCurto(m.occurredAt),
-                              maxLines: 1, overflow: TextOverflow.ellipsis, style: serif(16)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SJText.title(color: s.ink)),
                         ),
                         TextButton(
                           onPressed: _busy
@@ -487,9 +507,9 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                                         .where((x) => x.memoryId != m.memoryId)
                                         .toList());
                                   }),
-                          child: const Text('+ Adicionar',
+                          child: Text('+ Adicionar',
                               style: TextStyle(
-                                  color: SJColors.gold,
+                                  color: s.accent,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700)),
                         ),
@@ -500,8 +520,8 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
           Center(
             child: TextButton(
               onPressed: () => setState(() => _loose = null),
-              child: const Text('Fechar',
-                  style: TextStyle(color: SJColors.inkSoft, fontSize: 13)),
+              child: Text('Fechar',
+                  style: TextStyle(color: s.inkSoft, fontSize: 13)),
             ),
           ),
         ],
@@ -509,28 +529,28 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
     );
   }
 
-  Widget _deleteSection(JourneyDetail j) {
+  Widget _deleteSection(JourneyDetail j, SJScheme s) {
     if (!_confirmDelete) {
       return Center(
         child: TextButton(
           onPressed: () => setState(() => _confirmDelete = true),
-          child: const Text('Excluir jornada',
-              style: TextStyle(color: SJColors.danger, fontSize: 14)),
+          child: Text('Excluir jornada',
+              style: TextStyle(color: s.danger, fontSize: 14)),
         ),
       );
     }
     return Column(
       children: [
-        const Text('Excluir esta jornada? As memórias não são apagadas.',
+        Text('Excluir esta jornada? As memórias não são apagadas.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: SJColors.ink, fontSize: 14, fontWeight: FontWeight.w600)),
+            style: TextStyle(color: s.ink, fontSize: 14, fontWeight: FontWeight.w600)),
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: SJColors.danger,
+                  backgroundColor: s.danger,
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11)),
               onPressed: _busy
                   ? null
@@ -548,7 +568,7 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
             TextButton(
               onPressed: () => setState(() => _confirmDelete = false),
               child:
-                  const Text('Cancelar', style: TextStyle(color: SJColors.inkSoft, fontSize: 14)),
+                  Text('Cancelar', style: TextStyle(color: s.inkSoft, fontSize: 14)),
             ),
           ],
         ),

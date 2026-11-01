@@ -1,5 +1,7 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:some_journey/design/theme_controller.dart';
 import 'package:some_journey/main.dart';
 
 /// # Smoke test do app.
@@ -16,9 +18,13 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  /// O app com um controlador de aparência próprio por teste — o `main()` de
+  /// verdade cria o dele e lê a preferência salva antes do primeiro quadro.
+  Widget app() => SomeJourneyApp(tema: SjThemeController());
+
   testWidgets('o app inicia e chega na tela de login (sem sessão salva)',
       (tester) async {
-    await tester.pumpWidget(const SomeJourneyApp());
+    await tester.pumpWidget(app());
 
     // Bootstrap: decide a rota inicial e navega.
     // NÃO usar pumpAndSettle aqui: a tela de bootstrap tem um indicador de
@@ -41,7 +47,7 @@ void main() {
   testWidgets('com sessão salva, o app abre direto no atlas', (tester) async {
     SharedPreferences.setMockInitialValues({'sj_access_token': 'fake-token'});
 
-    await tester.pumpWidget(const SomeJourneyApp());
+    await tester.pumpWidget(app());
     // NÃO usar pumpAndSettle aqui: a tela de bootstrap tem um indicador de
     // progresso que anima INDEFINIDAMENTE, e o pumpAndSettle esperaria por uma
     // árvore sem animações — travaria o teste para sempre. Pumps com duração

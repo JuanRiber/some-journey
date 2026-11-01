@@ -86,3 +86,37 @@ class SjThemeController extends ChangeNotifier {
         ThemeMode.system => 'system',
       };
 }
+
+/// Leva o [SjThemeController] a qualquer tela.
+///
+/// PORQUÊ um escopo e não um singleton como `Api.instance`: o controlador é
+/// ESTADO DE INTERFACE, e estado de interface em variável global vaza entre
+/// testes — um teste que liga o escuro deixaria o próximo começando escuro, e
+/// a falha apareceria no arquivo errado. Com um escopo, cada árvore tem o seu.
+///
+/// É um [InheritedNotifier]: quem depende dele reconstrói sozinho quando o
+/// modo muda, sem ninguém precisar lembrar de ouvir o notifier na mão.
+class SjThemeScope extends InheritedNotifier<SjThemeController> {
+  const SjThemeScope({
+    super.key,
+    required SjThemeController controller,
+    required super.child,
+  }) : super(notifier: controller);
+
+  /// O controlador vigente. Lança se não houver escopo — de propósito.
+  ///
+  /// A alternativa seria devolver um controlador solto como "padrão seguro", e
+  /// aí o toggle de Configurações giraria sem mudar nada: o pior defeito
+  /// possível num controle, porque ele PARECE funcionar. Faltou escopo, a
+  /// árvore está montada errado, e é melhor saber na hora.
+  static SjThemeController of(BuildContext context) {
+    final escopo = context.dependOnInheritedWidgetOfExactType<SjThemeScope>();
+    assert(
+      escopo != null,
+      'SjThemeScope.of(): nenhum SjThemeScope acima deste contexto. '
+      'O app embrulha o MaterialApp em SjThemeScope; um teste que monta uma '
+      'tela com controle de aparência precisa fazer o mesmo.',
+    );
+    return escopo!.notifier!;
+  }
+}

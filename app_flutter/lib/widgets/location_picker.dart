@@ -9,8 +9,6 @@ import '../design/sj_theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
-import '../theme.dart';
-
 class GeoResult {
   final double latitude;
   final double longitude;
@@ -106,6 +104,7 @@ class _LocationPickerState extends State<LocationPicker> {
 
   @override
   Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -129,9 +128,9 @@ class _LocationPickerState extends State<LocationPicker> {
           Container(
             margin: const EdgeInsets.only(top: 6),
             decoration: BoxDecoration(
-              color: SJColors.card,
+              color: s.surface,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: SJColors.line),
+              border: Border.all(color: s.line),
             ),
             child: Column(
               children: _results
@@ -140,13 +139,13 @@ class _LocationPickerState extends State<LocationPicker> {
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                          decoration: const BoxDecoration(
-                              border: Border(bottom: BorderSide(color: SJColors.line))),
+                          decoration: BoxDecoration(
+                              border: Border(bottom: BorderSide(color: s.line))),
                           child: Text(r.label,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                  color: SJColors.ink, fontSize: 13, height: 1.4)),
+                              style: TextStyle(
+                                  color: s.ink, fontSize: 13, height: 1.4)),
                         ),
                       ))
                   .toList(),
@@ -157,8 +156,8 @@ class _LocationPickerState extends State<LocationPicker> {
           height: 240,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: SJColors.line),
-            color: SJColors.sand,
+            border: Border.all(color: s.line),
+            color: s.surfaceAlt,
           ),
           clipBehavior: Clip.antiAlias,
           child: FlutterMap(
@@ -171,11 +170,11 @@ class _LocationPickerState extends State<LocationPicker> {
               cameraConstraint: CameraConstraint.contain(
                 bounds: LatLngBounds(const LatLng(-85, -180), const LatLng(85, 180)),
               ),
-              backgroundColor: SJColors.sand,
+              backgroundColor: s.surfaceAlt,
               onTap: (_, pos) => _select(pos.latitude, pos.longitude, null),
             ),
             children: [
-              SJBasemap.layer(context, SJTheme.of(context)),
+              SJBasemap.layer(context, s),
               if (_picked != null)
                 MarkerLayer(markers: [
                   Marker(
@@ -184,13 +183,14 @@ class _LocationPickerState extends State<LocationPicker> {
                     height: 24,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: SJColors.wine,
+                        color: s.primary,
                         shape: BoxShape.circle,
-                        // Anel creme sobre a base clara (mesmo pin do atlas).
-                        border: Border.all(color: SJColors.card, width: 2),
+                        // Anel da superfície sobre a base (mesmo pin do atlas):
+                        // creme no papel quente, azul-noite no atlas noturno.
+                        border: Border.all(color: s.surface, width: 2),
                         boxShadow: [
                           BoxShadow(
-                            color: SJColors.ink.withValues(alpha: 0.22),
+                            color: s.shadow.withValues(alpha: 0.22),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -208,9 +208,9 @@ class _LocationPickerState extends State<LocationPicker> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: SJColors.card,
+              color: s.surface,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: SJColors.line),
+              border: Border.all(color: s.line),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,22 +218,22 @@ class _LocationPickerState extends State<LocationPicker> {
                 Text(_placeLabel.isEmpty ? 'Local selecionado' : _placeLabel,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: SJColors.ink, fontSize: 13)),
+                    style: TextStyle(color: s.ink, fontSize: 13)),
                 const SizedBox(height: 4),
                 Text(
                   '${_picked!.latitude.toStringAsFixed(5)}, ${_picked!.longitude.toStringAsFixed(5)}',
-                  style: const TextStyle(color: SJColors.inkSoft, fontSize: 12),
+                  style: TextStyle(color: s.inkSoft, fontSize: 12),
                 ),
               ],
             ),
           )
         else
-          const Text('Toque no mapa ou busque um lugar.',
+          Text('Toque no mapa ou busque um lugar.',
               style: TextStyle(
-                  color: SJColors.inkSoft, fontSize: 13, fontStyle: FontStyle.italic)),
+                  color: s.inkSoft, fontSize: 13, fontStyle: FontStyle.italic)),
         const SizedBox(height: 8),
-        const Text('A busca e o nome do lugar usam o OpenStreetMap.',
-            style: TextStyle(color: SJColors.placeholder, fontSize: 11)),
+        Text('A busca e o nome do lugar usam o OpenStreetMap.',
+            style: TextStyle(color: s.inkFaint, fontSize: 11)),
       ],
     );
   }

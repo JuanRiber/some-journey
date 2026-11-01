@@ -175,6 +175,7 @@ class SJButton extends StatelessWidget {
     this.variant = SJButtonVariant.primary,
     this.loading = false,
     this.icon,
+    this.trailingIcon,
     this.expand = false,
   });
 
@@ -187,6 +188,14 @@ class SJButton extends StatelessWidget {
 
   /// Ícone opcional à esquerda do label.
   final IconData? icon;
+
+  /// Seta de avanço, encostada na borda direita dentro de um disco suave.
+  ///
+  /// Não é o mesmo papel do [icon]: aquele QUALIFICA a ação (um lápis diz
+  /// "editar"); este diz para ONDE ela leva. Por isso mora na borda e não ao
+  /// lado do rótulo — o rótulo continua centrado, e o olho lê "Entrar" antes
+  /// de ver a seta.
+  final IconData? trailingIcon;
 
   /// Ocupa toda a largura disponível (útil em formulários/rodapés de sheet).
   final bool expand;
@@ -243,6 +252,57 @@ class SJButton extends StatelessWidget {
               ),
             ],
           );
+
+    if (trailingIcon != null && !loading) {
+      // Disco do próprio texto a 18%: pertence ao botão, não é uma segunda cor
+      // entrando na paleta.
+      final disco = Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: fg.withValues(alpha: 0.18),
+        ),
+        child: Icon(trailingIcon, size: 15, color: fg),
+      );
+
+      if (isLink) {
+        // No link a seta anda JUNTO do texto, e sem disco: um disco encostado
+        // na borda precisa de uma borda para encostar, e o link não tem caixa.
+        content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: content),
+            const SizedBox(width: SJSpace.x2),
+            Icon(trailingIcon, size: 16, color: fg),
+          ],
+        );
+      } else if (expand) {
+        // SÓ no botão largo o disco vai para a borda — e o `SizedBox` de
+        // largura infinita é o que faz isso funcionar. Sem ele o `Stack` se
+        // mede pelo RÓTULO, e o `right: 0` encosta na borda do rótulo, não na
+        // do botão: a seta aparecia colada no "R" de ENTRAR, no meio da peça.
+        content = Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(width: double.infinity, child: Center(child: content)),
+            Positioned(right: 0, child: disco),
+          ],
+        );
+      } else {
+        // Botão estreito: sem borda sobrando para encostar, a seta segue o
+        // rótulo.
+        content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: content),
+            const SizedBox(width: SJSpace.x3),
+            disco,
+          ],
+        );
+      }
+    }
 
     // Link é mais enxuto (sem preenchimento largo); os demais têm respiro.
     final padding = isLink

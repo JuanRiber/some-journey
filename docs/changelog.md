@@ -231,3 +231,90 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   e [`11-convencoes.md`](11-convencoes.md) deixaram de falar em dois clientes.
 - O roadmap perdeu o item de V2 "Paridade do app Expo com o Flutter".
 
+## 2026-10-12
+
+### Design system
+- [`08-design-system.md`](08-design-system.md) ganhou o **livro** (`SJBook`) na
+  anatomia dos componentes: capa de couro, duas páginas e a **folha** como
+  primitiva única — a mesma peça que serve à capa que abre e à página que vira.
+- Registrado o limite de **720pt**: acima disso o livro abre em folha dupla,
+  abaixo mostra uma página por vez. Duas páginas num celular dariam ~170pt cada,
+  e campo de formulário nenhum cabe ali.
+- Registrada também a regra que não é estética: **em repouso a folha não carrega
+  matriz nenhuma**. Perspectiva é transformação não afim, e sob ela o
+  `ensureVisible` que o foco do teclado dispara sozinho não converge — a página
+  trava rolando. O estado em que se digita precisa ser livre de transformação.
+
+### Movimento
+- A escala de durações ganhou um degrau acima de `page`: **cerimônia (900ms)**,
+  com regra própria escrita no doc. As outras durações são de transição — o
+  tempo é custo e o alvo é não ser notado. Cerimônia é o oposto: a animação que
+  o usuário DEVE ver acontecer. Hoje tem um só dono, a abertura do cadastro, e o
+  doc diz explicitamente que ela não serve para navegar.
+
+## 2026-10-12 (2)
+
+### A porta
+- [`08-design-system.md`](08-design-system.md) ganhou a seção **"A porta
+  (login)"** com a composição de referência: pôster acima de 900pt (arte
+  sangrando, promessa sobre a foto, cartão de papel à direita) e coluna única
+  abaixo disso.
+- Registrada a regra do véu sobre foto: ele é `shadow`, nunca `bgDeep` — no modo
+  claro o `bgDeep` é creme, e creme sobre creme não escurece nada.
+- Registrada a exceção de cor do app: sobre a foto, a tinta é sempre a clara
+  (`sjDark.ink`), independente do modo ativo. O papel quente some contra o céu
+  da ilustração.
+- Registrada a política para o que o desenho pede e o produto não tem:
+  **desenhado e desligado, com "em breve" escrito** (hoje, entrar com Google).
+  O que não existe de verdade — rota inventada na barra — simplesmente não
+  aparece.
+
+### Ornamentos
+- **Carimbo** (`SJSeal`) e **herbário** (`SJSprig`) entraram na anatomia dos
+  componentes. Os dois sangram para fora da borda de propósito: ornamento que
+  respeita a margem vira ilustração, e deixa de ser marca d'água.
+
+### Livro
+- Registrado o teto de proporção: **1,35:1** aberto, **0,70:1** por página. Sem
+  teto, numa janela alta o livro ocupava tudo e ficava quase quadrado — e um
+  quadrado lê como dois painéis, não como livro aberto.
+
+## 2026-10-12 (3)
+
+### Aparência
+- O **modo escuro foi ligado**. Os dois esquemas existiam desde sempre, a
+  galeria desenhava os dois e o controlador já sabia salvar a preferência — só
+  que `main.dart` fixava `ThemeMode.light`. Metade do design system estava
+  escrita e fora do produto.
+- Registrado em [`08-design-system.md`](08-design-system.md) o detalhe que faz
+  a diferença entre ligar e PARECER ligar: trocar só o `themeMode` mudaria o
+  Material por baixo e deixaria as telas cremes, porque `SJTheme.of(context)`
+  cai num fallback claro quando ninguém provê o esquema. Quem provê é o
+  `builder` do `MaterialApp`.
+- Configurações › Aparência deixou de ser mostrador e virou escolha: os três
+  modos (papel, atlas, automático) como grupo de rádio, persistido. O selo
+  "Em uso" saiu — selo diz o que É, rádio diz o que se PODE escolher.
+- O automático mostra em qual dos dois está ("Agora: atlas (escuro)"): é a
+  única escolha cujo nome não revela o resultado.
+
+## 2026-10-25
+
+### Performance
+- **O CanvasKit vinha do CDN do Google a cada carga.** O `flutter build web`
+  copia uma versão local de 7MB para dentro do build e, por padrão, a ignora:
+  o bootstrap aponta para `www.gstatic.com`. Medido no navegador, mesmo
+  recurso: `canvaskit.wasm` caiu de **3.088ms para 232ms**, e o `load` da
+  página, de **3.136ms para 144ms**. O `main.dart.js`, com 3MB, sempre baixou
+  em 54ms — bytes nunca foram o gargalo. De brinde, o app passou a abrir sem
+  internet.
+- A correção é um flag no comando de build (`--no-web-resources-cdn`), e isso
+  a torna frágil por natureza: quem rodar o build sem ele traz os três
+  segundos de volta, em silêncio. Por isso o comando passou a estar escrito no
+  README, e não só na memória de quem fez.
+- **Um filtro de cor por telha do mapa.** A base cartográfica era tingida pelo
+  `tileBuilder`, ou seja, um `ColorFiltered` para CADA telha — vinte a quarenta
+  `saveLayer` por quadro enquanto o mapa é arrastado, que é exatamente quando
+  não há quadro sobrando. O motivo alegado era não tingir pins e rastros, e ele
+  não se sustentava: essas camadas são IRMÃS da camada de telhas na lista de
+  filhos do `FlutterMap`, nunca filhas dela. Agora o filtro é um só, por fora
+  da camada inteira, com dois testes prendendo a forma da árvore.

@@ -51,7 +51,7 @@ some-journey/
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0010)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (214 testes)
+|   |-- tests/                 # pytest (240 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -162,6 +162,29 @@ Rodar os testes (usa um banco dedicado `some_journey_test`, criado se faltar):
 pip install -r requirements-dev.txt
 pytest
 ```
+
+#### Fotos (Supabase Storage)
+
+Sem estas duas chaves o upload de imagem responde **503** e o app diz, na tela,
+que as fotos estao indisponiveis. Todo o resto funciona. Para ligar:
+
+1. Crie um projeto em <https://supabase.com> (o plano gratuito atende).
+2. Em **Storage → New bucket**, crie um bucket chamado `memories` e deixe-o
+   **privado** (nao marque Public). O backend gera URLs assinadas de curta
+   duracao; bucket publico exporia a foto de todo mundo por URL adivinhavel.
+3. Em **Project Settings → API**, copie:
+   - **Project URL** (`https://<ref>.supabase.co`) para `SUPABASE_URL`;
+   - a chave **service_role** para `SUPABASE_SERVICE_KEY`.
+4. Reinicie a API.
+
+A chave `service_role` ignora as policies do Supabase e **nunca** pode ir para
+o cliente: ela vive so no `.env` do backend ou no cofre de segredos do host. O
+isolamento entre usuarios e feito pelo caminho do objeto
+(`{user_id}/{memory_id}/{uuid}.{ext}`), imposto no servidor — e por isso que o
+bucket precisa ser privado.
+
+Para conferir que ligou: anexar uma foto a uma memoria deve responder **201**
+em vez de 503.
 
 ### 3. App Flutter (principal)
 
@@ -322,7 +345,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Paginacao keyset em `/memories` e `/journeys`
 - [x] Migracoes versionadas (Alembic, 0001..0010)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
-- [x] Testes automatizados — 235 no backend (pytest) e 110 no app (flutter test)
+- [x] Testes automatizados — 240 no backend (pytest) e 403 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)

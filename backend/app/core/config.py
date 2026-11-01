@@ -4,7 +4,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Regex de origem CORS para DESENVOLVIMENTO: aceita localhost/127.0.0.1 em
-# qualquer porta (Expo/Vite trocam de porta o tempo todo). É o default do campo
+# qualquer porta (o servidor de desenvolvimento troca de porta o tempo todo). É o default do campo
 # CORS_ALLOW_ORIGIN_REGEX; a property cors_allow_origin_regex o SUPRIME em
 # produção (ver abaixo) para que esse curinga de dev jamais vaze para o ar.
 _DEV_CORS_ORIGIN_REGEX = r"http://(localhost|127\.0\.0\.1):\d+"

@@ -5,14 +5,14 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ a fazer. (Progresso detalhado no [`cha
 ## MVP
 - ✅ Login / cadastro (JWT).
 - ✅ Mapa interativo — o app Flutter desenha o atlas com `flutter_map` (tiles OSM/CartoDB)
-  consumindo `GET /map`; o app Expo usa Leaflet no web. Mapbox segue planejado para V2.
+  consumindo `GET /map`, no celular e na web. Mapbox segue planejado para V2.
 - ✅ Criar memória geolocalizada.
 - ✅ Visualizar pins (`GET /map`).
 - ✅ Timeline simples.
 - ✅ Criar jornada simples (com ciclo `draft/active/paused/finished`).
 - ✅ Associar pontos a jornadas (existentes e novos) + reordenar.
 - ✅ Desenhar rastro no mapa (LineString).
-- ✅ **Percurso real por GPS** — `JourneyTrack`/`JourneyTrackPoint`, `GET /journeys/{id}/map` (GeoJSON), captura em **primeiro plano** no app e alternância "Percurso real ↔ Conectar memórias". Distinto da linha simbólica; o mapa global segue simbólico. Tracking em **segundo plano** é evolução (exige `expo-task-manager` + dev build).
+- ✅ **Percurso real por GPS** — `JourneyTrack`/`JourneyTrackPoint`, `GET /journeys/{id}/map` (GeoJSON), captura em **primeiro plano** no app e alternância "Percurso real ↔ Conectar memórias". Distinto da linha simbólica; o mapa global segue simbólico. Tracking em **segundo plano** é evolução (exige permissões próprias e um dev build).
 - ✅ Upload de fotos — **até 5 por memória** no Supabase Storage (upload, URL assinada e
   delete validados de ponta a ponta). Antecipou o item "múltiplas fotos" da V2.
 - ✅ Recuperação de senha real — token com validade e uso único, envio por SMTP opcional,
@@ -29,7 +29,6 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ a fazer. (Progresso detalhado no [`cha
 - Estilos visuais de jornadas.
 - Exportação simples de jornada.
 - Mapa em **Mapbox** ou provedor nativo (o consumo de `GET /map` já está feito).
-- Paridade do app Expo com o Flutter (falta Perfil e Configurações).
 
 ## V3
 - Jornadas compartilhadas.

@@ -17,16 +17,15 @@ A vida deixa rastros. O Some Journey registra esses rastros e une lugar, tempo, 
 | --- | --- |
 | Backend | Python 3.12, FastAPI, SQLAlchemy, Pydantic, JWT |
 | Banco | PostgreSQL 16 + PostGIS 3.4 |
-| App principal | Flutter (Dart >= 3.12.2), `flutter_map` |
-| App web | React Native, Expo, Expo Router, TypeScript |
+| App | Flutter (Dart >= 3.12.2), `flutter_map` — movel e web |
 | Mapa | `flutter_map` com tiles OSM/CartoDB; Mapbox planejado |
 | Imagens | Supabase Storage (bucket privado, URL assinada) |
 | Infra | Docker Compose para PostgreSQL/PostGIS; Render para a API |
-| E2E | Playwright sobre o app web (Expo) |
 
-Ha **dois clientes** no repo. O Flutter (`app_flutter/`) e onde a evolucao acontece:
-so ele tem Perfil, Configuracoes, avatar e o atlas consumindo `GET /map`. O Expo
-(`mobile/`) mantem auth, memorias e jornadas, e e o alvo dos testes E2E.
+Ha **um cliente**: o Flutter (`app_flutter/`), que atende movel e web pelo mesmo
+codigo. Ate outubro de 2026 existia tambem um app Expo em `mobile/`, removido por
+nao ter nenhuma tela que o Flutter ja nao tivesse e por cobrar trabalho dobrado a
+cada mudanca de contrato da API.
 
 Decisoes tecnicas atuais: SQLAlchemy sincrono, UUID nativo do PostgreSQL, schema
 versionado por Alembic (o `create_all` no startup foi removido), imagens fora do
@@ -64,18 +63,10 @@ some-journey/
 |   |   |-- screens/           # telas
 |   |   `-- widgets/           # UI compartilhada (atlas_map, location_picker)
 |   `-- test/
-|-- mobile/                    # app web/Expo
-|   |-- src/app/               # rotas Expo Router
-|   |-- src/components/
-|   |-- src/lib/               # API, auth, geo, config
-|   |-- src/theme/
-|   `-- package.json
 |-- .github/workflows/ci.yml   # integracao continua (backend + app)
 |-- docs/                      # visao, regras, modelagem, API, design system, perfil
-|-- e2e/                       # smoke Playwright do app web
 |-- infra/
 |   `-- docker-compose.yml
-|-- playwright.config.ts
 |-- render.yaml                # blueprint de deploy da API
 |-- .env.example
 `-- README.md
@@ -88,7 +79,6 @@ some-journey/
 - Python 3.11+ (producao roda 3.12; o codigo usa sintaxe 3.10+)
 - Docker + Docker Compose (para o PostgreSQL/PostGIS)
 - Flutter SDK com Dart >= 3.12.2 (para o app principal)
-- Node.js 20+ (apenas para o app Expo e para o E2E)
 - Git
 
 ---
@@ -194,34 +184,6 @@ Verificacoes:
 flutter analyze
 flutter test
 ```
-
-### 4. App Expo (web)
-
-```bash
-cd mobile
-npm install
-npm run web
-```
-
-Por padrao, o app usa:
-
-- Android emulator: `http://10.0.2.2:8000`
-- Web, iOS e outros: `http://127.0.0.1:8000`
-
-Para apontar para outra API, ajuste `expo.extra.apiUrl` em `mobile/app.json`.
-
-### 5. E2E (Playwright)
-
-Na raiz do repositorio:
-
-```bash
-npm install
-npm run e2e:install
-npm run test:e2e
-```
-
-O Playwright sobe o app web sozinho. Os fluxos que batem na API precisam do
-backend e do banco no ar.
 
 ---
 
@@ -347,7 +309,6 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Testes automatizados — 235 no backend (pytest) e 110 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
-- [ ] Paridade do app Expo com o Flutter (falta Perfil e Configuracoes)
 - [ ] Tracking em segundo plano (exige dev build)
 - [ ] Mapa Mapbox ou provedor nativo
 
@@ -369,10 +330,6 @@ O GitHub Actions roda a cada push na `main` e em todo pull request
 A suite nao precisa de `.env`: o `conftest.py` define `DATABASE_URL`,
 `JWT_SECRET_KEY` e `APP_ENV=test` antes de importar o app, cria o banco de teste
 e habilita o PostGIS.
-
-O E2E (Playwright) **nao** entra no CI: ele sobe o app Expo, que e o cliente
-secundario, e depende do backend no ar — custo e instabilidade altos para o que
-cobre.
 
 ---
 

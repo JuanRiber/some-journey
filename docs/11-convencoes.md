@@ -170,9 +170,7 @@ de uma vez.
 **Estado real, para não prometer demais.** Só as duas coleções de topo paginam.
 `GET /journeys/{id}/memories` e `GET /journeys/{id}/tracks` devolvem a lista
 inteira, sem cursor — o docstring de `pagination.py` fala em "todas as rotas de
-lista", o que é a intenção, não o que está escrito hoje. E o cliente Expo
-(`mobile/src/lib/api.ts`) não envia `?limit`/`?cursor` nem lê o header: ele vê
-as primeiras 30 linhas e não sabe que existem mais.
+lista", o que é a intenção, não o que está escrito hoje.
 
 ---
 
@@ -305,11 +303,10 @@ são da mesma família e mordem do mesmo jeito:
   rota confia em `user_id` vindo do cliente. Ver
   [`04-decisoes-tecnicas.md`](04-decisoes-tecnicas.md).
 - **Nenhum valor de cor, espaçamento ou tipografia escrito solto numa tela** —
-  tudo vem de `app_flutter/lib/design/tokens.dart`, que espelha
-  `mobile/src/theme/tokens.ts` com os mesmos valores. Ver
+  tudo vem de `app_flutter/lib/design/tokens.dart`. Ver
   [`08-design-system.md`](08-design-system.md).
-- **Dois clientes, um principal** — a evolução acontece em `app_flutter/`;
-  `mobile/` mantém auth, memórias e jornadas e é o alvo dos testes Playwright.
+- **Um cliente só** — `app_flutter/`, que atende celular e web pelo mesmo
+  código. O app Expo que vivia em `mobile/` foi removido em outubro de 2026.
   Ver o README.
 
 ---

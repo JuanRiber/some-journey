@@ -3,7 +3,9 @@
 Registro curto das decisões já tomadas. Formato: **Decisão / Motivo / Consequência**.
 
 ## Stack principal
-**Decisão.** Mobile: React Native + Expo + TypeScript. Backend: Python + FastAPI + SQLAlchemy +
+**Decisão.** Cliente: Flutter + Dart, um código para celular e web. (Até outubro
+de 2026 a decisão era React Native + Expo + TypeScript; o app Expo foi removido
+por não ter nenhuma tela que o Flutter já não tivesse.) Backend: Python + FastAPI + SQLAlchemy +
 Pydantic. Banco: PostgreSQL + PostGIS. Storage de imagens: Supabase Storage. Auth: JWT no backend.
 **Motivo.** Stack produtiva, tipada e adequada a dados geográficos.
 **Consequência.** Camadas separadas no backend (models / schemas / repositories / services / routes).

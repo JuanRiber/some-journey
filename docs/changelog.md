@@ -189,3 +189,45 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
 >   `^3.10.9` desde o commit que baixou a restrição para a versão realmente
 >   necessária. A contagem de testes do backend no README (214) também ficou
 >   para trás.
+
+## 2026-10-11 (2)
+
+### Decisão de produto
+- **O app Expo foi removido.** `mobile/`, o smoke Playwright em `e2e/` e o
+  harness do Playwright na raiz saíram do repositório — 89 arquivos, cerca de
+  14.700 linhas.
+- O motivo não foi abandono, foi redundância verificada: o Flutter tem **todas**
+  as telas que o Expo tinha e mais quatro que ele nunca teve (Perfil, Edição de
+  perfil, Configurações e Edição de jornada). Não havia uma única tela só no
+  Expo. E `app_flutter/web/` já está configurado, então o último argumento a
+  favor dele — ser o caminho web — também não valia mais.
+- O que ele cobrava: 6.052 linhas sem nenhum teste, oito endpoints atrás
+  (incluindo Perfil e Música inteiros) e trabalho dobrado a cada mudança de
+  contrato da API. Só em outubro isso custou duas vezes — o título opcional e a
+  paginação por cursor.
+- Removido inteiro em vez de marcado como não mantido. Código deprecado continua
+  aparecendo em busca, continua confundindo quem lê, e continua convidando o
+  próximo a "só atualizar aquela telinha". O histórico do git guarda o que foi.
+- O smoke do Playwright saiu junto porque existia para verificar que o Expo Web
+  subia; sem o Expo ele não testa nada. O harness pode voltar apontado para o
+  build web do Flutter se um dia houver E2E de verdade.
+
+### Consequência inesperada, e boa
+- Tirar o Expo fez a verificação de paridade acusar cinco rotas sem cliente.
+  Quatro eram **falso positivo**: o ciclo de vida da jornada é chamado por um
+  ajudante que monta o caminho em tempo de execução, então a string nunca
+  aparece inteira no arquivo — o Expo mascarava isso porque escrevia os caminhos
+  literais. O check passou a declarar esses caminhos montados, com dois testes
+  que cobram a declaração nas duas pontas.
+- A quinta era **real**: `GET /journeys/{id}/memories` não tem cliente nenhum.
+  Parecia alcançada porque o Expo declarava um wrapper que nenhuma tela chamava.
+  Entrou em `KNOWN_GAPS` com o motivo: o detalhe da jornada já devolve `points`
+  com as memórias, e é por ali que o app lê.
+
+### Documentação
+- README, [`01-regras-negocio.md`](01-regras-negocio.md),
+  [`04-decisoes-tecnicas.md`](04-decisoes-tecnicas.md),
+  [`06-roadmap.md`](06-roadmap.md), [`08-design-system.md`](08-design-system.md)
+  e [`11-convencoes.md`](11-convencoes.md) deixaram de falar em dois clientes.
+- O roadmap perdeu o item de V2 "Paridade do app Expo com o Flutter".
+

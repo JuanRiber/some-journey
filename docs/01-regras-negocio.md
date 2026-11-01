@@ -52,7 +52,7 @@
 
 ## Mapa
 - O mapa é o centro da experiência. **(impl.)** O app Flutter desenha o atlas com
-  `flutter_map` consumindo `GET /map`; o app Expo usa Leaflet no web. **(impl.)**
+  `flutter_map` consumindo `GET /map`, no celular e na web. **(impl.)**
 - Mostra pins de memórias e rastros de jornadas. **(impl.)**
 - Diferencia pontos soltos de pontos de jornada (cores distintas). **(impl.)**
 - Suporta recorte por área (bbox) e por jornada; visão mundo/país/região/cidade vem do zoom. **(impl. via `GET /map`)**

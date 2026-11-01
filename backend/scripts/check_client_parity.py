@@ -12,7 +12,7 @@ Como ele lê cada lado:
   prefixos moram nos routers (`APIRouter(prefix="/journeys")`), então um grep
   nos `@router.get` devolveria `/{journey_id}/cover` — caminho que não existe.
 - **Clientes**: os literais de caminho de `app_flutter/lib/api.dart` e
-  `mobile/src/lib/api.ts`, que são os dois únicos lugares onde um caminho de
+  que é o único lugar onde um caminho de
   API é escrito. Cada interpolação (`$id`, `${id}`) vira `{}`, que é a mesma
   forma que o parâmetro tem na tabela de rotas — é assim que
   `/journeys/$id/cover` encontra `/journeys/{journey_id}/cover`.
@@ -86,6 +86,14 @@ KNOWN_GAPS: dict[Endpoint, str] = {
         "Liveness. Quem bate aqui é o orquestrador (Render), não o app — e de "
         "propósito não toca o banco."
     ),
+    Endpoint("GET", "/journeys/{}/memories"): (
+        "Redundante: GET /journeys/{id} devolve JourneyDetailRead, que já traz "
+        "`points` com as memórias da jornada — e é por ali que o app lê. Esta "
+        "rota parecia alcançada até outubro de 2026 só porque o cliente Expo "
+        "declarava um wrapper que nenhuma tela chamava; removido o Expo, ela "
+        "apareceu pelo que é. Fica de pé porque o contrato está publicado, sem "
+        "cliente porque não há o que ela resolva."
+    ),
     Endpoint("GET", "/health/ready"): (
         "Readiness e keep-warm. Também é infraestrutura: o app não deve decidir "
         "nada a partir dela, só tentar a chamada real e tratar o erro."
@@ -93,12 +101,37 @@ KNOWN_GAPS: dict[Endpoint, str] = {
 }
 
 
-# Os dois — e únicos — lugares onde um caminho de API é escrito do lado do
-# cliente. Qualquer chamada fora daqui passa despercebida por este check; é o
-# preço de não varrer 77 arquivos de tela atrás de string.
+# O único lugar onde um caminho de API é escrito do lado do cliente. Qualquer
+# chamada fora daqui passa despercebida por este check; é o preço de não varrer
+# as telas atrás de string.
+#
+# Continua sendo um dicionário, e não um caminho só, porque a estrutura é o que
+# torna barato acrescentar um segundo cliente se um dia existir — foi assim que
+# o app Expo entrou e saiu sem reescrever este arquivo.
+# Caminhos que o cliente MONTA em tempo de execução, e que por isso nunca
+# aparecem inteiros no arquivo.
+#
+# `_lifecycle(id, action)` escreve `'/journeys/$id/$action'` e recebe
+# 'start'|'pause'|'resume'|'finish' dos quatro métodos logo abaixo dele. O
+# extrator enxerga `/journeys/{}/{}` e não tem como saber que segmento é aquele.
+#
+# Declarar é mais honesto que ensinar o parser a adivinhar: expandir `{}` contra
+# todo literal do arquivo marcaria `/journeys/{}/memories` como alcançada só
+# porque a palavra "memories" aparece em outro lugar — encobrindo exatamente a
+# deriva que este check existe para achar. O teste ao lado cobra que cada
+# entrada continue verdadeira nas duas pontas.
+ASSEMBLED: dict[str, tuple[str, ...]] = {
+    "/journeys/{}/{}": (
+        "/journeys/{}/start",
+        "/journeys/{}/pause",
+        "/journeys/{}/resume",
+        "/journeys/{}/finish",
+    ),
+}
+
+
 CLIENTS: dict[str, Path] = {
     "app_flutter": _REPO_ROOT / "app_flutter" / "lib" / "api.dart",
-    "mobile": _REPO_ROOT / "mobile" / "src" / "lib" / "api.ts",
 }
 
 
@@ -171,8 +204,9 @@ def backend_routes(application=None) -> set[Endpoint]:
 
 _QUOTES = "'\"`"
 
-# A forma do `fetch` do cliente Expo, onde o verbo vem DEPOIS do caminho, nas
-# opções: `fetch(url, { method: "POST", ... })`.
+# A forma em que o verbo vem DEPOIS do caminho, nas opções:
+# `fetch(url, { method: "POST", ... })`. Nenhum cliente atual escreve assim —
+# fica porque é barato e porque foi a forma do cliente anterior.
 _METHOD_OPTION = re.compile(r"""method\s*[:=]\s*["'`](GET|POST|PUT|PATCH|DELETE)["'`]""")
 
 # Quanto o verbo pode estar antes do caminho para ainda ser dele. Cobre
@@ -360,7 +394,24 @@ def client_endpoints(clients: dict[str, Path] | None = None) -> set[tuple[str | 
                 "rota pareceria sem chamador — corrija o caminho em CLIENTS."
             )
         found |= client_calls(path.read_text(encoding="utf-8"))
-    return found
+    return found | _expand_assembled(found)
+
+
+def _expand_assembled(
+    calls: set[tuple[str | None, str]],
+    assembled: dict[str, tuple[str, ...]] | None = None,
+) -> set[tuple[str | None, str]]:
+    """Resolve os caminhos montados em tempo de execução (ver ASSEMBLED).
+
+    O verbo da chamada original é preservado: quem monta o caminho não muda de
+    método no caminho.
+    """
+    tabela = ASSEMBLED if assembled is None else assembled
+    extra: set[tuple[str | None, str]] = set()
+    for method, path in calls:
+        for concreto in tabela.get(path, ()):
+            extra.add((method, concreto))
+    return extra
 
 
 # ---------------------------------------------------------------------------
@@ -437,8 +488,8 @@ def format_report(report: Report, show_accepted: bool = False) -> str:
         lines += [f"  {endpoint}" for endpoint in report.drift]
         lines += [
             "",
-            "Ou algum cliente passa a chamar (app_flutter/lib/api.dart,",
-            "mobile/src/lib/api.ts), ou a lacuna entra em KNOWN_GAPS, em",
+            "Ou algum cliente passa a chamar (app_flutter/lib/api.dart),",
+            "ou a lacuna entra em KNOWN_GAPS, em",
             "backend/scripts/check_client_parity.py, com o motivo escrito ao lado.",
         ]
     else:

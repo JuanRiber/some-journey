@@ -143,3 +143,47 @@ def test_comentario_nao_e_lido_como_chamada():
 request("GET", "/memories", undefined, true);
 """
     assert parity.client_calls(fonte) == {("GET", "/memories")}
+
+
+# ---------------------------------------------------------------------------
+# ASSEMBLED não pode apodrecer
+# ---------------------------------------------------------------------------
+#
+# Declarar à mão que `/journeys/{}/{}` vira quatro rotas é o preço de não
+# ensinar o parser a adivinhar. O risco de toda lista escrita à mão é envelhecer
+# calada — e aí ela passa a AFIRMAR cobertura que não existe, que é pior que não
+# ter check nenhum. Estes dois testes cobram a declaração nas duas pontas.
+
+
+def test_assembled_ainda_descreve_o_cliente():
+    """Se o ajudante sumir do cliente, a entrada tem de gritar.
+
+    Sem isto, apagar `_lifecycle` deixaria as quatro rotas do ciclo de vida
+    marcadas como alcançadas para sempre, por uma declaração que não descreve
+    mais nada.
+    """
+    from scripts.check_client_parity import ASSEMBLED, CLIENTS, client_calls
+
+    chamadas = set()
+    for caminho in CLIENTS.values():
+        chamadas |= {p for _m, p in client_calls(caminho.read_text(encoding="utf-8"))}
+
+    for dinamico in ASSEMBLED:
+        assert dinamico in chamadas, (
+            f"ASSEMBLED declara '{dinamico}', que nenhum cliente monta mais. "
+            "A entrada ficou órfã: ou o ajudante mudou de forma, ou sumiu."
+        )
+
+
+def test_assembled_aponta_para_rotas_que_existem():
+    """E se a rota sumir do backend, a entrada também tem de gritar."""
+    from scripts.check_client_parity import ASSEMBLED, backend_routes
+
+    caminhos = {r.path for r in backend_routes()}
+
+    for dinamico, concretos in ASSEMBLED.items():
+        for concreto in concretos:
+            assert concreto in caminhos, (
+                f"ASSEMBLED resolve '{dinamico}' em '{concreto}', que não é mais "
+                "uma rota do backend."
+            )

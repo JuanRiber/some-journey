@@ -318,3 +318,19 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   não se sustentava: essas camadas são IRMÃS da camada de telhas na lista de
   filhos do `FlutterMap`, nunca filhas dela. Agora o filtro é um só, por fora
   da camada inteira, com dois testes prendendo a forma da árvore.
+
+## 2026-11-01
+
+### Correção
+- **A foto de memória não cabia no próprio teto.** O backend corta o upload em
+  5MB e devolve 413; o avatar e a capa de jornada sempre encolheram antes de
+  enviar, mas a foto da memória ia em resolução cheia — nas duas telas que a
+  escolhem. Na prática o caminho mais percorrido do produto falhava para a
+  foto comum de celular (3 a 12MB) e só funcionava para captura de tela.
+- Os limites passaram a morar num ponto único (2048px no maior lado,
+  qualidade 85 — tipicamente 400KB a 1,2MB), porque duas cópias de um limite é
+  um limite que será corrigido pela metade.
+- O defeito era invisível porque ninguém observa os ARGUMENTOS de um seletor
+  de imagem: a tela compila, a galeria abre e devolve arquivos do mesmo jeito.
+  Agora cinco testes observam, inclusive o corte para a galeria que ignora o
+  limite que recebeu.

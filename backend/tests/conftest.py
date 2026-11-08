@@ -31,6 +31,7 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import MetaData, create_engine, text  # noqa: E402
 from sqlalchemy.engine import make_url  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
 
 _engine = create_engine(TEST_DATABASE_URL)
 
@@ -163,6 +164,19 @@ def _reset_rate_limit():
 
     rate_limit._buckets.clear()
     yield
+
+
+@pytest.fixture()
+def db_session(_schema):
+    """Sessão direta ao banco de teste, para AFIRMAR sobre linhas.
+
+    Existe porque algumas regras só são visíveis na tabela: que o login com
+    Google não criou uma segunda conta, que o `password_hash` ficou nulo, que
+    o vínculo foi gravado. Pela API essas coisas aparecem no máximo de
+    esguelha — e um teste que afirma de esguelha não protege.
+    """
+    with Session(_engine) as sessao:
+        yield sessao
 
 
 @pytest.fixture()

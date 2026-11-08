@@ -86,6 +86,15 @@ KNOWN_GAPS: dict[Endpoint, str] = {
         "Liveness. Quem bate aqui é o orquestrador (Render), não o app — e de "
         "propósito não toca o banco."
     ),
+    Endpoint("POST", "/auth/google"): (
+        "Entrar com o Google: o backend ficou pronto antes do cliente, e de "
+        "propósito. A verificação do id_token, o vínculo por `sub` e a "
+        "prevenção de conta duplicada são a parte que dá para construir e "
+        "testar sem credencial do Google Cloud e sem build assinado de "
+        "aparelho. O botão no app continua desenhado e DESLIGADO até existir "
+        "um client id — ligar antes seria um botão que não faz nada. Esta "
+        "entrada sai daqui no dia em que o cliente chamar a rota."
+    ),
     Endpoint("GET", "/journeys/{}/memories"): (
         "Redundante: GET /journeys/{id} devolve JourneyDetailRead, que já traz "
         "`points` com as memórias da jornada — e é por ali que o app lê. Esta "

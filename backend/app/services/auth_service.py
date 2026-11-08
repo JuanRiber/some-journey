@@ -15,6 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core import google_oauth
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
@@ -74,12 +75,72 @@ def login(db: Session, data: LoginRequest) -> LoginResponse:
         # resposta seja ~igual ao de uma senha errada (não vaza se o e-mail existe).
         verify_password(data.password, _DUMMY_PASSWORD_HASH)
         raise InvalidCredentialsError()
+    if user.password_hash is None:
+        # Conta que só tem Google: não há senha para conferir. Roda o argon2
+        # contra o hash dummy e devolve a MESMA mensagem genérica — dizer
+        # "esta conta usa Google" revelaria que o e-mail existe, que é
+        # exatamente o que o resto deste fluxo evita.
+        verify_password(data.password, _DUMMY_PASSWORD_HASH)
+        raise InvalidCredentialsError()
     if not verify_password(data.password, user.password_hash):
         raise InvalidCredentialsError()
     if not user.is_active:
         raise InactiveUserError()
     # pcat = password_changed_at vigente: o token só vale enquanto a senha não
     # for trocada/redefinida (ver get_current_user).
+    access_token = create_access_token(user.id, user.password_changed_at)
+    return LoginResponse(
+        access_token=access_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+def login_with_google(db: Session, id_token: str) -> LoginResponse:
+    """Entra (ou cadastra) pelo Google e emite NOSSO token.
+
+    Três caminhos, nesta ordem, e a ordem é a regra:
+
+    1. **Já conhecemos este `sub`** — é a mesma conta Google de antes; entra.
+    2. **Não, mas o e-mail já tem cadastro** — VINCULA em vez de criar. É isto
+       que impede a segunda conta: quem usava e-mail e senha e um dia toca em
+       "entrar com Google" cai no próprio cadastro, com as próprias memórias,
+       e não num perfil vazio de mesmo nome.
+    3. **Nenhum dos dois** — cria, sem senha (`password_hash=None`).
+
+    O vínculo é pelo `sub`, nunca pelo e-mail, porque o e-mail de uma conta
+    Google pode mudar; e o e-mail só serve de ponte no passo 2 porque o
+    verificador já exigiu `email_verified`.
+
+    A corrida entre dois logins simultâneos do mesmo Google novo é resolvida
+    pelo banco: `google_sub` e `email` são UNIQUE, o INSERT perdedor levanta
+    IntegrityError, e aqui relemos a linha que o vencedor gravou em vez de
+    devolver erro para alguém que apenas tocou no botão duas vezes.
+    """
+    identidade = google_oauth.verify(id_token)
+
+    user = user_repository.get_by_google_sub(db, identidade.sub)
+    if user is None:
+        existente = user_repository.get_by_email(db, identidade.email)
+        if existente is not None:
+            user = user_repository.link_google(
+                db, user=existente, google_sub=identidade.sub
+            )
+        else:
+            try:
+                user = user_repository.create(
+                    db,
+                    name=identidade.name or identidade.email.split("@")[0],
+                    email=identidade.email,
+                    password_hash=None,
+                    google_sub=identidade.sub,
+                )
+            except IntegrityError:
+                user = user_repository.get_by_google_sub(db, identidade.sub)
+                if user is None:
+                    raise
+
+    if not user.is_active:
+        raise InactiveUserError()
     access_token = create_access_token(user.id, user.password_changed_at)
     return LoginResponse(
         access_token=access_token,

@@ -51,7 +51,7 @@ some-journey/
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0010)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (240 testes)
+|   |-- tests/                 # pytest (292 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -185,6 +185,34 @@ bucket precisa ser privado.
 
 Para conferir que ligou: anexar uma foto a uma memoria deve responder **201**
 em vez de 503.
+
+#### Entrar com o Google
+
+Sem `GOOGLE_CLIENT_ID` a rota `POST /auth/google` responde **503** e o botao no
+app fica desligado, com "em breve" escrito. Todo o resto funciona. Para ligar:
+
+1. No <https://console.cloud.google.com>, crie um projeto.
+2. **APIs e servicos → Tela de permissao OAuth**: configure o consentimento
+   (tipo Externo, nome do app e e-mail de contato).
+3. **Credenciais → Criar credenciais → ID do cliente OAuth**. Crie um por
+   plataforma que for usar: *Aplicativo da Web* (informando a origem
+   autorizada), *Android* (com o nome do pacote e a impressao digital SHA-1 da
+   chave de assinatura) e *iOS* (com o bundle id).
+4. Coloque os client ids em `GOOGLE_CLIENT_ID`, **separados por virgula**. O
+   `aud` de cada id_token e o client id da plataforma que pediu — com um valor
+   so, o login da web funciona e o do celular e recusado como token invalido.
+5. Reinicie a API.
+
+O backend nao guarda segredo do Google: so o client id, que e publico por
+natureza. Nao ha `client_secret` aqui porque o fluxo e de id_token — quem fala
+com o Google e o cliente; o backend apenas **verifica a assinatura** do token
+contra as chaves publicas do Google e confere `aud`, `iss`, `exp` e
+`email_verified`.
+
+Vinculo de conta: o primeiro login cria o cadastro; se o e-mail ja existir, a
+conta Google e **vinculada a ela** em vez de criar uma segunda. O vinculo e
+pelo `sub` do Google, nunca pelo e-mail, porque o e-mail de uma conta Google
+pode mudar.
 
 ### 3. App Flutter (principal)
 
@@ -345,7 +373,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Paginacao keyset em `/memories` e `/journeys`
 - [x] Migracoes versionadas (Alembic, 0001..0010)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
-- [x] Testes automatizados — 240 no backend (pytest) e 403 no app (flutter test)
+- [x] Testes automatizados — 292 no backend (pytest) e 403 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)

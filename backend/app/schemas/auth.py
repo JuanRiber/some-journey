@@ -90,6 +90,18 @@ class LoginRequest(BaseModel):
     password: str = Field(max_length=128)
 
 
+class GoogleLoginRequest(BaseModel):
+    """O `id_token` que o Google devolveu ao cliente.
+
+    É só isso que entra. Nada do que o cliente afirme sobre si — e-mail, nome,
+    id — é aceito: tudo vem das claims assinadas dentro do token, conferidas
+    em `app.core.google_oauth`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id_token: str = Field(min_length=1, max_length=4096)
+
+
 class LoginResponse(BaseModel):
     """Resposta 200: {access_token, token_type, expires_in}. Schema de saída
     puro (não lê do ORM): o token é emitido pelo service."""

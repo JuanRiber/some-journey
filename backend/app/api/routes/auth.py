@@ -2,12 +2,14 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request,
 from sqlalchemy.orm import Session
 
 from app.core import email as email_delivery
+from app.core import google_oauth
 from app.core.config import settings
 from app.core.rate_limit import check_rate_limit
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.schemas.auth import (
+    GoogleLoginRequest,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
@@ -189,6 +191,44 @@ def reset_password(
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_current_user)) -> User:
     return current_user
+
+
+@router.post("/google", response_model=LoginResponse)
+def login_with_google(
+    data: GoogleLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> LoginResponse:
+    """Entra com o Google. Cria a conta na primeira vez, vincula se o e-mail
+    já existir, e nunca cria uma segunda.
+
+    Os status: **503** quando o GOOGLE_CLIENT_ID não está configurado (o
+    recurso não existe neste ambiente — melhor dizer isso do que aceitar um
+    token sem saber para quem foi emitido), **401** para token inválido,
+    expirado, de outro cliente ou com e-mail não verificado, e **403** para
+    conta inativa, igual ao login por senha.
+
+    O limitador usa o próprio token como chave de balde: sem e-mail no corpo,
+    é o que identifica a tentativa antes de sabermos quem é.
+    """
+    _limit_auth(request, "google", data.id_token[:64])
+    try:
+        return auth_service.login_with_google(db, data.id_token)
+    except google_oauth.GoogleNotConfigured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured.",
+        )
+    except google_oauth.InvalidGoogleToken:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google token.",
+        )
+    except auth_service.InactiveUserError:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account is inactive.",
+        )
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

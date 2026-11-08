@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     # SUPABASE_SERVICE_KEY o upload fica desabilitado (o endpoint responde 503) e
     # image_url volta None. Bucket PRIVADO: o backend gera URLs assinadas de
     # curta duração na leitura; o service key NUNCA chega ao cliente.
+    # --- Entrar com o Google ---------------------------------------------
+    # OPCIONAL: sem GOOGLE_CLIENT_ID a rota POST /auth/google responde 503 e o
+    # botao do cliente fica desligado. E o `aud` esperado no id_token: sem ele
+    # nao ha como saber se o token foi emitido para ESTE aplicativo.
+    # Aceita VARIOS, separados por virgula: o Google emite um client id por
+    # plataforma (web, Android, iOS) e o `aud` do id_token e o de quem pediu.
+    GOOGLE_CLIENT_ID: str | None = None
+
     SUPABASE_URL: str | None = None
     SUPABASE_SERVICE_KEY: str | None = None
     SUPABASE_BUCKET: str = "memories"

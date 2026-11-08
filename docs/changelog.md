@@ -334,3 +334,49 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   de imagem: a tela compila, a galeria abre e devolve arquivos do mesmo jeito.
   Agora cinco testes observam, inclusive o corte para a galeria que ignora o
   limite que recebeu.
+
+## 2026-11-02
+
+### Entrar com o Google (backend)
+- A rota `POST /auth/google` existe e funciona. O cliente faz o fluxo com o
+  Google, recebe um `id_token` e manda só isso: **nada do que ele afirma sobre
+  si é aceito**, porque o token é um JWT assinado pelo Google e é a assinatura
+  que vale.
+- São conferidos a assinatura (contra as chaves públicas do Google), o `aud`,
+  o `iss`, o `exp` e o `email_verified`. O `aud` é o que impede um token
+  emitido para OUTRO aplicativo de ser aceito aqui — sem essa checagem,
+  qualquer desenvolvedor entraria como qualquer pessoa.
+- `GOOGLE_CLIENT_ID` aceita **vários separados por vírgula**: o Google emite um
+  client id por plataforma e o `aud` é o de quem pediu. Com um valor só, a web
+  entraria e o celular seria recusado como "token inválido" — mandando a pessoa
+  depurar o lugar errado.
+- Sem a variável configurada a rota responde **503**, não 401. O recurso não
+  existe naquele ambiente, e dizer "token inválido" seria mentira útil para
+  ninguém.
+
+### O vínculo, que é a regra que importa
+- Três caminhos, nesta ordem: `sub` conhecido → entra; e-mail já cadastrado →
+  **vincula**; nenhum dos dois → cria. O segundo é o que impede a segunda
+  conta: quem usava e-mail e senha e um dia toca em "entrar com Google" cai no
+  próprio cadastro, com as próprias memórias, e não num perfil vazio de mesmo
+  nome.
+- O vínculo é pelo `sub` do Google, **nunca pelo e-mail** — o e-mail de uma
+  conta Google pode mudar de dono dentro de um domínio; o `sub` não.
+- A corrida entre dois logins simultâneos é resolvida pelo banco: `google_sub`
+  e `email` são UNIQUE, e o perdedor relê a linha do vencedor em vez de
+  devolver erro a quem só tocou no botão duas vezes.
+
+### Schema
+- Migration `0012_google_identity`: `users.google_sub` (único, nulo) e
+  `users.password_hash` passa a aceitar NULL.
+- Senha nula é deliberado. Guardar um hash inventado para quem entrou pelo
+  Google manteria o NOT NULL ao custo de uma linha que MENTE — pareceria ter
+  senha, e o próximo a ler a tabela trataria como se tivesse. O login por senha
+  recusa essas contas com a **mesma mensagem genérica** de credencial inválida:
+  responder "esta conta usa Google" confirmaria que o e-mail existe.
+
+### Paridade
+- A rota entrou em `KNOWN_GAPS` com o motivo escrito: o backend ficou pronto
+  antes do cliente de propósito, porque é a parte que dá para construir e
+  testar sem credencial do Google Cloud e sem build assinado de aparelho. O
+  botão no app segue desenhado e desligado até existir um client id.

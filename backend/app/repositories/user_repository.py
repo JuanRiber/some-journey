@@ -48,7 +48,37 @@ def get_by_id(db: Session, user_id: uuid.UUID) -> User | None:
     return db.get(User, user_id)
 
 
-def create(db: Session, *, name: str, email: str, password_hash: str) -> User:
+def get_by_google_sub(db: Session, google_sub: str) -> User | None:
+    """Busca pelo identificador estável da conta Google (`sub` do id_token).
+
+    É por aqui que o login com Google reencontra quem já entrou antes. Nunca
+    pelo e-mail: o e-mail de uma conta Google pode trocar de dono dentro de um
+    domínio, o `sub` não. Como google_sub é UNIQUE, no máximo uma linha casa.
+    """
+    return db.scalar(select(User).where(User.google_sub == google_sub))
+
+
+def link_google(db: Session, *, user: User, google_sub: str) -> User:
+    """Vincula uma conta Google a um usuário que JÁ existe.
+
+    É o que impede a segunda conta: quem se cadastrou com e-mail e senha e um
+    dia entra pelo Google com o mesmo e-mail cai no próprio cadastro, com as
+    próprias memórias, em vez de num perfil vazio de mesmo nome.
+    """
+    user.google_sub = google_sub
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def create(
+    db: Session,
+    *,
+    name: str,
+    email: str,
+    password_hash: str | None,
+    google_sub: str | None = None,
+) -> User:
     """Cria e persiste um novo usuário; retorna a instância com os campos do
     banco já populados.
 
@@ -95,7 +125,12 @@ def create(db: Session, *, name: str, email: str, password_hash: str) -> User:
     utilizável. Não engolimos o erro nem logamos nada (e-mail é PII).
     """
     # Monta a entidade só com os campos de entrada; os defaults vêm do banco.
-    user = User(name=name, email=email, password_hash=password_hash)
+    user = User(
+        name=name,
+        email=email,
+        password_hash=password_hash,
+        google_sub=google_sub,
+    )
     db.add(user)
     try:
         # commit envia o INSERT (flush) e confirma a transação.

@@ -42,7 +42,18 @@ class User(Base):
 
     # Hash da senha. NUNCA texto puro e NUNCA retornado pela API/log — a coluna
     # existe aqui só porque a persistência precisa dela.
-    password_hash: Mapped[str] = mapped_column(Text)
+    # NULO para quem entrou pelo Google e nunca definiu senha. Antes era NOT
+    # NULL porque a unica porta era e-mail+senha; guardar um hash inventado
+    # para essas contas seria uma linha que MENTE — pareceria ter senha, e
+    # alguem acabaria tratando como se tivesse.
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Identificador estavel da conta Google (`sub` do id_token). O vinculo e
+    # por ele, nunca pelo e-mail: o e-mail de uma conta Google pode mudar, o
+    # `sub` nao.
+    google_sub: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True, default=None
+    )
 
     # Timestamps timezone-aware (TIMESTAMPTZ). server_default=func.now() é
     # avaliado por linha no servidor (não congela um instante no import).

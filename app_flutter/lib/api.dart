@@ -366,6 +366,19 @@ class Api {
     await _saveToken(data['access_token'] as String);
   }
 
+  /// Entra com o Google: manda o `id_token` e recebe a NOSSA sessão.
+  ///
+  /// O app não decide quem a pessoa é — quem verifica a assinatura do token,
+  /// confere o `aud` e vincula (ou cria) a conta é o backend. Aqui só o
+  /// transporte.
+  ///
+  /// 503 = o servidor não tem GOOGLE_CLIENT_ID configurado; 401 = token
+  /// recusado. Os dois chegam como `ApiError` com a mensagem pronta.
+  Future<void> loginWithGoogle(String idToken) async {
+    final data = await _request('POST', '/auth/google', body: {'id_token': idToken});
+    await _saveToken(data['access_token'] as String);
+  }
+
   Future<void> logout() => _saveToken(null);
 
   Future<void> changePassword(String current, String next) => _request(

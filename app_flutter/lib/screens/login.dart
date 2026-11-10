@@ -4,6 +4,8 @@ import '../api.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/auth/google_button.dart';
+import '../features/auth/google_signin.dart';
 
 /// # Entrar — a porta do próprio atlas.
 ///
@@ -68,6 +70,42 @@ class _LoginScreenState extends State<LoginScreen> {
       _aviso = 'Conta criada. Agora é só entrar.';
     });
     _passwordFocus.requestFocus();
+  }
+
+  /// Troca o `id_token` do Google por uma sessão nossa.
+  ///
+  /// Quem decide se o token vale é o backend; aqui a tela só reage. Uma conta
+  /// que já existia com e-mail e senha é VINCULADA lá, então esta mesma
+  /// chamada serve para quem entra pela primeira vez e para quem já tinha
+  /// conta — a tela não precisa saber a diferença.
+  Future<void> _entrarComGoogle(String idToken) async {
+    setState(() {
+      _error = '';
+      _aviso = '';
+      _loading = true;
+    });
+    try {
+      await Api.instance.loginWithGoogle(idToken);
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/tabs', (_) => false);
+    } on ApiError catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'Erro inesperado.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _falhaDoGoogle(GoogleFalha falha) {
+    if (!mounted) return;
+    setState(() {
+      _error = switch (falha) {
+        GoogleFalha.naoSuportado =>
+          'Entrar com Google não está disponível aqui. Use o e-mail e a senha.',
+        _ => 'Não foi possível falar com o Google. Tente de novo.',
+      };
+    });
   }
 
   Future<void> _onLogin() async {
@@ -273,7 +311,11 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: SJSpace.x5),
           const _Ou(),
           const SizedBox(height: SJSpace.x5),
-          const _ContinuarComGoogle(),
+          GoogleBotao(
+            ocupado: _loading,
+            onToken: _entrarComGoogle,
+            onFalha: _falhaDoGoogle,
+          ),
           const SizedBox(height: SJSpace.x5),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -652,49 +694,6 @@ class _Ou extends StatelessWidget {
         ),
         fio,
       ],
-    );
-  }
-}
-
-/// Entrar com Google — desenhado, desligado, e dizendo que está desligado.
-///
-/// O backend não tem OAuth: `POST /auth/login` só conhece e-mail e senha. Um
-/// botão bonito que não faz nada é pior que um botão ausente, e um botão
-/// ausente estragaria a composição que o desenho pede. A saída honesta é a
-/// mesma que Configurações já usa no app inteiro: aparece, com "em breve"
-/// escrito, e não aceita toque.
-class _ContinuarComGoogle extends StatelessWidget {
-  const _ContinuarComGoogle();
-
-  @override
-  Widget build(BuildContext context) {
-    final s = SJTheme.of(context);
-    return Opacity(
-      opacity: 0.55,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 48),
-        decoration: BoxDecoration(
-          color: s.surface,
-          border: Border.all(color: s.line),
-          borderRadius: BorderRadius.circular(SJRadius.md),
-        ),
-        alignment: Alignment.center,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                'Continuar com Google',
-                style: SJText.bodySm(color: s.ink),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: SJSpace.x2),
-            SJBadge('em breve', color: s.inkFaint),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -380,3 +380,29 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   antes do cliente de propósito, porque é a parte que dá para construir e
   testar sem credencial do Google Cloud e sem build assinado de aparelho. O
   botão no app segue desenhado e desligado até existir um client id.
+
+## 2026-11-08
+
+### Entrar com o Google (app)
+- O botão deixou de ser desenho e virou botão — **quando há client id**. Sem
+  `--dart-define=GOOGLE_CLIENT_ID` ele continua desenhado e desligado, com "em
+  breve" escrito, que é o estado honesto de quem ainda não criou a credencial.
+  Ligar antes seria um botão que não faz nada.
+- A web usa o botão renderizado pelo **próprio Google**: eles não autorizam o
+  fluxo a sair de um botão de terceiro, e a resposta chega por evento em vez de
+  pelo retorno da chamada. Fora da web o fluxo é direto e o botão é o nosso, no
+  design system. A diferença fica isolada num import condicional; a tela de
+  login não sabe em qual dos dois está.
+- Cancelar **não é erro**. Fechar a janela do Google é decisão de quem estava
+  entrando, e virar mensagem vermelha diria que ela errou quando só mudou de
+  ideia.
+- O token vai direto para `POST /auth/google` e quem decide qualquer coisa é o
+  backend — inclusive se a conta é nova ou se é um vínculo com um cadastro
+  antigo. A tela não precisa saber a diferença.
+
+### Testabilidade
+- O SDK do Google entrou atrás de uma interface, pelo mesmo motivo do
+  `MusicProvider`: o fluxo real não roda em teste. Sem a fronteira, nada do que
+  a tela faz com o token — sucesso, cancelamento, falha, plataforma sem suporte
+  — seria observável, e o botão seria o pedaço do app que ninguém exercita até
+  alguém tocar nele em produção. São oito testes.

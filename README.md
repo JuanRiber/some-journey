@@ -203,6 +203,23 @@ app fica desligado, com "em breve" escrito. Todo o resto funciona. Para ligar:
    so, o login da web funciona e o do celular e recusado como token invalido.
 5. Reinicie a API.
 
+No APP o mesmo client id entra por `--dart-define`, igual ao `API_URL`:
+
+```bash
+flutter run --dart-define=GOOGLE_CLIENT_ID=<o-client-id-da-plataforma>
+```
+
+Sem ele o botao fica desenhado e DESLIGADO, com "em breve" escrito — e isso e
+proposital: um botao ligado sem credencial seria um botao que nao faz nada.
+Use o client id da plataforma que esta construindo (o da Web para `-d chrome`,
+o de Android para Android, o de iOS para iOS); no backend va todos, separados
+por virgula.
+
+Na web o botao e o renderizado pelo PROPRIO Google, nao um nosso: o Google nao
+autoriza o fluxo a sair de um botao de terceiro, e a resposta chega por evento
+em vez de pelo retorno da chamada. Fora da web o fluxo e direto e o botao e o
+nosso, no design system.
+
 O backend nao guarda segredo do Google: so o client id, que e publico por
 natureza. Nao ha `client_secret` aqui porque o fluxo e de id_token — quem fala
 com o Google e o cliente; o backend apenas **verifica a assinatura** do token
@@ -373,7 +390,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Paginacao keyset em `/memories` e `/journeys`
 - [x] Migracoes versionadas (Alembic, 0001..0010)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
-- [x] Testes automatizados — 292 no backend (pytest) e 403 no app (flutter test)
+- [x] Testes automatizados — 292 no backend (pytest) e 411 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)

@@ -6,7 +6,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy import text
 
 import app.models  # noqa: F401 - register models in SQLAlchemy metadata
-from app.api.routes import auth, journey, map, memory, profile, track
+from app.api.routes import auth, journey, life_phase, map, memory, profile, track
 from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import settings
 from app.core.pagination import NEXT_CURSOR_HEADER
@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
     application.include_router(auth.router)
     application.include_router(memory.router)
     application.include_router(journey.router)
+    application.include_router(life_phase.router)
     application.include_router(track.router)
     application.include_router(map.router)
     application.include_router(profile.router)

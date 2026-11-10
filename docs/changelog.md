@@ -406,3 +406,38 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   a tela faz com o token — sucesso, cancelamento, falha, plataforma sem suporte
   — seria observável, e o botão seria o pedaço do app que ninguém exercita até
   alguém tocar nele em produção. São oito testes.
+
+## 2026-11-10
+
+### Fases da vida — a fundação
+- Nova tabela `life_phases` e vínculo **opcional** com memórias e jornadas.
+  Uma fase é um capítulo que a pessoa reconhece na própria história: infância,
+  recomeços, novos caminhos.
+- CRUD completo em `/life-phases`, isolado por usuário — id de outra pessoa e
+  id inexistente respondem igual (404), para quem sonda ids não descobrir
+  quais existem.
+- Detalhe de contrato que foge ao padrão da casa: no `PATCH` daqui, `null`
+  **limpa** o campo. No PATCH de jornada, `null` é no-op silencioso. A
+  diferença é deliberada: uma fase que ganhou data de fim por engano precisa
+  poder voltar a ser a fase em curso, e para data não existe o truque da
+  string vazia.
+
+### O que o schema se recusa a impor
+- **Sem lista predefinida.** O banco nasce vazio de fases. Os exemplos vivem
+  no texto do produto, nunca como linhas semeadas.
+- **Sem restrição de sobreposição.** "Vida adulta" e "recomeços" convivem;
+  exigir períodos disjuntos transformaria memória em planilha.
+- **Período aberto dos dois lados.** Nem toda pessoa sabe quando a infância
+  virou outra coisa, e pedir data de fim para salvar seria pedir que ela
+  decretasse o próprio presente no passado.
+- **Cor da paleta, não hexadecimal.** Cor livre quebraria o contraste em um
+  dos dois modos — o que é legível no papel quente some no atlas noturno.
+
+### E a regra que vale o arquivo de teste
+- Apagar uma fase **solta** o que apontava para ela. A etiqueta é descartável;
+  a lembrança não. Perder uma memória por causa da categoria seria a ordem
+  errada de importância.
+
+### Paridade
+- As cinco rotas entraram em `KNOWN_GAPS` com o motivo: a fase só faz sentido
+  quando houver tela para criar e FILTRAR por ela, e essa é a próxima fatia.

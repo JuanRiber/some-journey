@@ -168,6 +168,38 @@ Jornada é uma **trajetória** formada por pontos/memórias em sequência.
 > Enviados em lote (até 1000 por requisição). **Nunca** expostos no mapa global —
 > a visão macro mostra só a linha simbólica.
 
+## life_phases  (os capítulos que a pessoa reconhece na própria vida)
+
+| coluna | tipo | observação |
+| --- | --- | --- |
+| id | uuid | PK |
+| user_id | uuid | FK users, ON DELETE CASCADE |
+| name | varchar(60) | único campo obrigatório |
+| description | text | opcional |
+| color | varchar(20) | PAPEL da paleta: primary, secondary, accent, moss, highlight |
+| started_at | timestamptz | **nulo** — nem toda pessoa sabe quando a fase começou |
+| ended_at | timestamptz | **nulo** — a fase em curso não terminou |
+| created_at / updated_at | timestamptz | |
+| deleted_at | timestamptz | soft delete, como em journeys |
+
+`memories.life_phase_id` e `journeys.life_phase_id` são FKs **opcionais** com
+`ON DELETE SET NULL`.
+
+**Três ausências deliberadas no schema**, e cada uma é uma decisão de produto:
+
+- **Não há lista predefinida.** O banco nasce vazio de fases. Infância,
+  adolescência e recomeços são exemplos no texto do produto, nunca linhas
+  semeadas — a fase existe para a pessoa interpretar a própria história, não
+  para encaixá-la numa taxonomia.
+- **Não há restrição de sobreposição.** "Vida adulta" e "recomeços" convivem.
+  Exigir períodos disjuntos transformaria memória em planilha.
+- **A cor não é hexadecimal.** Cor livre quebraria o contraste em um dos dois
+  modos do app: o que é legível no papel quente some no atlas noturno. São
+  papéis semânticos que já existem e já têm contraste conferido.
+
+Apagar uma fase **solta** as memórias e jornadas que apontavam para ela, e não
+as leva junto: a etiqueta é descartável, a lembrança não.
+
 ## password_reset_tokens
 | Campo | Tipo | Notas |
 |---|---|---|

@@ -59,6 +59,16 @@ class Journey(Base):
     is_private: Mapped[bool] = mapped_column(Boolean, server_default=sql_text("true"))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Capítulo da vida a que isto pertence, se a pessoa quis dizer. NULO é o
+    # estado normal: fase é uma lente para interpretar a própria história, não
+    # um campo obrigatório. Apagar a fase solta o vínculo (ON DELETE SET NULL)
+    # em vez de levar a memória junto.
+    life_phase_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("life_phases.id", ondelete="SET NULL"),
+        index=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

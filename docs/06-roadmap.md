@@ -24,7 +24,7 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ a fazer. (Progresso detalhado no [`cha
 
 ## V2
 - ✅ Múltiplas fotos por memória (entregue no MVP, teto de 5).
-- Fases da vida.
+- 🟡 **Fases da vida** — backend pronto (tabela, CRUD, vínculo opcional com memórias e jornadas, 18 testes). Falta o cliente: telas de criar/editar e o filtro por fase no atlas e na timeline.
 - Filtros avançados no mapa.
 - Estilos visuais de jornadas.
 - Exportação simples de jornada.

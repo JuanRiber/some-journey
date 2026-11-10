@@ -20,7 +20,7 @@ A vida deixa rastros. O Some Journey registra esses rastros e une lugar, tempo, 
 | App | Flutter (Dart >= 3.12.2), `flutter_map` — movel e web |
 | Mapa | `flutter_map` com tiles OSM/CartoDB; Mapbox planejado |
 | Imagens | Supabase Storage (bucket privado, URL assinada) |
-| Infra | Docker Compose para PostgreSQL/PostGIS; Render para a API |
+| Infra | Docker Compose para PostgreSQL/PostGIS; Render para a API; Cloudflare Pages para o app web |
 
 Ha **um cliente**: o Flutter (`app_flutter/`), que atende movel e web pelo mesmo
 codigo. Ate outubro de 2026 existia tambem um app Expo em `mobile/`, removido por
@@ -63,8 +63,10 @@ some-journey/
 |   |   |-- screens/           # telas
 |   |   `-- widgets/           # UI compartilhada (atlas_map, location_picker)
 |   `-- test/
-|-- .github/workflows/ci.yml   # integracao continua (backend + app)
-|-- docs/                      # visao, regras, modelagem, API, design system, perfil
+|-- .github/workflows/
+|   |-- ci.yml                 # integracao continua (backend + app)
+|   `-- deploy-web.yml         # publica o app web no Cloudflare Pages
+|-- docs/                      # visao, regras, modelagem, API, design system, perfil, deploy
 |-- infra/
 |   `-- docker-compose.yml
 |-- render.yaml                # blueprint de deploy da API
@@ -414,6 +416,16 @@ O GitHub Actions roda a cada push na `main` e em todo pull request
 A suite nao precisa de `.env`: o `conftest.py` define `DATABASE_URL`,
 `JWT_SECRET_KEY` e `APP_ENV=test` antes de importar o app, cria o banco de teste
 e habilita o PostGIS.
+
+---
+
+## Deploy para testers
+
+Tudo no plano gratuito: API no **Render** (`render.yaml`), banco e fotos no
+**Supabase**, app web no **Cloudflare Pages** (`.github/workflows/deploy-web.yml`)
+e um ping no **UptimeRobot** para a API nao dormir. Um push na `main` so e
+publicado depois do CI verde, nos dois lados. O passo a passo, na ordem, esta em
+[`docs/12-deploy.md`](docs/12-deploy.md).
 
 ---
 

@@ -441,3 +441,16 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
 ### Paridade
 - As cinco rotas entraram em `KNOWN_GAPS` com o motivo: a fase só faz sentido
   quando houver tela para criar e FILTRAR por ela, e essa é a próxima fatia.
+
+## 2026-11-10
+
+### Deploy para testers
+- Criado `12-deploy.md`: o passo a passo, na ordem, para pôr o app no ar de graça — API no
+  Render, banco e fotos no Supabase, app web no Cloudflare Pages, ping no UptimeRobot — e as
+  contas dos testers pelo script de seed.
+- Registrado por que o ping vai no `/health/ready` e não no `/health`: um só monitor impede o
+  Render de dormir **e** o Supabase de pausar, porque o `/health/ready` consulta o banco.
+- Registradas as armadilhas da `DATABASE_URL` do Supabase: prefixo `postgresql+psycopg://`,
+  Session pooler (a conexão direta é só IPv6) e senha sem caractere especial.
+- Registrado que nenhum dos dois deploys publica commit com CI vermelho: o Render usa
+  `autoDeployTrigger: checksPass` e o app web só é publicado depois do CI na `main`.

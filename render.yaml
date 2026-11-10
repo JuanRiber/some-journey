@@ -7,6 +7,10 @@ services:
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
     plan: free
+    # Só publica depois do CI verde no commit — o mesmo critério do deploy web
+    # (.github/workflows/deploy-web.yml). O padrão do Render é publicar a cada
+    # push, inclusive o que a suíte reprovou.
+    autoDeployTrigger: checksPass
     healthCheckPath: /health
     envVars:
       - key: APP_ENV
@@ -16,7 +20,10 @@ services:
       - key: SUPABASE_BUCKET
         value: memories
       # --- definir no painel (Environment) ---
-      - key: DATABASE_URL          # Postgres do Supabase (connection string do pooler)
+      # Postgres do Supabase: a string do SESSION pooler (a conexão direta é só
+      # IPv6 e o Render não alcança), com o prefixo trocado para
+      # postgresql+psycopg:// — ver docs/12-deploy.md.
+      - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET_KEY        # gere um forte, novo (não o de dev)
         sync: false

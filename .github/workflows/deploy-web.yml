@@ -1,0 +1,119 @@
+# Publicação do app web (Flutter) no Cloudflare Pages.
+#
+# O Cloudflare Pages não tem Flutter na imagem de build, então o build é feito
+# aqui e o Pages só recebe a pasta pronta (Direct Upload via wrangler).
+#
+# Roda DEPOIS do CI verde na main, nunca em paralelo: publicar um app que a
+# própria suíte reprovou é exatamente o que o CI existe para impedir. Também
+# pode ser disparado na mão (Actions → Deploy web → Run workflow).
+#
+# Configuração (Settings → Secrets and variables → Actions), passo a passo em
+# docs/12-deploy.md:
+#   secrets   CLOUDFLARE_API_TOKEN   token com permissão "Cloudflare Pages: Edit"
+#             CLOUDFLARE_ACCOUNT_ID  id da conta Cloudflare
+#   variables API_URL                https://<servico>.onrender.com (obrigatória)
+#             GOOGLE_CLIENT_ID       client id WEB do Google (opcional)
+#             CF_PAGES_PROJECT       nome do projeto no Pages (padrão: some-journey)
+#
+# Sem os secrets o trabalho termina em verde com um aviso, em vez de falhar:
+# enquanto a hospedagem não está configurada, um X vermelho a cada push só
+# ensinaria a ignorar o X vermelho.
+
+name: Deploy web
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# Dois deploys ao mesmo tempo disputariam o mesmo projeto; o mais novo vence.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build e publicação
+    runs-on: ubuntu-latest
+    # Do workflow_run, só o CI de um PUSH que passou. CI de pull request também
+    # "completa", e não pode publicar nada.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+
+    env:
+      API_URL: ${{ vars.API_URL }}
+      GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+      CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT || 'some-journey' }}
+      HAS_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+
+    steps:
+      - name: Conferir configuração
+        id: config
+        run: |
+          if [ "$HAS_CF_TOKEN" != "true" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID não configurados — deploy pulado. Ver docs/12-deploy.md."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Sem API_URL o app sairia apontando para 127.0.0.1 (o padrão de
+          # desenvolvimento) e abriria no ar sem conseguir falar com ninguém.
+          if [ -z "$API_URL" ]; then
+            echo "::error::A variável API_URL não está definida (ex.: https://some-journey-api.onrender.com)."
+            exit 1
+          fi
+          case "$API_URL" in
+            https://*) ;;
+            *) echo "::error::API_URL precisa começar com https:// (o Pages é https e o navegador bloqueia chamada http)."; exit 1 ;;
+          esac
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.skip != 'true'
+        with:
+          # No workflow_run o checkout padrão é o topo da main AGORA; o que o CI
+          # aprovou foi este commit.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: subosito/flutter-action@v2
+        if: steps.config.outputs.skip != 'true'
+        with:
+          # A mesma do ci.yml (motivo lá).
+          flutter-version: '3.38.10'
+          channel: stable
+          cache: true
+
+      - name: Build web
+        if: steps.config.outputs.skip != 'true'
+        working-directory: app_flutter
+        # --no-web-resources-cdn: ver "Build para a web" no README.
+        run: |
+          flutter pub get
+          flutter build web --release --no-web-resources-cdn \
+            --dart-define=API_URL="$API_URL" \
+            --dart-define=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID"
+
+      # Na primeira vez o projeto não existe e o deploy em modo não interativo
+      # não o cria sozinho. Nas seguintes este passo falha com "já existe" —
+      # por isso o continue-on-error.
+      - name: Criar o projeto no Pages (só na primeira vez)
+        if: steps.config.outputs.skip != 'true'
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project create ${{ env.CF_PAGES_PROJECT }} --production-branch=main
+
+      # Sem 404.html no build, o Pages trata o site como SPA e devolve o
+      # index.html para qualquer caminho — o que o Flutter precisa.
+      - name: Publicar
+        if: steps.config.outputs.skip != 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy app_flutter/build/web --project-name=${{ env.CF_PAGES_PROJECT }} --branch=main --commit-dirty=true

@@ -28,3 +28,14 @@ services:
         sync: false
       - key: TRUSTED_HOSTS         # o host do Render, ex.: some-journey-api.onrender.com
         sync: false
+      # --- opcionais: vazias, o recurso fica desligado e o resto funciona ---
+      - key: GOOGLE_CLIENT_ID      # ids da web, Android e iOS, separados por vírgula (sem: /auth/google responde 503)
+        sync: false
+      - key: SMTP_HOST             # sem SMTP_HOST + SMTP_FROM o e-mail de recuperação de senha não sai
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM             # remetente, ex.: Some Journey <nao-responda@seu-dominio>
+        sync: false

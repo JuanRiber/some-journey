@@ -454,3 +454,13 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   Session pooler (a conexão direta é só IPv6) e senha sem caractere especial.
 - Registrado que nenhum dos dois deploys publica commit com CI vermelho: o Render usa
   `autoDeployTrigger: checksPass` e o app web só é publicado depois do CI na `main`.
+- Registrado que API e banco ficam na **mesma região** (Render em Virginia, Supabase em East US):
+  o Render não tem região no Brasil, e com o banco em São Paulo cada consulta cruzaria o
+  continente. A região não muda depois de criado o serviço, por isso o guia a fixa na criação.
+- Registrado o limite de conexões do pooler do Supabase grátis e o pool pequeno que o
+  `render.yaml` define (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`).
+- As credenciais de produção usadas pelos scripts locais passaram a ficar em
+  `backend/production.env` (fora do git), lidas por `scripts/with_production_env.sh`, em vez de
+  coladas na linha de comando. O guia ganhou a checagem do banco (`scripts.check_database`) como
+  critério de "pronto" do passo do Supabase.
+- Corrigida a resposta esperada do `/health/ready` no guia: é `{"status":"ready"}`.

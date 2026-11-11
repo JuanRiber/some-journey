@@ -9,9 +9,13 @@ from app.core.config import settings
 # Ele gerencia um "pool" de conexões reutilizáveis.
 # pool_pre_ping testa se a conexão está viva antes de usá-la,
 # evitando erros quando o banco fechou uma conexão ociosa.
+# O tamanho do pool vem da configuração (DB_POOL_SIZE / DB_MAX_OVERFLOW): em
+# produção o banco fica atrás de um pooler com poucas vagas.
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
 )
 
 # SessionLocal é uma "fábrica" de sessões.

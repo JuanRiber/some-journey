@@ -7,6 +7,12 @@ services:
     dockerfilePath: backend/Dockerfile
     dockerContext: backend
     plan: free
+    # Mesma região do banco (Supabase em East US / North Virginia). O Render não
+    # tem região no Brasil; com API e banco lado a lado, cada consulta custa ~1 ms
+    # e o tester paga uma única ida aos EUA por request — com o banco em São
+    # Paulo e a API aqui, CADA consulta cruzaria o continente. A região não muda
+    # depois de criado o serviço (só recriando).
+    region: virginia
     # Só publica depois do CI verde no commit — o mesmo critério do deploy web
     # (.github/workflows/deploy-web.yml). O padrão do Render é publicar a cada
     # push, inclusive o que a suíte reprovou.
@@ -19,6 +25,13 @@ services:
         value: "false"
       - key: SUPABASE_BUCKET
         value: memories
+      # Pool pequeno: o Session pooler do Supabase grátis aceita ~15 conexões, e
+      # são 2 workers. 2 × (3 + 2) = 10, sobrando folga para os scripts
+      # (seed, reset) rodados da máquina de quem administra.
+      - key: DB_POOL_SIZE
+        value: "3"
+      - key: DB_MAX_OVERFLOW
+        value: "2"
       # --- definir no painel (Environment) ---
       # Postgres do Supabase: a string do SESSION pooler (a conexão direta é só
       # IPv6 e o Render não alcança), com o prefixo trocado para

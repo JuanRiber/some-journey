@@ -19,6 +19,13 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str
+    # Pool de conexões POR PROCESSO (cada worker do uvicorn tem o seu). O teto
+    # real de conexões é workers × (DB_POOL_SIZE + DB_MAX_OVERFLOW). Os padrões
+    # são os do SQLAlchemy; em produção o render.yaml baixa os dois, porque o
+    # pooler do Supabase grátis aceita ~15 conexões e passar disso devolve
+    # "max clients reached" no meio de um request.
+    DB_POOL_SIZE: int = Field(default=5, ge=1, le=50)
+    DB_MAX_OVERFLOW: int = Field(default=10, ge=0, le=50)
 
     # Auth / JWT
     JWT_SECRET_KEY: str = Field(min_length=32)

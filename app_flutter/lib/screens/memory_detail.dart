@@ -6,6 +6,7 @@ import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../models.dart';
 import '../features/music/memory_music_section.dart';
+import '../features/phases/phase_widgets.dart';
 import '../widgets/photo_viewer.dart';
 
 const _mesesLong = [
@@ -134,6 +135,17 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                 ),
                               ],
                             ),
+                            // A marca PRÓPRIA da memória. A fase herdada da
+                            // jornada não aparece aqui: ela vale para a lente,
+                            // mas a memória não foi marcada nela.
+                            if (m.lifePhaseId != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: PhaseTag(phaseId: m.lifePhaseId),
+                                ),
+                              ),
                             // A foto é a protagonista: tocar abre em TELA CHEIA
                             // (zoom por pinça, deslize entre as fotos da memória).
                             for (final entry in m.images.asMap().entries)

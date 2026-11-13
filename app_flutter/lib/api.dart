@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'features/phases/phase_domain.dart';
 import 'features/profile/profile_models.dart';
 import 'models.dart';
 
@@ -327,11 +328,15 @@ class Api {
   /// O cursor é opaco (base64url com `-`, `_` e possível `=`), então ele PRECISA
   /// passar por codificação de querystring — concatenar na mão corromperia o
   /// padding e o backend responderia 400.
-  String _paged(String path, int? limit, String? cursor) {
-    final q = <String, String>{
-      if (limit != null) 'limit': '$limit',
-      'cursor': ?cursor,
-    };
+  String _paged(String path, int? limit, String? cursor, {String? phaseId}) =>
+      _query(path, {
+        if (limit != null) 'limit': '$limit',
+        'cursor': ?cursor,
+        'life_phase_id': ?phaseId,
+      });
+
+  /// Acrescenta a querystring à rota, codificada — ou devolve a rota pura.
+  String _query(String path, Map<String, String> q) {
     if (q.isEmpty) return path;
     return '$path?${Uri(queryParameters: q).query}';
   }
@@ -345,8 +350,10 @@ class Api {
     T Function(Map<String, dynamic>) parse, {
     int? limit,
     String? cursor,
+    String? phaseId,
   }) async {
-    final r = await _send('GET', _paged(path, limit, cursor), authed: true);
+    final r = await _send('GET', _paged(path, limit, cursor, phaseId: phaseId),
+        authed: true);
     final data = r.bodyBytes.isEmpty ? null : jsonDecode(utf8.decode(r.bodyBytes));
     if (data is! List) return const Page._empty();
     // O pacote http normaliza nomes de header para minúsculas.
@@ -439,8 +446,13 @@ class Api {
   /// Passe [cursor] com o `nextCursor` da página anterior para continuar. Sem
   /// paginar, a timeline mostrava só as 30 primeiras e escondia o resto sem
   /// avisar — num app de preservar memórias, o pior tipo de falha.
-  Future<Page<Memory>> listMemories({int? limit, String? cursor}) =>
-      _page('/memories', Memory.fromJson, limit: limit, cursor: cursor);
+  ///
+  /// [phaseId] é a lente: só as memórias da fase (marcadas nela ou dentro de
+  /// uma jornada marcada nela — a regra mora no backend). O cursor de uma
+  /// página filtrada só vale com o MESMO filtro.
+  Future<Page<Memory>> listMemories({int? limit, String? cursor, String? phaseId}) =>
+      _page('/memories', Memory.fromJson,
+          limit: limit, cursor: cursor, phaseId: phaseId);
 
   Future<Memory> getMemory(String id) async =>
       Memory.fromJson(await _request('GET', '/memories/$id', authed: true));
@@ -571,9 +583,11 @@ class Api {
           await _request('GET', '/journeys/$journeyId/map', authed: true));
 
   // ---- Jornadas ----
-  /// Uma página de jornadas, da mais recente para a mais antiga.
-  Future<Page<Journey>> listJourneys({int? limit, String? cursor}) =>
-      _page('/journeys', Journey.fromJson, limit: limit, cursor: cursor);
+  /// Uma página de jornadas, da mais recente para a mais antiga. Com
+  /// [phaseId], só as da fase — marcadas nela ou com alguma memória dela.
+  Future<Page<Journey>> listJourneys({int? limit, String? cursor, String? phaseId}) =>
+      _page('/journeys', Journey.fromJson,
+          limit: limit, cursor: cursor, phaseId: phaseId);
 
   Future<JourneyDetail> getJourney(String id) async =>
       JourneyDetail.fromJson(await _request('GET', '/journeys/$id', authed: true));
@@ -633,6 +647,35 @@ class Api {
           body: {'memory_ids': memoryIds}, authed: true));
 
   // ---- Mapa ----
-  Future<MapResponse> getMap() async =>
-      MapResponse.fromJson(await _request('GET', '/map', authed: true));
+  /// O atlas inteiro ou, com [phaseId], a lente de uma fase: pins soltos
+  /// marcados nela e as jornadas que pertencem a ela, inteiras.
+  Future<MapResponse> getMap({String? phaseId}) async => MapResponse.fromJson(
+      await _request('GET', _query('/map', {'life_phase_id': ?phaseId}),
+          authed: true));
+
+  // ---- Fases da vida ----
+  /// As fases da pessoa, na ordem em que a vida aconteceu (as sem início vão
+  /// para o fim — a ordem é do backend). Quem nunca criou nenhuma recebe [].
+  Future<List<LifePhase>> listPhases() async {
+    final data = await _request('GET', '/life-phases', authed: true);
+    if (data is! List) return [];
+    return data.map((e) => LifePhase.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// 422 = nome vazio, cor fora da paleta ou fim antes do início; a mensagem
+  /// já vem em pt-BR, escrita para quem vai ler.
+  Future<LifePhase> createPhase(Map<String, dynamic> body) async => LifePhase.fromJson(
+      await _request('POST', '/life-phases', body: body, authed: true));
+
+  /// PARCIAL, e aqui `null` LIMPA (ao contrário do PATCH de jornada): é o que
+  /// deixa uma fase que ganhou fim por engano voltar a ser a fase em curso.
+  /// Monte o corpo com `phasePatch`, que só manda o que mudou.
+  Future<LifePhase> updatePhase(String id, Map<String, dynamic> patch) async =>
+      LifePhase.fromJson(
+          await _request('PATCH', '/life-phases/$id', body: patch, authed: true));
+
+  /// Apaga a fase e SOLTA o que apontava para ela: memórias e jornadas ficam,
+  /// só perdem a etiqueta.
+  Future<void> deletePhase(String id) =>
+      _request('DELETE', '/life-phases/$id', authed: true);
 }

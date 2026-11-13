@@ -51,7 +51,7 @@ some-journey/
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0010)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (310 testes)
+|   |-- tests/                 # pytest (341 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -291,10 +291,10 @@ exigem `Authorization: Bearer <token>`.
 
 Todas as rotas exigem Bearer token.
 
-- `POST /memories`
-- `GET /memories` — paginacao keyset (`?limit=&cursor=`)
+- `POST /memories` — aceita `life_phase_id` opcional (uma fase ativa do proprio usuario)
+- `GET /memories` — paginacao keyset (`?limit=&cursor=`); `?life_phase_id=` recorta pela fase
 - `GET /memories/{memory_id}`
-- `PATCH /memories/{memory_id}`
+- `PATCH /memories/{memory_id}` — em `life_phase_id`, e so nele, `null` solta a memoria da fase
 - `DELETE /memories/{memory_id}`
 - `POST /memories/{memory_id}/images` — upload `multipart/form-data`, ate **5 fotos** por memoria
 - `DELETE /memories/{memory_id}/images/{image_id}`
@@ -317,10 +317,10 @@ Todas as rotas exigem Bearer token. Ciclo de vida do `status`:
 `draft -> active <-> paused -> finished` (`finished` e terminal; so uma jornada
 `active` por usuario de cada vez — pausar libera o slot).
 
-- `POST /journeys` — cria (nasce `draft`; aceita `mood` e `is_private`)
-- `GET /journeys` — lista as do usuario, paginacao keyset (`?limit=&cursor=`)
+- `POST /journeys` — cria (nasce `draft`; aceita `mood`, `is_private` e `life_phase_id`)
+- `GET /journeys` — lista as do usuario, paginacao keyset (`?limit=&cursor=`); `?life_phase_id=` recorta pela fase
 - `GET /journeys/{journey_id}` — detalhe com pontos ordenados + `route` (LineString; `null` se < 2 pontos)
-- `PATCH /journeys/{journey_id}` — edita titulo, descricao, `mood`, `is_private`, datas
+- `PATCH /journeys/{journey_id}` — edita titulo, descricao, `mood`, `is_private`, datas e `life_phase_id` (`null` solta da fase)
 - `DELETE /journeys/{journey_id}` — soft delete da jornada
 - `POST /journeys/{journey_id}/cover` — define a capa da jornada
 - `DELETE /journeys/{journey_id}/cover` — remove a capa
@@ -359,6 +359,31 @@ Visao macro: mostra so a linha **simbolica** — nao expoe pontos de GPS brutos.
 - `GET /map` — tudo do usuario: `loose_points` (memorias sem jornada) + `journeys` (pontos + `route`)
 - `GET /map?bbox=min_lng,min_lat,max_lng,max_lat` — recorta pela viewport (mundo/pais/regiao/cidade)
 - `GET /map?journey_id={id}` — foca uma jornada especifica
+- `GET /map?life_phase_id={id}` — a lente de uma fase da vida (regra abaixo)
+
+### Fases da vida
+
+Os capitulos que a pessoa reconhece na propria historia. Nao ha lista
+predefinida, so o nome e obrigatorio, o periodo pode ficar aberto dos dois lados
+e fases podem se sobrepor. Bearer token; fase de outra pessoa responde igual a
+inexistente.
+
+- `GET /life-phases` — as fases do usuario, na ordem em que a vida aconteceu
+- `POST /life-phases` — cria (`name`, e opcionalmente `description`, `color`, `started_at`, `ended_at`)
+- `GET /life-phases/{phase_id}`
+- `PATCH /life-phases/{phase_id}` — parcial, e aqui `null` LIMPA (para reabrir uma fase encerrada)
+- `DELETE /life-phases/{phase_id}` — apaga a fase e solta o que apontava para ela; nenhuma memoria se perde
+
+`color` e um papel da paleta (`primary`, `secondary`, `accent`, `moss`,
+`highlight`), nunca um hexadecimal: cor livre quebraria o contraste num dos dois
+modos do app.
+
+A **lente** (`?life_phase_id=` em `/memories`, `/journeys` e `/map`): a memoria
+esta na fase quando foi marcada nela **ou** quando esta numa jornada marcada
+nela; a jornada esta na fase quando foi marcada nela ou quando alguma memoria
+dela foi, e no mapa vem inteira, com o rastro. A fase nao e deduzida das datas.
+Fase alheia ou apagada no filtro responde **404**; no corpo de um POST/PATCH de
+memoria ou jornada, **422**.
 
 ### Perfil
 
@@ -392,7 +417,8 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Paginacao keyset em `/memories` e `/journeys`
 - [x] Migracoes versionadas (Alembic, 0001..0010)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
-- [x] Testes automatizados — 310 no backend (pytest) e 411 no app (flutter test)
+- [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
+- [x] Testes automatizados — 341 no backend (pytest) e 453 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)

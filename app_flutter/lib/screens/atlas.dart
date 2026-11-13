@@ -5,6 +5,9 @@ import '../design/components.dart';
 import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_domain.dart';
+import '../features/phases/phase_store.dart';
+import '../features/phases/phase_widgets.dart';
 import '../models.dart';
 import '../widgets/api_error_view.dart';
 import '../widgets/atlas_map.dart';
@@ -34,6 +37,11 @@ import '../widgets/atlas_map.dart';
 /// Estados cobertos: carregando (moldura + bússola que oscila), erro (bússola
 /// quebrada + "Tentar de novo"), vazio (ilustração da primeira jornada ENSINANDO
 /// o próximo passo) e conteúdo. Pull-to-refresh em todos.
+///
+/// **A lente das fases** fica sob o masthead, só para quem nomeou alguma fase:
+/// o mapa passa a mostrar os lugares de um capítulo — e as jornadas dele
+/// inteiras, porque um rastro cortado no meio contaria um caminho que não
+/// aconteceu (a regra é do backend).
 class AtlasScreen extends StatefulWidget {
   const AtlasScreen({super.key});
 
@@ -46,30 +54,72 @@ class _AtlasScreenState extends State<AtlasScreen> {
   ApiError? _error;
   bool _loading = true;
 
+  final _phases = PhaseStore.instance;
+
+  /// A fase pela qual o atlas está sendo lido; null é a vida toda.
+  String? _phaseId;
+
   @override
   void initState() {
     super.initState();
+    _phases.addListener(_onPhases);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _phases.removeListener(_onPhases);
+    super.dispose();
+  }
+
+  /// Se a fase da lente foi apagada noutra tela, o atlas volta para a vida
+  /// toda em vez de ficar pedindo uma fase que responde 404.
+  void _onPhases() {
+    if (!mounted) return;
+    final valida = lensFor(_phases.value, _phaseId);
+    if (valida != _phaseId) {
+      _setLens(valida);
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _setLens(String? phaseId) {
+    if (phaseId == _phaseId) return;
+    // O mapa anterior fica em tela enquanto o novo vem: a moldura não pisca,
+    // e a troca de lente parece uma troca de prancha, não um recarregamento.
+    setState(() => _phaseId = phaseId);
     _load();
   }
 
   Future<void> _load() async {
+    final lente = _phaseId;
     setState(() {
       _error = null;
       // Só mostramos o esqueleto quando ainda não há mapa em tela; num
       // pull-to-refresh o conteúdo antigo fica visível (o indicador já informa).
       if (_map == null) _loading = true;
     });
+    // As fases vêm junto, sem segurar o mapa — uma falha nelas não pode
+    // apagar o atlas de ninguém.
+    _phases.refresh();
     try {
-      final data = await Api.instance.getMap();
-      if (!mounted) return;
+      final data = await Api.instance.getMap(phaseId: lente);
+      // A lente mudou enquanto este mapa vinha: ele é de outra prancha.
+      if (!mounted || lente != _phaseId) return;
       setState(() {
         _map = data;
         _loading = false;
       });
     } on ApiError catch (e) {
-      if (!mounted) return;
+      if (!mounted || lente != _phaseId) return;
       if (e.isUnauthorized) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      // 404 com lente é a fase apagada noutro aparelho: volta para a vida toda.
+      if (lente != null && e.status == 404) {
+        _setLens(null);
         return;
       }
       setState(() {
@@ -138,6 +188,21 @@ class _AtlasScreenState extends State<AtlasScreen> {
                     ),
                     sliver: SliverToBoxAdapter(
                       child: _MapSkeleton(scheme: s, height: mapHeight),
+                    ),
+                  )
+                else if ((_map?.totalPoints ?? 0) == 0 &&
+                    phaseById(_phases.value, _phaseId) != null)
+                  // Vazio COM lente não é atlas em branco: é uma fase sem
+                  // lugar marcado ainda.
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: SJEmptyState(
+                      title: 'Nenhum lugar nesta fase ainda.',
+                      body: 'Marque memórias ou jornadas com '
+                          '“${phaseById(_phases.value, _phaseId)!.name}” — na '
+                          'edição de cada uma — e elas aparecem neste mapa.',
+                      actionLabel: 'Ver o atlas inteiro',
+                      onAction: () => _setLens(null),
                     ),
                   )
                 else if ((_map?.totalPoints ?? 0) == 0)
@@ -213,6 +278,14 @@ class _AtlasScreenState extends State<AtlasScreen> {
             _SkeletonBar(scheme: s, width: 240)
           else if (_error == null && _map != null && _map!.totalPoints > 0)
             Text(_narrative(_map!), style: _diaryItalic(s)),
+          if (_phases.value.isNotEmpty) ...[
+            const SizedBox(height: SJSpace.x5),
+            PhaseLens(
+              phases: _phases.value,
+              selected: _phaseId,
+              onChanged: _setLens,
+            ),
+          ],
         ],
       );
 
@@ -313,6 +386,19 @@ class _AtlasScreenState extends State<AtlasScreen> {
     final places = m.totalPoints;
     final journeys = m.journeys.length;
     final active = m.journeys.where((j) => j.status == 'active').length;
+
+    // Com lente, a frase diz de QUE pedaço da vida o mapa está falando — "você
+    // marcou 3 lugares" leria como o atlas inteiro.
+    final fase = phaseById(_phases.value, _phaseId);
+    if (fase != null) {
+      final lugares = places == 1 ? '1 lugar' : '$places lugares';
+      final emJornadas = journeys == 0
+          ? ''
+          : journeys == 1
+              ? ', numa jornada'
+              : ', em $journeys jornadas';
+      return 'Na fase “${fase.name}”: $lugares$emJornadas.';
+    }
 
     if (places == 1) {
       return journeys == 0

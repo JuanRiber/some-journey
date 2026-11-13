@@ -6,6 +6,9 @@ import '../features/photos/photo_picker.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_domain.dart';
+import '../features/phases/phase_store.dart';
+import '../features/phases/phase_widgets.dart';
 import '../widgets/common.dart';
 import '../widgets/date_field.dart';
 import '../widgets/location_picker.dart';
@@ -42,6 +45,21 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
   bool _loading = false;
   String _error = '';
 
+  /// A fase escolhida para a memória; null é nenhuma (o normal).
+  String? _phaseId;
+
+  /// O seletor de fase só existe fora do modo jornada. Dentro dela a memória
+  /// já entra na fase da jornada pela regra da lente, e perguntar de novo
+  /// seria pedir uma decisão que já foi tomada — quem quiser uma fase própria
+  /// para ela marca na edição.
+  bool get _choosesPhase => widget.journeyId == null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_choosesPhase) PhaseStore.instance.refresh();
+  }
+
   Future<void> _pickPhotos() async {
     final imgs = await SJPhoto.escolher(
       restantes: SJPhoto.maxPorMemoria - _picks.length,
@@ -62,6 +80,7 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
       'latitude': _lat,
       'longitude': _lng,
       'occurred_at': '${_date}T12:00:00Z',
+      if (_choosesPhase) 'life_phase_id': ?_phaseId,
     };
     try {
       String? memId;
@@ -148,6 +167,20 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
               ),
               const FieldLabel('Fotos (opcional, até 5)'),
               _photoGrid(s),
+              if (_choosesPhase)
+                ValueListenableBuilder<List<LifePhase>>(
+                  valueListenable: PhaseStore.instance,
+                  builder: (context, phases, _) => phases.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: PhasePicker(
+                            phases: phases,
+                            selected: _phaseId,
+                            onChanged: (id) => setState(() => _phaseId = id),
+                          ),
+                        ),
+                ),
               InlineError(_error),
               const SizedBox(height: 20),
               PrimaryButton(

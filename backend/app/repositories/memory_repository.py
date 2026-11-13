@@ -12,12 +12,12 @@ import uuid
 from datetime import datetime
 
 from geoalchemy2 import Geometry
-from sqlalchemy import cast, func, select, tuple_
+from sqlalchemy import cast, func, or_, select, tuple_
 from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
 from app.domain.location import Location
-from app.models.journey import JourneyMemory
+from app.models.journey import Journey, JourneyMemory
 from app.models.memory import Memory, MemoryImage, MemoryMusic
 
 # bbox geográfico no formato (min_lng, min_lat, max_lng, max_lat) em WGS84.
@@ -30,6 +30,29 @@ def _bbox_filter(bbox: Bbox):
     min_lng, min_lat, max_lng, max_lat = bbox
     envelope = func.ST_MakeEnvelope(min_lng, min_lat, max_lng, max_lat, 4326)
     return func.ST_Intersects(cast(Memory.location, Geometry), envelope)
+
+
+def in_phase(phase_id: uuid.UUID):
+    """A memória está na fase quando foi MARCADA nela ou quando está numa
+    jornada marcada nela.
+
+    É a regra da lente (ver `app.domain.life_phase`): quem marca "Intercâmbio"
+    numa jornada espera ver as lembranças dela ao filtrar por "Intercâmbio",
+    sem ter de marcar uma por uma. Só contam vínculo e jornada ATIVOS — a
+    memória que saiu da jornada deixa de herdar a fase dela.
+    """
+    via_jornada = (
+        select(JourneyMemory.id)
+        .join(Journey, Journey.id == JourneyMemory.journey_id)
+        .where(
+            JourneyMemory.memory_id == Memory.id,
+            JourneyMemory.deleted_at.is_(None),
+            Journey.deleted_at.is_(None),
+            Journey.life_phase_id == phase_id,
+        )
+        .exists()
+    )
+    return or_(Memory.life_phase_id == phase_id, via_jornada)
 
 
 def _point(latitude: float, longitude: float):
@@ -48,6 +71,7 @@ def create(
     latitude: float,
     longitude: float,
     occurred_at: datetime,
+    life_phase_id: uuid.UUID | None = None,
 ) -> Memory:
     memory = Memory(
         user_id=user_id,
@@ -55,6 +79,7 @@ def create(
         text=text,
         location=_point(latitude, longitude),
         occurred_at=occurred_at,
+        life_phase_id=life_phase_id,
     )
     db.add(memory)
     db.commit()
@@ -108,6 +133,7 @@ def list_by_user(
     user_id: uuid.UUID,
     limit: int,
     cursor: tuple[datetime, uuid.UUID] | None = None,
+    life_phase_id: uuid.UUID | None = None,
 ) -> list[Memory]:
     """Página de memórias ativas do usuário, da mais recente para a mais antiga.
 
@@ -123,6 +149,9 @@ def list_by_user(
     do cursor. Usamos comparação de tupla (row-value) `tuple_(...) < tuple_(...)`,
     que o Postgres avalia lexicograficamente (occurred_at < c_ts OR (occurred_at
     = c_ts AND id < c_id)) e resolve pelo índice ix_memories_user_occurred.
+
+    `life_phase_id` recorta pela fase (regra em [in_phase]). O keyset continua
+    valendo: o filtro só tira linhas, não muda a ordem de quem fica.
     """
     stmt = (
         select(Memory)
@@ -134,14 +163,21 @@ def list_by_user(
         stmt = stmt.where(
             tuple_(Memory.occurred_at, Memory.id) < tuple_(cursor_ts, cursor_id)
         )
+    if life_phase_id is not None:
+        stmt = stmt.where(in_phase(life_phase_id))
     return list(db.scalars(stmt.limit(limit + 1)))
 
 
 def list_loose(
-    db: Session, *, user_id: uuid.UUID, bbox: Bbox | None = None
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    bbox: Bbox | None = None,
+    life_phase_id: uuid.UUID | None = None,
 ) -> list[Memory]:
     """Memórias "soltas": ativas e SEM vínculo ativo em nenhuma jornada — os pins
-    isolados do mapa. bbox opcional recorta pela viewport."""
+    isolados do mapa. bbox opcional recorta pela viewport; `life_phase_id`, pela
+    fase (solta não tem jornada de quem herdar, então vale só a marcação dela)."""
     has_active_link = (
         select(JourneyMemory.id)
         .where(
@@ -162,6 +198,8 @@ def list_loose(
     )
     if bbox is not None:
         stmt = stmt.where(_bbox_filter(bbox))
+    if life_phase_id is not None:
+        stmt = stmt.where(Memory.life_phase_id == life_phase_id)
     return list(db.scalars(stmt))
 
 

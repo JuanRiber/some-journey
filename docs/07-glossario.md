@@ -15,4 +15,6 @@ Termos do domínio, para evitar ambiguidade.
 - **`image_path`** — Referência (caminho) da imagem no Supabase Storage. A API expõe uma `image_url` assinada e temporária.
 - **Ownership** — Regra de que um usuário só acessa e altera os próprios dados.
 - **Soft delete** — Exclusão lógica via `deleted_at`, sem apagar imediatamente o registro.
+- **Fase da vida** — Capítulo que a pessoa reconhece na própria história (a faculdade, um recomeço). Opcional, sem lista predefinida; memórias e jornadas podem ser marcadas nela.
+- **Lente** — Reler a timeline, as jornadas ou o atlas por uma fase. Inclui o que foi marcado na fase e as memórias de jornadas marcadas nela.
 - **bbox** — Caixa geográfica (`min_lng,min_lat,max_lng,max_lat`) usada para recortar o mapa pela área visível.

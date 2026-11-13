@@ -18,7 +18,7 @@ from app.core.pagination import encode_cursor
 from app.db.session import SessionLocal
 from app.models.memory import Memory, MemoryImage, MemoryMusic
 from app.repositories import memory_repository
-from app.services import geocoding
+from app.services import geocoding, life_phase_service
 from app.schemas.memory import (
     MemoryCreate,
     MemoryImageRead,
@@ -98,6 +98,7 @@ def _to_read(
         country=memory.country,
         country_code=memory.country_code,
         continent=memory.continent,
+        life_phase_id=memory.life_phase_id,
         music=[
             MemoryMusicRead(
                 id=t.id,
@@ -125,6 +126,11 @@ def _read_with_images(db: Session, memory: Memory) -> MemoryRead:
 
 
 def create(db: Session, *, user_id: uuid.UUID, data: MemoryCreate) -> MemoryRead:
+    """Levanta `PhaseNotFoundError` se `life_phase_id` não for uma fase ativa
+    desta pessoa — antes de gravar qualquer coisa."""
+    fase = life_phase_service.owned_phase_id(
+        db, user_id=user_id, phase_id=data.life_phase_id
+    )
     memory = memory_repository.create(
         db,
         user_id=user_id,
@@ -133,6 +139,7 @@ def create(db: Session, *, user_id: uuid.UUID, data: MemoryCreate) -> MemoryRead
         latitude=data.latitude,
         longitude=data.longitude,
         occurred_at=data.occurred_at,
+        life_phase_id=fase,
     )
     return _to_read(memory, [], {})  # nasce sem fotos
 
@@ -198,16 +205,23 @@ def list_for_user(
     user_id: uuid.UUID,
     limit: int,
     cursor: tuple[datetime, uuid.UUID] | None = None,
+    life_phase_id: uuid.UUID | None = None,
 ) -> tuple[list[MemoryRead], str | None]:
     """Uma PÁGINA das memórias do usuário + o cursor da próxima (ou None).
+
+    Com `life_phase_id`, só as memórias da fase — marcadas nela ou dentro de
+    uma jornada marcada nela. Fase alheia ou inexistente levanta
+    `PhaseNotFoundError` (a rota responde 404, como o `?journey_id=` do mapa).
 
     O repository devolve `limit + 1` linhas: se vieram mais que `limit`, existe
     próxima página. Cortamos em `limit` e o cursor é o par (occurred_at, id) da
     ÚLTIMA linha da página — o mesmo par que o keyset usa para continuar. Retorna
     a lista (corpo, array puro) e o cursor separados; a rota decide o header.
     """
+    if life_phase_id is not None:
+        life_phase_service.get_phase(db, phase_id=life_phase_id, user_id=user_id)
     rows = memory_repository.list_by_user(
-        db, user_id=user_id, limit=limit, cursor=cursor
+        db, user_id=user_id, limit=limit, cursor=cursor, life_phase_id=life_phase_id
     )
     has_next = len(rows) > limit
     page = rows[:limit]
@@ -231,9 +245,15 @@ def update(
     if memory is None:
         raise MemoryNotFoundError()
     # exclude_unset: só os campos realmente enviados chegam ao repository.
-    updated = memory_repository.update(
-        db, memory=memory, **data.model_dump(exclude_unset=True)
-    )
+    campos = data.model_dump(exclude_unset=True)
+    # A fase sai do pacote ANTES do repository, porque é o único campo em que
+    # `null` significa alguma coisa (soltar) — o repository ignora nulos. Ela
+    # é gravada no objeto e vai junto no commit do `update` logo abaixo.
+    if "life_phase_id" in campos:
+        memory.life_phase_id = life_phase_service.owned_phase_id(
+            db, user_id=user_id, phase_id=campos.pop("life_phase_id")
+        )
+    updated = memory_repository.update(db, memory=memory, **campos)
     return _read_with_images(db, updated)
 
 

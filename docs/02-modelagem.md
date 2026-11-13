@@ -200,6 +200,15 @@ Jornada é uma **trajetória** formada por pontos/memórias em sequência.
 Apagar uma fase **solta** as memórias e jornadas que apontavam para ela, e não
 as leva junto: a etiqueta é descartável, a lembrança não.
 
+O vínculo só aceita uma fase **ativa da mesma pessoa** — a FK sozinha aceitaria a fase de
+outra, porque ela existe. A conferência mora em `life_phase_service.owned_phase_id`.
+
+Ao **filtrar** (a lente), a fase da jornada desce para as memórias dela: uma memória sem
+marca própria dentro da jornada "Intercâmbio" aparece na lente "Intercâmbio". A coluna
+`memories.life_phase_id` continua guardando só a marca própria — a herança é calculada na
+consulta (`memory_repository.in_phase`), nunca gravada, para que tirar a memória da jornada
+a tire da fase sem nenhuma escrita a mais.
+
 ## password_reset_tokens
 | Campo | Tipo | Notas |
 |---|---|---|

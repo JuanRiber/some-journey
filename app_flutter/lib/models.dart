@@ -33,6 +33,11 @@ class Memory {
   /// faixa — por isso não é uma lista de [MusicTrack] pura.
   final List<SavedTrack> music;
 
+  /// A fase em que a PRÓPRIA memória foi marcada, ou null. Não é a fase
+  /// herdada de uma jornada: essa só vale para filtrar, e mostrá-la aqui faria
+  /// o seletor da edição dizer que a memória foi marcada onde não foi.
+  final String? lifePhaseId;
+
   /// Título em branco não é erro: é uma memória que dispensou rótulo.
   bool get hasTitle => title.trim().isNotEmpty;
 
@@ -47,6 +52,7 @@ class Memory {
     required this.images,
     this.music = const [],
     this.imageUrl,
+    this.lifePhaseId,
   });
 
   factory Memory.fromJson(Map<String, dynamic> j) => Memory(
@@ -64,6 +70,7 @@ class Memory {
             .map((e) => SavedTrack.fromJson(e as Map<String, dynamic>))
             .toList(),
         imageUrl: j['image_url'] as String?,
+        lifePhaseId: j['life_phase_id'] as String?,
       );
 }
 
@@ -133,6 +140,9 @@ class Journey {
   final String createdAt;
   final int pointsCount;
 
+  /// A fase em que a jornada foi marcada, ou null.
+  final String? lifePhaseId;
+
   Journey({
     required this.id,
     required this.title,
@@ -145,6 +155,7 @@ class Journey {
     this.endedAt,
     required this.createdAt,
     required this.pointsCount,
+    this.lifePhaseId,
   });
 
   factory Journey.fromJson(Map<String, dynamic> j) => Journey(
@@ -159,6 +170,7 @@ class Journey {
         endedAt: j['ended_at'] as String?,
         createdAt: j['created_at'] as String,
         pointsCount: (j['points_count'] ?? 0) as int,
+        lifePhaseId: j['life_phase_id'] as String?,
       );
 }
 
@@ -219,6 +231,7 @@ class JourneyDetail extends Journey {
     super.endedAt,
     required super.createdAt,
     required super.pointsCount,
+    super.lifePhaseId,
     required this.points,
     this.route,
   });
@@ -237,6 +250,7 @@ class JourneyDetail extends Journey {
       endedAt: base.endedAt,
       createdAt: base.createdAt,
       pointsCount: base.pointsCount,
+      lifePhaseId: base.lifePhaseId,
       points: ((j['points'] ?? []) as List)
           .map((e) => JourneyPoint.fromJson(e as Map<String, dynamic>))
           .toList(),

@@ -464,3 +464,52 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
   coladas na linha de comando. O guia ganhou a checagem do banco (`scripts.check_database`) como
   critério de "pronto" do passo do Supabase.
 - Corrigida a resposta esperada do `/health/ready` no guia: é `{"status":"ready"}`.
+
+## 2026-11-12
+
+### Fases da vida — o vínculo e a lente
+- A metade que faltava. O backend tinha a tabela e o CRUD, mas nenhuma rota de memória ou
+  jornada aceitava `life_phase_id`: a coluna existia e não havia como preenchê-la. Agora
+  `POST`/`PATCH` de memória e de jornada aceitam o campo e a leitura o devolve.
+- O vínculo passa por uma porta só, `life_phase_service.owned_phase_id`: a fase precisa ser
+  ativa e da mesma pessoa. A FK sozinha aceitaria a fase de outra pessoa, porque ela existe.
+  Fase alheia, apagada ou inexistente no corpo responde **422** — o recurso da URL existe, quem
+  não serve é um valor do corpo.
+- No PATCH de memória e de jornada, `life_phase_id: null` **solta** a fase. É a única exceção
+  ao "null não mexe" desses dois PATCHes, pelo mesmo motivo do PATCH de fases: um id não tem
+  string vazia que o substitua.
+
+### A regra da lente
+- `?life_phase_id=` em `/memories`, `/journeys` e `/map`. A memória está na fase quando foi
+  marcada nela **ou** quando está numa jornada marcada nela; a jornada, quando foi marcada ou
+  quando alguma memória dela foi. Quem marca "Intercâmbio" na jornada não deveria ter de marcar
+  foto por foto para encontrá-las.
+- A herança desce da jornada para a memória e para aí — uma memória marcada não puxa as irmãs.
+  E ela é calculada na consulta, nunca gravada: tirar a memória da jornada a tira da fase sem
+  nenhuma escrita a mais, e a leitura da memória continua dizendo só onde ela foi marcada.
+- No mapa a jornada vem inteira, rastro e todos os pins, pela mesma razão do `bbox`: um rastro
+  cortado no meio contaria um caminho que não aconteceu.
+- A fase não é deduzida das datas. O período é contexto que a pessoa escreve; usá-lo para
+  recortar sozinho poria na fase o que ela não pôs.
+- Fase alheia ou apagada no filtro responde **404**, como o `?journey_id=` do mapa. Uma lista
+  vazia seria uma resposta plausível e esconderia o id errado.
+
+### No app
+- **Perfil → Fases da vida**: criar, editar e apagar. Só o nome é obrigatório; a cor é um dos
+  cinco papéis da paleta; as datas ficam em aberto e cada uma tem como voltar a ficar em branco
+  — esvaziar o fim reabre a fase (manda `null`). Apagar pede confirmação e diz o que não
+  acontece: as memórias ficam.
+- O seletor de fase nos formulários de memória e de jornada, e a etiqueta da fase nos detalhes.
+  Na memória criada dentro de uma jornada o seletor não aparece: ela já entra na fase da
+  jornada pela regra da lente.
+- A lente na timeline e no atlas. Vazio com lente tem texto próprio ("nada guardado nesta fase
+  ainda") e a saída de volta para a vida toda; tocar de novo na fase escolhida também volta.
+- Quem nunca criou uma fase não vê lente nem seletor: a timeline, o atlas e os formulários
+  ficam exatamente como eram.
+- As fases vivem num `PhaseStore` compartilhado. A timeline e o atlas são abas e não recarregam
+  ao voltar; sem o notificador, a fase criada não apareceria na lente, e a fase apagada
+  continuaria filtrando por um id que devolve 404. A lista é esquecida ao sair da conta.
+
+### Paridade
+- Saíram de `KNOWN_GAPS` as rotas que o app passou a chamar. Fica `GET /life-phases/{id}`,
+  com o motivo escrito: a lista já traz cada fase inteira e o formulário abre com ela na mão.

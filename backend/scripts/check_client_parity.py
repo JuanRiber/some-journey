@@ -86,20 +86,11 @@ KNOWN_GAPS: dict[Endpoint, str] = {
         "Liveness. Quem bate aqui é o orquestrador (Render), não o app — e de "
         "propósito não toca o banco."
     ),
-    Endpoint("GET", "/life-phases"): (
-        "Fases da vida: o backend veio primeiro, e o cliente vem em seguida. A fase é uma LENTE para reler o atlas — ela só faz sentido quando houver tela para criar, editar e FILTRAR por ela, e isso é a próxima fatia. Enquanto não houver, a rota existe e ninguém a chama."
-    ),
-    Endpoint("POST", "/life-phases"): (
-        "Fases da vida: o backend veio primeiro, e o cliente vem em seguida. A fase é uma LENTE para reler o atlas — ela só faz sentido quando houver tela para criar, editar e FILTRAR por ela, e isso é a próxima fatia. Enquanto não houver, a rota existe e ninguém a chama."
-    ),
     Endpoint("GET", "/life-phases/{}"): (
-        "Fases da vida: o backend veio primeiro, e o cliente vem em seguida. A fase é uma LENTE para reler o atlas — ela só faz sentido quando houver tela para criar, editar e FILTRAR por ela, e isso é a próxima fatia. Enquanto não houver, a rota existe e ninguém a chama."
-    ),
-    Endpoint("PATCH", "/life-phases/{}"): (
-        "Fases da vida: o backend veio primeiro, e o cliente vem em seguida. A fase é uma LENTE para reler o atlas — ela só faz sentido quando houver tela para criar, editar e FILTRAR por ela, e isso é a próxima fatia. Enquanto não houver, a rota existe e ninguém a chama."
-    ),
-    Endpoint("DELETE", "/life-phases/{}"): (
-        "Fases da vida: o backend veio primeiro, e o cliente vem em seguida. A fase é uma LENTE para reler o atlas — ela só faz sentido quando houver tela para criar, editar e FILTRAR por ela, e isso é a próxima fatia. Enquanto não houver, a rota existe e ninguém a chama."
+        "Redundante para o app: GET /life-phases já traz cada fase inteira, e o "
+        "formulário de edição abre com ela na mão — buscar de novo pelo id "
+        "seria uma ida à rede para receber o que já está em tela. Fica de pé "
+        "porque é o par natural de PATCH e DELETE no mesmo caminho."
     ),
     Endpoint("GET", "/journeys/{}/memories"): (
         "Redundante: GET /journeys/{id} devolve JourneyDetailRead, que já traz "

@@ -5,6 +5,9 @@ import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../widgets/api_error_view.dart';
+import '../features/phases/phase_domain.dart';
+import '../features/phases/phase_store.dart';
+import '../features/phases/phase_widgets.dart';
 import '../features/profile/profile_models.dart';
 import 'profile_edit.dart';
 
@@ -27,7 +30,9 @@ const _meses = [
 ///
 /// **Dados:** TUDO vem de `GET /me/profile`, agregado no banco. A tela não conta
 /// nada, não baixa memórias e não inventa valores — se um número não existe no
-/// backend, ele não aparece aqui.
+/// backend, ele não aparece aqui. A exceção são as fases da vida, que vêm da
+/// lista delas (`GET /life-phases`): não são número, são a porta para a tela
+/// onde a pessoa nomeia os próprios capítulos.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -47,6 +52,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _load() async {
     setState(() => _error = null);
+    // Em paralelo e sem esperar: a seção de fases se redesenha sozinha quando
+    // a lista chega, e uma falha nela não pode segurar o perfil inteiro.
+    PhaseStore.instance.refresh();
     try {
       final data = await Api.instance.getProfile();
       if (mounted) setState(() => _profile = data);
@@ -124,6 +132,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
         const SizedBox(height: SJSpace.x8),
         _passport(s, profile),
+        const SizedBox(height: SJSpace.x8),
+        _phases(s),
         const SizedBox(height: SJSpace.x8),
         _achievements(s),
         const SizedBox(height: SJSpace.x8),
@@ -352,6 +362,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      );
+
+  /// Fases da vida: a porta para os capítulos. Com fases, mostra os nomes —
+  /// é a pessoa se reconhecendo; sem nenhuma, uma linha que explica para que
+  /// serve, sem cobrar que ela crie.
+  Widget _phases(SJScheme s) => ValueListenableBuilder<List<LifePhase>>(
+        valueListenable: PhaseStore.instance,
+        builder: (context, phases, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SJSectionHeader(overline: 'Capítulos', title: 'Fases da vida'),
+            const SizedBox(height: SJSpace.x4),
+            SJCard(
+              onTap: () => Navigator.of(context).pushNamed('/phases'),
+              semanticLabel: 'Fases da vida',
+              child: Row(
+                children: [
+                  Expanded(
+                    child: phases.isEmpty
+                        ? Text(
+                            'Nomeie os capítulos da sua história — a faculdade, '
+                            'um recomeço — e releia o atlas por eles.',
+                            style: SJText.bodySm(color: s.inkSoft),
+                          )
+                        : Wrap(
+                            spacing: SJSpace.x4,
+                            runSpacing: SJSpace.x2,
+                            children: [
+                              for (final p in phases)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    PhaseDot(color: p.color),
+                                    const SizedBox(width: SJSpace.x2),
+                                    Text(p.name, style: SJText.bodySm(color: s.ink)),
+                                  ],
+                                ),
+                            ],
+                          ),
+                  ),
+                  const SizedBox(width: SJSpace.x4),
+                  Text('→', style: SJText.button(color: s.secondary, size: 17)),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
 
   /// Conquistas: aparecem VAZIAS de propósito — ver o que existe para alcançar

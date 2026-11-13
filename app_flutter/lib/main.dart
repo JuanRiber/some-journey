@@ -16,6 +16,7 @@ import 'screens/login.dart';
 import 'screens/memory_detail.dart';
 import 'screens/memory_edit.dart';
 import 'screens/memory_new.dart';
+import 'screens/phases.dart';
 import 'screens/profile.dart';
 import 'screens/register.dart';
 import 'screens/settings.dart';
@@ -114,6 +115,9 @@ class SomeJourneyApp extends StatelessWidget {
         // as configurações.
         '/profile': (_) => const ProfileScreen(),
         '/settings': (_) => const SettingsScreen(),
+        // Fases da vida: a porta fica no Perfil, porque fase é história de
+        // quem a viveu, não ajuste do app.
+        '/phases': (_) => const PhasesScreen(),
         // Vitrine do design system (componentes/tokens) — criada por outro
         // agente em design/gallery.dart. Rota estática, sem argumento.
         '/design-gallery': (_) => const DesignGalleryScreen(),

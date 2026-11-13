@@ -37,6 +37,15 @@ busca/GPS e a visualização é por lista (ver [`04-decisoes-tecnicas.md`](04-de
 5. Sistema destaca os pontos e a linha daquela jornada.
 6. Tocar num pin abre o detalhe da memória.
 
+## Fluxo 4b — Reler a vida por fase
+1. Usuário abre **Perfil → Fases da vida** e nomeia uma fase (só o nome é obrigatório).
+2. Marca memórias ou jornadas com ela, na criação ou na edição de cada uma.
+3. Na timeline ou no atlas, escolhe a fase na lente (`?life_phase_id`).
+4. Sistema mostra o que foi marcado na fase **e** as memórias das jornadas marcadas nela;
+   no atlas, essas jornadas vêm inteiras, com o rastro.
+5. Tocar de novo na fase (ou em "A vida toda") volta para a vida inteira.
+6. Quem nunca criou fase não vê lente nem seletor — o app fica exatamente como era.
+
 ## Fluxo 5 — Upload de foto
 1. Usuário seleciona uma imagem (galeria).
 2. Sistema valida que a memória pertence ao usuário.

@@ -17,6 +17,20 @@ Três decisões, e as três são sobre o que NÃO fazer:
   qualquer quebraria o design system nos dois modos — o que é legível no papel
   quente some no atlas noturno. A escolha é entre papéis semânticos que já
   existem e já têm contraste conferido.
+
+E a regra da LENTE — o que conta como "estar na fase" quando se filtra:
+
+- Uma memória está na fase quando foi marcada nela **ou** quando está numa
+  jornada marcada nela. Quem marca "Intercâmbio" na jornada não deveria ter de
+  marcar foto por foto para encontrá-las ao filtrar.
+- Uma jornada está na fase quando foi marcada nela **ou** quando alguma
+  memória dela foi. No mapa ela vem inteira: um rastro cortado no meio
+  contaria um caminho que não aconteceu.
+- A herança desce da jornada para a memória e para aí: uma memória marcada
+  não puxa as irmãs dela para a fase. E a leitura de uma memória devolve só a
+  marca PRÓPRIA — a herdada vale para filtrar, não para dizer o que foi gravado.
+- A fase não é deduzida das datas. Um período é contexto que a pessoa
+  escreve; usá-lo para recortar sozinho poria na fase o que ela não pôs.
 """
 
 from datetime import datetime

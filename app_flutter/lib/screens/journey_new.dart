@@ -4,6 +4,9 @@ import '../api.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_domain.dart';
+import '../features/phases/phase_store.dart';
+import '../features/phases/phase_widgets.dart';
 
 /// # Nova jornada — abrir um capítulo da vida.
 ///
@@ -36,6 +39,16 @@ class _JourneyNewScreenState extends State<JourneyNewScreen> {
   bool _saving = false;
   String _error = '';
 
+  /// A fase da jornada; null é nenhuma. As memórias que entrarem nela passam
+  /// a aparecer na lente da fase sem precisar ser marcadas uma a uma.
+  String? _phaseId;
+
+  @override
+  void initState() {
+    super.initState();
+    PhaseStore.instance.refresh();
+  }
+
   Future<void> _onSave() async {
     setState(() => _error = '');
     if (_title.text.trim().isEmpty) {
@@ -49,6 +62,7 @@ class _JourneyNewScreenState extends State<JourneyNewScreen> {
         'description': _description.text.trim().isEmpty ? null : _description.text.trim(),
         'mood': _mood.text.trim().isEmpty ? null : _mood.text.trim(),
         'is_private': _isPrivate,
+        'life_phase_id': ?_phaseId,
       });
       if (!mounted) return;
       Navigator.of(context).pushReplacementNamed('/journey', arguments: j.id);
@@ -145,6 +159,7 @@ class _JourneyNewScreenState extends State<JourneyNewScreen> {
                 onSubmitted: (_) => _onSave(),
               ),
               const SizedBox(height: SJSpace.x5),
+              _phasePicker(),
               _privacyRow(s),
               if (_error.isNotEmpty) ...[
                 const SizedBox(height: SJSpace.x3),
@@ -163,6 +178,21 @@ class _JourneyNewScreenState extends State<JourneyNewScreen> {
       ),
     );
   }
+
+  /// O seletor de fase — invisível para quem não tem fase nenhuma.
+  Widget _phasePicker() => ValueListenableBuilder<List<LifePhase>>(
+        valueListenable: PhaseStore.instance,
+        builder: (context, phases, _) => phases.isEmpty
+            ? const SizedBox.shrink()
+            : Padding(
+                padding: const EdgeInsets.only(bottom: SJSpace.x5),
+                child: PhasePicker(
+                  phases: phases,
+                  selected: _phaseId,
+                  onChanged: (id) => setState(() => _phaseId = id),
+                ),
+              ),
+      );
 
   /// Privacidade como uma linha calma (não um "formulário de permissões"): o
   /// padrão é privado, e o texto explica o que isso significa hoje.

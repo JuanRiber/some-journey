@@ -19,6 +19,7 @@ def create_journey(
     ended_at: datetime | None = None,
     mood: str | None = None,
     is_private: bool = True,
+    life_phase_id: uuid.UUID | None = None,
 ) -> Journey:
     journey = Journey(
         user_id=user_id,
@@ -28,6 +29,7 @@ def create_journey(
         ended_at=ended_at,
         mood=mood,
         is_private=is_private,
+        life_phase_id=life_phase_id,
     )
     db.add(journey)
     db.commit()
@@ -71,6 +73,7 @@ def list_journeys(
     user_id: uuid.UUID,
     limit: int | None = None,
     cursor: tuple[datetime, uuid.UUID] | None = None,
+    life_phase_id: uuid.UUID | None = None,
 ) -> list[tuple[Journey, int]]:
     """Jornadas do usuário (com a contagem de pontos ativos), da mais recente
     para a mais antiga.
@@ -86,6 +89,11 @@ def list_journeys(
       linha extra e monta o cursor. `cursor` é o par (created_at, id) do fim da
       página anterior; como a ordem é DESC, a próxima página é tudo que vem DEPOIS
       dele, i.e. (created_at, id) estritamente MENOR que o cursor.
+
+    `life_phase_id` recorta pela fase: a jornada entra quando foi marcada nela
+    OU quando alguma memória dela foi. É o espelho da regra das memórias
+    (`memory_repository.in_phase`) — a lente mostra a jornada que tem um pedaço
+    da fase, inteira, do mesmo jeito que o bbox do mapa não corta o rastro.
     """
     stmt = (
         select(Journey, func.count(Memory.id))
@@ -114,6 +122,21 @@ def list_journeys(
                     Journey.id < cursor_id,
                 ),
             )
+        )
+    if life_phase_id is not None:
+        memoria_da_fase = (
+            select(JourneyMemory.id)
+            .join(Memory, Memory.id == JourneyMemory.memory_id)
+            .where(
+                JourneyMemory.journey_id == Journey.id,
+                JourneyMemory.deleted_at.is_(None),
+                Memory.deleted_at.is_(None),
+                Memory.life_phase_id == life_phase_id,
+            )
+            .exists()
+        )
+        stmt = stmt.where(
+            or_(Journey.life_phase_id == life_phase_id, memoria_da_fase)
         )
     if limit is not None:
         stmt = stmt.limit(limit + 1)

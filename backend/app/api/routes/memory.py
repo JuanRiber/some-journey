@@ -38,7 +38,12 @@ from app.schemas.memory import (
     MemoryRead,
     MemoryUpdate,
 )
+from app.api.routes.life_phase import (
+    fase_do_corpo_inexistente,
+    fase_do_filtro_inexistente,
+)
 from app.services import memory_service
+from app.services.life_phase_service import PhaseNotFoundError
 from app.services.memory_service import (
     DuplicateMusicError,
     InvalidImageError,
@@ -69,7 +74,10 @@ def create_memory(
     A resposta sai assim que a memória está salva: o usuário não espera pelo
     provedor de geocodificação (serviço de terceiros, centenas de ms). O lugar
     aparece logo depois; se o provedor falhar, a linha fica na fila de backfill."""
-    created = memory_service.create(db, user_id=current_user.id, data=data)
+    try:
+        created = memory_service.create(db, user_id=current_user.id, data=data)
+    except PhaseNotFoundError:
+        raise fase_do_corpo_inexistente()
     background.add_task(
         memory_service.geocode_memory,
         user_id=current_user.id,
@@ -83,12 +91,14 @@ def list_memories(
     response: Response,
     limit: int | None = Query(default=None),
     cursor: str | None = Query(default=None),
+    life_phase_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[MemoryRead]:
     """Lista paginada por keyset. Corpo = ARRAY puro (retrocompatível); quando há
     próxima página, o cursor vai no header X-Next-Cursor. `?limit` é normalizado
-    para [1, MAX_LIMIT]; `?cursor` opaco e malformado -> 400 (nunca 500)."""
+    para [1, MAX_LIMIT]; `?cursor` opaco e malformado -> 400 (nunca 500).
+    `?life_phase_id` recorta pela fase; fase que não é desta pessoa -> 404."""
     decoded = None
     if cursor is not None:
         try:
@@ -98,9 +108,16 @@ def list_memories(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid pagination cursor.",
             )
-    items, next_cursor = memory_service.list_for_user(
-        db, user_id=current_user.id, limit=clamp_limit(limit), cursor=decoded
-    )
+    try:
+        items, next_cursor = memory_service.list_for_user(
+            db,
+            user_id=current_user.id,
+            limit=clamp_limit(limit),
+            cursor=decoded,
+            life_phase_id=life_phase_id,
+        )
+    except PhaseNotFoundError:
+        raise fase_do_filtro_inexistente()
     if next_cursor is not None:
         response.headers[NEXT_CURSOR_HEADER] = next_cursor
     return items
@@ -131,6 +148,8 @@ def update_memory(
         )
     except MemoryNotFoundError:
         raise _not_found
+    except PhaseNotFoundError:
+        raise fase_do_corpo_inexistente()
 
 
 @router.delete("/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)

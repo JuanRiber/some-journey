@@ -29,8 +29,13 @@ from app.schemas.journey import (
     JourneyReorder,
     JourneyUpdate,
 )
+from app.api.routes.life_phase import (
+    fase_do_corpo_inexistente,
+    fase_do_filtro_inexistente,
+)
 from app.schemas.memory import MemoryRead
 from app.services import journey_service
+from app.services.life_phase_service import PhaseNotFoundError
 from app.services.journey_service import (
     ActiveJourneyExistsError,
     InvalidCoverImageError,
@@ -62,7 +67,10 @@ def create_journey(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> JourneyRead:
-    return journey_service.create(db, user_id=current_user.id, data=data)
+    try:
+        return journey_service.create(db, user_id=current_user.id, data=data)
+    except PhaseNotFoundError:
+        raise fase_do_corpo_inexistente()
 
 
 @router.get("", response_model=list[JourneyRead])
@@ -73,6 +81,7 @@ def list_journeys(
     # não rejeitados.
     limit: int | None = Query(default=None),
     cursor: str | None = Query(default=None),
+    life_phase_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[JourneyRead]:
@@ -81,11 +90,18 @@ def list_journeys(
     Contrato compartilhado: corpo é um ARRAY JSON puro (retrocompatível); aceita
     ?limit (default DEFAULT_LIMIT, teto MAX_LIMIT) e ?cursor (opaco, o do fim da
     página anterior); havendo próxima página, o cursor volta no header
-    X-Next-Cursor. Cursor inválido -> 400."""
+    X-Next-Cursor. Cursor inválido -> 400. `?life_phase_id` recorta pela
+    fase (marcada nela, ou com alguma memória dela); fase alheia -> 404."""
     try:
         items, next_cursor = journey_service.list_for_user(
-            db, user_id=current_user.id, limit=limit, cursor=cursor
+            db,
+            user_id=current_user.id,
+            limit=limit,
+            cursor=cursor,
+            life_phase_id=life_phase_id,
         )
+    except PhaseNotFoundError:
+        raise fase_do_filtro_inexistente()
     except CursorError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -122,6 +138,8 @@ def update_journey(
         )
     except JourneyNotFoundError:
         raise _not_found
+    except PhaseNotFoundError:
+        raise fase_do_corpo_inexistente()
 
 
 @router.post("/{journey_id}/start", response_model=JourneyRead)

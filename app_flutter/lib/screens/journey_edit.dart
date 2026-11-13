@@ -6,6 +6,9 @@ import '../design/components.dart';
 import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_domain.dart';
+import '../features/phases/phase_store.dart';
+import '../features/phases/phase_widgets.dart';
 import '../models.dart';
 
 /// # Editar jornada — corrigir o nome de um capítulo sem perdê-lo.
@@ -82,6 +85,10 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
   String _error = '';
   String _loadError = '';
 
+  /// A fase escolhida agora. A gravada é a de [_original]; só a diferença vai
+  /// no PATCH, e `null` ali SOLTA a jornada da fase.
+  String? _phaseId;
+
   /// A capa já foi gravada no servidor, mesmo que nenhum campo tenha mudado.
   /// É o que faz a tela de detalhe recarregar ao voltar: sem isso, quem só
   /// trocou a foto continuaria vendo a capa antiga até a próxima leitura.
@@ -93,6 +100,7 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
     for (final c in [_title, _description, _mood]) {
       c.addListener(_onChanged);
     }
+    PhaseStore.instance.refresh();
     _load();
   }
 
@@ -103,14 +111,22 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
   bool get _dirty {
     final o = _original;
     if (o == null) return false;
-    return journeyPatch(
-      o,
-      title: _title.text,
-      description: _description.text,
-      mood: _mood.text,
-      isPrivate: _isPrivate,
-    ).isNotEmpty;
+    return _patchFor(o).isNotEmpty;
   }
+
+  /// Os metadados que mudaram e, se mudou, a fase. Ficam separados porque a
+  /// fase não obedece ao "null não mexe" de [journeyPatch]: lá `null` é
+  /// ignorado, aqui é o jeito de soltar a jornada.
+  Map<String, dynamic> _patchFor(Journey o) => {
+        ...journeyPatch(
+          o,
+          title: _title.text,
+          description: _description.text,
+          mood: _mood.text,
+          isPrivate: _isPrivate,
+        ),
+        ...phaseLinkPatch(o.lifePhaseId, _phaseId),
+      };
 
   Future<void> _load() async {
     try {
@@ -122,6 +138,7 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
         _description.text = j.description ?? '';
         _mood.text = j.mood ?? '';
         _isPrivate = j.isPrivate;
+        _phaseId = j.lifePhaseId;
       });
     } on ApiError catch (e) {
       if (!mounted) return;
@@ -144,13 +161,7 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
       return;
     }
 
-    final patch = journeyPatch(
-      o,
-      title: _title.text,
-      description: _description.text,
-      mood: _mood.text,
-      isPrivate: _isPrivate,
-    );
+    final patch = _patchFor(o);
     // Nada mudou nos campos: voltar é a resposta honesta, não uma requisição
     // vazia. Ainda assim a capa pode ter mudado — ela não passa pelo PATCH.
     if (patch.isEmpty) {
@@ -372,6 +383,19 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
           onSubmitted: (_) => _dirty ? _onSave() : null,
         ),
         const SizedBox(height: SJSpace.x5),
+        ValueListenableBuilder<List<LifePhase>>(
+          valueListenable: PhaseStore.instance,
+          builder: (context, phases, _) => phases.isEmpty
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: SJSpace.x5),
+                  child: PhasePicker(
+                    phases: phases,
+                    selected: _phaseId,
+                    onChanged: (id) => setState(() => _phaseId = id),
+                  ),
+                ),
+        ),
         _privacidade(s),
         if (_error.isNotEmpty) ...[
           const SizedBox(height: SJSpace.x3),

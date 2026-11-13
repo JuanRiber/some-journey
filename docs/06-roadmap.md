@@ -24,7 +24,10 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ a fazer. (Progresso detalhado no [`cha
 
 ## V2
 - ✅ Múltiplas fotos por memória (entregue no MVP, teto de 5).
-- 🟡 **Fases da vida** — backend pronto (tabela, CRUD, vínculo opcional com memórias e jornadas, 18 testes). Falta o cliente: telas de criar/editar e o filtro por fase no atlas e na timeline.
+- ✅ **Fases da vida** — tabela e CRUD (`/life-phases`); vínculo opcional e conferido com
+  memórias e jornadas; a **lente** `?life_phase_id=` em `/memories`, `/journeys` e `/map`, com
+  a fase da jornada descendo para as memórias dela. No app: tela de fases no Perfil, seletor
+  nos formulários de memória e jornada, etiqueta nos detalhes e a lente na timeline e no atlas.
 - Filtros avançados no mapa.
 - Estilos visuais de jornadas.
 - Exportação simples de jornada.

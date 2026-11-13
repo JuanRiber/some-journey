@@ -21,11 +21,12 @@ header `Authorization: Bearer <token>`. ✅ = implementado · 🔜 = planejado.
 - ✅ `POST /auth/reset-password` — redefine a senha com o token (validade + uso único)
 
 ## Memórias  (privadas)
-- ✅ `POST /memories` — cria ponto/memória solta
+- ✅ `POST /memories` — cria ponto/memória solta; `life_phase_id` opcional
 - ✅ `GET /memories` — lista as do usuário (mais recentes primeiro), **paginação keyset**
-  (`?limit=&cursor=`)
+  (`?limit=&cursor=`); `?life_phase_id=` aplica a lente da fase (ver **Fases da vida**)
 - ✅ `GET /memories/{id}` — busca uma
-- ✅ `PATCH /memories/{id}` — edição parcial (lat/long sempre juntas)
+- ✅ `PATCH /memories/{id}` — edição parcial (lat/long sempre juntas). Em `life_phase_id`,
+  e só nele, `null` **solta** a memória da fase — um id não tem string vazia que o substitua
 - ✅ `DELETE /memories/{id}` — soft delete (204)
 
 IDs inexistentes ou de outro usuário → **404** uniforme.
@@ -61,10 +62,12 @@ memória (**409**). As faixas viajam junto da memória em `GET /memories` e
 `GET /memories/{id}`, no campo `music`.
 
 ## Jornadas  (privadas)
-- ✅ `POST /journeys` — `{title, description?, mood?, is_private?, started_at?, ended_at?}` → 201 (nasce `draft`)
-- ✅ `GET /journeys` — lista (com `points_count`), **paginação keyset** (`?limit=&cursor=`)
+- ✅ `POST /journeys` — `{title, description?, mood?, is_private?, started_at?, ended_at?, life_phase_id?}` → 201 (nasce `draft`)
+- ✅ `GET /journeys` — lista (com `points_count`), **paginação keyset** (`?limit=&cursor=`);
+  `?life_phase_id=` aplica a lente da fase
 - ✅ `GET /journeys/{id}` — detalhe com `points[]` ordenados + `route` (LineString GeoJSON, ou `null` se < 2 pontos)
-- ✅ `PATCH /journeys/{id}` — edita título, descrição, `mood`, `is_private` e datas
+- ✅ `PATCH /journeys/{id}` — edita título, descrição, `mood`, `is_private`, datas e
+  `life_phase_id` (aqui `null` solta a jornada da fase)
 - ✅ `DELETE /journeys/{id}` — soft delete (não apaga memórias)
 
 ## Capa da jornada  (privadas)
@@ -100,9 +103,34 @@ Distinto da linha **simbólica** que liga as memórias na ordem.
 
 ## Mapa  (privada)
 - ✅ `GET /map` — `{loose_points[], journeys[]}` para desenhar o atlas (pins soltos + jornadas com pontos e rastro).
-  Filtros: `?bbox=min_lng,min_lat,max_lng,max_lat` e `?journey_id={id}`.
+  Filtros: `?bbox=min_lng,min_lat,max_lng,max_lat`, `?journey_id={id}` e
+  `?life_phase_id={id}` (a lente de uma fase; com `journey_id`, o foco na jornada vence).
 
 A visão macro mostra só a linha simbólica — pontos de GPS brutos nunca saem por aqui.
+
+## Fases da vida  (privadas)
+- ✅ `GET /life-phases` — as fases do usuário, na ordem em que a vida aconteceu (sem início vão para o fim)
+- ✅ `POST /life-phases` — `{name, description?, color?, started_at?, ended_at?}` → 201
+- ✅ `GET /life-phases/{id}`
+- ✅ `PATCH /life-phases/{id}` — parcial; aqui `null` **limpa** (uma fase encerrada por engano volta a ser a fase em curso)
+- ✅ `DELETE /life-phases/{id}` — soft delete que **solta** memórias e jornadas da fase (204)
+
+`color` é um papel da paleta (`primary`, `secondary`, `accent`, `moss`, `highlight`). Fase de
+outra pessoa ou inexistente → **404** uniforme.
+
+**A lente** (`?life_phase_id=` em `/memories`, `/journeys` e `/map`):
+
+- a memória está na fase quando foi marcada nela **ou** quando está numa jornada (ativa,
+  com vínculo ativo) marcada nela;
+- a jornada está na fase quando foi marcada nela **ou** quando alguma memória dela foi; no
+  mapa ela vem inteira, com o rastro;
+- a herança desce da jornada para a memória e para aí: uma memória marcada não puxa as
+  irmãs. E a leitura da memória devolve só a marca **própria** em `life_phase_id`;
+- a fase não é deduzida das datas.
+
+Fase alheia ou apagada no filtro → **404** (e não lista vazia, que esconderia o id errado).
+No corpo de um POST/PATCH de memória ou jornada → **422**: o recurso da URL existe, quem não
+serve é um valor do corpo.
 
 ## Perfil  (privadas)
 Um **único** endpoint agregado, com as contagens em SQL — o cliente jamais baixa memórias

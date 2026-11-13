@@ -33,6 +33,21 @@ def get_phase(db: Session, *, phase_id: uuid.UUID, user_id: uuid.UUID) -> LifePh
     return fase
 
 
+def owned_phase_id(
+    db: Session, *, user_id: uuid.UUID, phase_id: uuid.UUID | None
+) -> uuid.UUID | None:
+    """O id que um vínculo pode gravar: o da fase, ou None para soltar.
+
+    É a única porta por onde uma memória ou jornada ganha fase. Sem ela, um
+    `life_phase_id` qualquer no corpo do POST amarraria a lembrança à fase de
+    OUTRA pessoa — a FK aceitaria, porque a fase existe. A de outra pessoa, a
+    apagada e a inexistente levantam o mesmo erro, pelo motivo de sempre.
+    """
+    if phase_id is None:
+        return None
+    return get_phase(db, phase_id=phase_id, user_id=user_id).id
+
+
 def create_phase(db: Session, *, user_id: uuid.UUID, data: LifePhaseCreate) -> LifePhase:
     nome = validate_name(data.name)
     cor = validate_color(data.color)

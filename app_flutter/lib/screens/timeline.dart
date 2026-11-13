@@ -5,6 +5,9 @@ import '../design/components.dart';
 import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_domain.dart';
+import '../features/phases/phase_store.dart';
+import '../features/phases/phase_widgets.dart';
 import '../models.dart';
 import '../widgets/api_error_view.dart';
 
@@ -55,6 +58,11 @@ String _excerpt(String text) =>
 /// Estados: carregando (esqueleto de capítulo), erro (bússola quebrada +
 /// "Tentar de novo"), vazio (lua e estrelas ENSINANDO a primeira página) e
 /// conteúdo, sempre com pull-to-refresh.
+///
+/// **A lente das fases:** quem nomeou fases da vida pode reler o álbum por
+/// uma delas — a faculdade, o intercâmbio. Os capítulos continuam sendo os
+/// anos; a fase só escolhe quais páginas entram. Sem fase cadastrada a lente
+/// não aparece, e a tela é exatamente o que sempre foi.
 class TimelineScreen extends StatefulWidget {
   const TimelineScreen({super.key});
 
@@ -78,21 +86,64 @@ class _TimelineScreenState extends State<TimelineScreen> {
   /// Largura da goteira da espinha (fio + ponto) e o respiro até o conteúdo.
   static const double _railWidth = 22;
 
+  final _phases = PhaseStore.instance;
+
+  /// A fase pela qual o álbum está sendo lido; null é a vida toda.
+  String? _phaseId;
+
   @override
   void initState() {
     super.initState();
+    _phases.addListener(_onPhases);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _phases.removeListener(_onPhases);
+    super.dispose();
+  }
+
+  /// As fases mudaram (criadas, renomeadas, apagadas noutra tela). Se a da
+  /// lente sumiu, o álbum volta para a vida toda em vez de ficar pedindo uma
+  /// fase que responde 404.
+  void _onPhases() {
+    if (!mounted) return;
+    final valida = lensFor(_phases.value, _phaseId);
+    if (valida != _phaseId) {
+      _setLens(valida);
+    } else {
+      setState(() {});
+    }
+  }
+
+  /// Troca a lente e relê do começo. As páginas e o cursor da lente anterior
+  /// não servem para a nova — o cursor só vale com o mesmo filtro.
+  void _setLens(String? phaseId) {
+    if (phaseId == _phaseId) return;
+    setState(() {
+      _phaseId = phaseId;
+      _memories = null;
+      _nextCursor = null;
+      _moreError = '';
+    });
     _load();
   }
 
   Future<void> _load() async {
+    final lente = _phaseId;
     setState(() {
       _error = null;
       // Esqueleto só na primeira carga: num refresh o álbum antigo continua lá.
       if (_memories == null) _loading = true;
     });
+    // As fases vêm junto, sem segurar o álbum: a lente se redesenha quando
+    // chegarem, e uma falha nelas não impede ninguém de ver as memórias.
+    _phases.refresh();
     try {
-      final page = await Api.instance.listMemories();
-      if (!mounted) return;
+      final page = await Api.instance.listMemories(phaseId: lente);
+      // A lente mudou enquanto esta página vinha: ela é de outro álbum.
+      if (!mounted || lente != _phaseId) return;
       setState(() {
         _memories = page.items;
         _nextCursor = page.nextCursor;
@@ -100,9 +151,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
         _loading = false;
       });
     } on ApiError catch (e) {
-      if (!mounted) return;
+      if (!mounted || lente != _phaseId) return;
       if (e.isUnauthorized) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      // 404 com lente é a fase apagada noutro aparelho: volta para a vida toda.
+      if (lente != null && e.status == 404) {
+        _setLens(null);
         return;
       }
       setState(() {
@@ -118,14 +174,20 @@ class _TimelineScreenState extends State<TimelineScreen> {
   /// gatilho é de rolagem e dispara muitas vezes por segundo.
   Future<void> _loadMore() async {
     final cursor = _nextCursor;
+    final lente = _phaseId;
     if (cursor == null || _loadingMore) return;
     setState(() {
       _loadingMore = true;
       _moreError = '';
     });
     try {
-      final page = await Api.instance.listMemories(cursor: cursor);
+      final page = await Api.instance.listMemories(cursor: cursor, phaseId: lente);
       if (!mounted) return;
+      // Página de outra lente não entra neste álbum.
+      if (lente != _phaseId) {
+        setState(() => _loadingMore = false);
+        return;
+      }
       setState(() {
         _memories = [...?_memories, ...page.items];
         _nextCursor = page.nextCursor;
@@ -133,6 +195,10 @@ class _TimelineScreenState extends State<TimelineScreen> {
       });
     } on ApiError catch (e) {
       if (!mounted) return;
+      if (lente != _phaseId) {
+        setState(() => _loadingMore = false);
+        return;
+      }
       if (e.isUnauthorized) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
@@ -224,6 +290,23 @@ class _TimelineScreenState extends State<TimelineScreen> {
       ];
     }
     final memories = _memories ?? const <Memory>[];
+    final fase = phaseById(_phases.value, _phaseId);
+    if (memories.isEmpty && fase != null) {
+      // Vazio COM lente não é álbum vazio: é uma fase sem página ainda. O
+      // convite é outro, e a saída é voltar para a vida toda.
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: SJEmptyState(
+            title: 'Nada guardado nesta fase ainda.',
+            body: 'Marque memórias ou jornadas com “${fase.name}” — na edição '
+                'de cada uma — e elas aparecem aqui.',
+            actionLabel: 'Ver a vida toda',
+            onAction: () => _setLens(null),
+          ),
+        ),
+      ];
+    }
     if (memories.isEmpty) {
       return [
         SliverFillRemaining(
@@ -286,6 +369,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
           Text('Sua timeline', style: SJText.display(color: s.ink)),
           const SizedBox(height: SJSpace.x2),
           Text(_narrative(), style: _diaryItalic(s)),
+          if (_phases.value.isNotEmpty) ...[
+            const SizedBox(height: SJSpace.x5),
+            PhaseLens(
+              phases: _phases.value,
+              selected: _phaseId,
+              onChanged: _setLens,
+            ),
+          ],
         ],
       );
 
@@ -303,8 +394,16 @@ class _TimelineScreenState extends State<TimelineScreen> {
   /// "156 memórias".
   String _narrative() {
     final memories = _memories;
+    final fase = phaseById(_phases.value, _phaseId);
     if (memories == null || memories.isEmpty || _error != null) {
-      return 'As memórias do seu atlas em ordem viva.';
+      return fase == null
+          ? 'As memórias do seu atlas em ordem viva.'
+          : 'O que você guardou na fase “${fase.name}”.';
+    }
+    if (fase != null) {
+      return memories.length == 1
+          ? 'Uma página na fase “${fase.name}”.'
+          : '${memories.length} momentos na fase “${fase.name}”.';
     }
     if (memories.length == 1) return 'A primeira página do seu álbum.';
     final years = memories.map((m) => _yearOf(m.occurredAt)).toSet().toList()

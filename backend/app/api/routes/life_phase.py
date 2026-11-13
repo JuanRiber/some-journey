@@ -26,6 +26,28 @@ def _nao_encontrada() -> HTTPException:
     )
 
 
+def fase_do_corpo_inexistente() -> HTTPException:
+    """Para as rotas de memória e jornada, quando o corpo aponta para uma fase
+    que esta pessoa não tem.
+
+    422 e não 404: o recurso da URL (a memória, a jornada) existe; quem não
+    serve é um valor do corpo. Responder 404 diria que a memória sumiu.
+    """
+    return HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail="Essa fase da vida não existe mais. Escolha outra ou deixe sem fase.",
+    )
+
+
+def fase_do_filtro_inexistente() -> HTTPException:
+    """Para os filtros (`?life_phase_id=`): 404, como o `?journey_id=` do mapa.
+
+    Devolver lista vazia seria pior — "nenhuma memória nesta fase" é uma
+    resposta plausível, e esconderia que a fase pedida não existe.
+    """
+    return _nao_encontrada()
+
+
 def _invalida(exc: InvalidPhaseError) -> HTTPException:
     # A mensagem vem do domínio, já em pt-BR e escrita para quem vai ler.
     return HTTPException(

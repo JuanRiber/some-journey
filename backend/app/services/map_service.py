@@ -17,6 +17,7 @@ from app.repositories import journey_repository, memory_repository
 from app.repositories.memory_repository import Bbox
 from app.schemas.journey import JourneyRoute
 from app.schemas.map import MapJourney, MapPoint, MapResponse
+from app.services import life_phase_service
 from app.services.journey_service import JourneyNotFoundError
 
 
@@ -66,7 +67,22 @@ def get_map(
     user_id: uuid.UUID,
     bbox: Bbox | None = None,
     journey_id: uuid.UUID | None = None,
+    life_phase_id: uuid.UUID | None = None,
 ) -> MapResponse:
+    """O mapa inteiro, ou recortado.
+
+    `life_phase_id` é a lente das fases: pins soltos marcados na fase e
+    jornadas que pertencem a ela — marcadas, ou com alguma memória marcada. A
+    jornada vem INTEIRA, rastro e todos os pins, pelo mesmo motivo do bbox: um
+    rastro cortado no meio contaria um caminho que não aconteceu. Fase alheia
+    ou inexistente levanta `PhaseNotFoundError`.
+
+    Com `journey_id` o foco é aquela jornada, e a fase não recorta nada (mas
+    ainda é conferida, para um id errado não passar calado).
+    """
+    if life_phase_id is not None:
+        life_phase_service.get_phase(db, phase_id=life_phase_id, user_id=user_id)
+
     # Filtro por jornada: devolve só aquela jornada (destaque), sem pins soltos.
     if journey_id is not None:
         journey = journey_repository.get_journey(
@@ -84,9 +100,16 @@ def get_map(
 
     loose = [
         _memory_to_point(m)
-        for m in memory_repository.list_loose(db, user_id=user_id, bbox=bbox)
+        for m in memory_repository.list_loose(
+            db, user_id=user_id, bbox=bbox, life_phase_id=life_phase_id
+        )
     ]
-    all_journeys = [j for j, _count in journey_repository.list_journeys(db, user_id=user_id)]
+    all_journeys = [
+        j
+        for j, _count in journey_repository.list_journeys(
+            db, user_id=user_id, life_phase_id=life_phase_id
+        )
+    ]
     # Pontos de TODAS as jornadas numa query só (sem N+1).
     points_by_journey = journey_repository.list_points_for_journeys(
         db, journey_ids=[j.id for j in all_journeys], user_id=user_id

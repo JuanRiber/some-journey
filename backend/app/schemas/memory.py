@@ -46,6 +46,9 @@ class MemoryCreate(BaseModel):
     # Normaliza para UTC-aware: um horário naive seria reinterpretado no fuso da
     # sessão do Postgres (TIMESTAMPTZ), corrompendo a ordem da timeline.
     occurred_at: AwareUtcDatetime
+    # Fase da vida (opcional). Precisa ser uma fase ativa DESTA pessoa; a de
+    # outra, apagada ou inexistente responde 422 do mesmo jeito.
+    life_phase_id: uuid.UUID | None = None
 
 
 class MemoryUpdate(BaseModel):
@@ -60,6 +63,12 @@ class MemoryUpdate(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     occurred_at: AwareUtcDatetime | None = None
+    # A ÚNICA exceção à convenção acima: aqui `null` SOLTA a memória da fase.
+    # Para um id não existe o truque da string vazia, e sem isso uma memória
+    # marcada numa fase por engano nunca mais voltaria a não ter fase. O
+    # serviço distingue "não mandou" de "mandou null" por `model_fields_set` —
+    # o mesmo arranjo do PATCH de fases.
+    life_phase_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _lat_long_juntas(self) -> "MemoryUpdate":
@@ -170,3 +179,8 @@ class MemoryRead(BaseModel):
     country: str | None = None
     country_code: str | None = None
     continent: str | None = None
+    # A fase em que a PRÓPRIA memória foi marcada. Não reflete a fase herdada
+    # da jornada: essa vale para filtrar (ver `app.domain.life_phase`), mas a
+    # memória não foi marcada nela, e mostrar as duas como uma só faria o
+    # seletor da tela de edição mentir sobre o que está gravado.
+    life_phase_id: uuid.UUID | None = None

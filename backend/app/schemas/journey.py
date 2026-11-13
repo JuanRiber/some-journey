@@ -24,6 +24,8 @@ class JourneyCreate(BaseModel):
     # UTC-aware (AwareUtcDatetime) — as colunas são TIMESTAMPTZ.
     started_at: AwareUtcDatetime | None = None
     ended_at: AwareUtcDatetime | None = None
+    # Fase da vida (opcional). Ativa e DESTA pessoa; senão, 422.
+    life_phase_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def _dates_consistent(self) -> "JourneyCreate":
@@ -53,6 +55,10 @@ class JourneyUpdate(BaseModel):
     is_private: bool | None = None
     started_at: datetime | None = None
     ended_at: datetime | None = None
+    # Exceção deliberada ao "null não mexe" deste PATCH: aqui `null` SOLTA a
+    # jornada da fase. Um id não tem string vazia que o substitua, e sem isso
+    # uma jornada marcada por engano ficaria presa à fase para sempre.
+    life_phase_id: uuid.UUID | None = None
 
 
 class JourneyRead(BaseModel):
@@ -68,6 +74,7 @@ class JourneyRead(BaseModel):
     ended_at: datetime | None
     points_count: int
     created_at: datetime
+    life_phase_id: uuid.UUID | None = None
 
 
 class JourneyPointRead(BaseModel):

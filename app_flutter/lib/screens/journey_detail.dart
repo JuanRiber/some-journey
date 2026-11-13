@@ -5,6 +5,7 @@ import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../features/atlas/atlas_domain.dart';
+import '../features/phases/phase_widgets.dart';
 import '../features/tracks/track_panel.dart';
 import '../features/tracks/track_recorder.dart';
 import '../models.dart';
@@ -224,6 +225,14 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                       // desenha em `journeys.dart`: reusar o estilo de lá é o
                       // que mantém a lane com uma voz só.
                       child: Text(j.mood!, style: journeyMoodStyle(s)),
+                    ),
+                  if (j.lifePhaseId != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: PhaseTag(phaseId: j.lifePhaseId),
+                      ),
                     ),
                   Padding(
                     padding: const EdgeInsets.only(top: 8),

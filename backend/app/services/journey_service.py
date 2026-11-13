@@ -12,7 +12,7 @@ from app.models.journey import Journey
 from app.models.memory import Memory
 from app.repositories import journey_repository, memory_repository
 from app.schemas.memory import MemoryRead
-from app.services import memory_service
+from app.services import life_phase_service, memory_service
 from app.schemas.journey import (
     JourneyCreate,
     JourneyDetailRead,
@@ -106,6 +106,7 @@ def _journey_to_read(
         ended_at=journey.ended_at,
         points_count=points_count,
         created_at=journey.created_at,
+        life_phase_id=journey.life_phase_id,
     )
 
 
@@ -158,6 +159,11 @@ def _detail(db: Session, *, user_id: uuid.UUID, journey: Journey) -> JourneyDeta
 
 
 def create(db: Session, *, user_id: uuid.UUID, data: JourneyCreate) -> JourneyRead:
+    """Levanta `PhaseNotFoundError` se `life_phase_id` não for uma fase ativa
+    desta pessoa — antes de gravar qualquer coisa."""
+    fase = life_phase_service.owned_phase_id(
+        db, user_id=user_id, phase_id=data.life_phase_id
+    )
     journey = journey_repository.create_journey(
         db,
         user_id=user_id,
@@ -167,6 +173,7 @@ def create(db: Session, *, user_id: uuid.UUID, data: JourneyCreate) -> JourneyRe
         is_private=data.is_private,
         started_at=data.started_at,
         ended_at=data.ended_at,
+        life_phase_id=fase,
     )
     return _journey_to_read(journey, 0)
 
@@ -194,9 +201,14 @@ def update(
     journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
     if journey is None:
         raise JourneyNotFoundError()
-    updated = journey_repository.update_journey(
-        db, journey=journey, **data.model_dump(exclude_unset=True)
-    )
+    campos = data.model_dump(exclude_unset=True)
+    # A fase sai antes do repository, que ignora nulos: aqui `null` quer dizer
+    # SOLTAR. Gravada no objeto, ela vai no mesmo commit do update abaixo.
+    if "life_phase_id" in campos:
+        journey.life_phase_id = life_phase_service.owned_phase_id(
+            db, user_id=user_id, phase_id=campos.pop("life_phase_id")
+        )
+    updated = journey_repository.update_journey(db, journey=journey, **campos)
     return _read_with_count(db, user_id=user_id, journey=updated)
 
 
@@ -206,6 +218,7 @@ def list_for_user(
     user_id: uuid.UUID,
     limit: int | None = None,
     cursor: str | None = None,
+    life_phase_id: uuid.UUID | None = None,
 ) -> tuple[list[JourneyRead], str | None]:
     """Listagem paginada por keyset das jornadas do usuário.
 
@@ -220,8 +233,15 @@ def list_for_user(
     """
     clamped = clamp_limit(limit)
     decoded = decode_cursor(cursor) if cursor else None
+    # Fase alheia ou inexistente: PhaseNotFoundError (a rota responde 404).
+    if life_phase_id is not None:
+        life_phase_service.get_phase(db, phase_id=life_phase_id, user_id=user_id)
     rows = journey_repository.list_journeys(
-        db, user_id=user_id, limit=clamped, cursor=decoded
+        db,
+        user_id=user_id,
+        limit=clamped,
+        cursor=decoded,
+        life_phase_id=life_phase_id,
     )
     has_next = len(rows) > clamped
     page = rows[:clamped]

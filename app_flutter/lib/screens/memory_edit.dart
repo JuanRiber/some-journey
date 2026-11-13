@@ -6,6 +6,9 @@ import '../features/photos/photo_picker.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_domain.dart';
+import '../features/phases/phase_store.dart';
+import '../features/phases/phase_widgets.dart';
 import '../models.dart';
 import '../widgets/common.dart';
 import '../widgets/date_field.dart';
@@ -47,9 +50,15 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   bool _saving = false;
   String _error = '';
 
+  /// A fase gravada quando a tela abriu e a escolhida agora. Só a diferença
+  /// vai no PATCH — e `null` ali SOLTA a memória da fase.
+  String? _savedPhaseId;
+  String? _phaseId;
+
   @override
   void initState() {
     super.initState();
+    PhaseStore.instance.refresh();
     _load();
   }
 
@@ -64,6 +73,8 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
         _lat = m.latitude;
         _lng = m.longitude;
         _saved = m.images;
+        _savedPhaseId = m.lifePhaseId;
+        _phaseId = m.lifePhaseId;
         _loaded = true;
       });
     } on ApiError catch (e) {
@@ -107,6 +118,7 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
         'latitude': _lat,
         'longitude': _lng,
         'occurred_at': '${_date}T12:00:00Z',
+        ...phaseLinkPatch(_savedPhaseId, _phaseId),
       });
       for (final p in _picks) {
         final bytes = await p.readAsBytes();
@@ -122,7 +134,11 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
         return;
       }
       setState(() {
-        _error = e.isNotFound ? 'Memória não encontrada.' : e.message;
+        // Só o 404 é a memória que sumiu. O 422 ao SALVAR é o corpo que não
+        // serve — a fase apagada noutra tela, por exemplo — e a mensagem do
+        // servidor diz isso; trocá-la por "não encontrada" mandaria a pessoa
+        // procurar uma memória que está bem ali.
+        _error = e.status == 404 ? 'Memória não encontrada.' : e.message;
         _saving = false;
       });
     }
@@ -189,6 +205,19 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
                 ),
                 const FieldLabel('Fotos (opcional, até 5)'),
                 _photoGrid(s),
+                ValueListenableBuilder<List<LifePhase>>(
+                  valueListenable: PhaseStore.instance,
+                  builder: (context, phases, _) => phases.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: PhasePicker(
+                            phases: phases,
+                            selected: _phaseId,
+                            onChanged: (id) => setState(() => _phaseId = id),
+                          ),
+                        ),
+                ),
                 InlineError(_error),
                 const SizedBox(height: 20),
                 PrimaryButton(

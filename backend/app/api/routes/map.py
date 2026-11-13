@@ -4,7 +4,8 @@ Devolve, em uma só resposta, tudo que o front precisa para desenhar o mapa do
 usuário: pins soltos + jornadas (pins ordenados + rastro). O user_id vem SEMPRE
 do token (ownership). Filtros opcionais:
 - bbox: recorta pela viewport (mundo/país/região/cidade é só zoom no front);
-- journey_id: foca uma jornada específica.
+- journey_id: foca uma jornada específica;
+- life_phase_id: a lente de uma fase da vida (regra em map_service.get_map).
 """
 
 import uuid
@@ -17,8 +18,10 @@ from app.dependencies.auth import get_current_user
 from app.models.user import User
 from app.repositories.memory_repository import Bbox
 from app.schemas.map import MapResponse
+from app.api.routes.life_phase import fase_do_filtro_inexistente
 from app.services import map_service
 from app.services.journey_service import JourneyNotFoundError
+from app.services.life_phase_service import PhaseNotFoundError
 
 router = APIRouter(prefix="/map", tags=["map"])
 
@@ -53,14 +56,21 @@ def get_map(
         default=None, description="Viewport: 'min_lng,min_lat,max_lng,max_lat'."
     ),
     journey_id: uuid.UUID | None = Query(default=None),
+    life_phase_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MapResponse:
     parsed = _parse_bbox(bbox)
     try:
         return map_service.get_map(
-            db, user_id=current_user.id, bbox=parsed, journey_id=journey_id
+            db,
+            user_id=current_user.id,
+            bbox=parsed,
+            journey_id=journey_id,
+            life_phase_id=life_phase_id,
         )
+    except PhaseNotFoundError:
+        raise fase_do_filtro_inexistente()
     except JourneyNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found."

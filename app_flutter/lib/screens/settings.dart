@@ -5,6 +5,7 @@ import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/theme_controller.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_store.dart';
 
 /// # Configurações — estruturadas para crescer.
 ///
@@ -30,6 +31,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _logout() async {
     await Api.instance.logout();
+    // As fases ficam em memória entre as telas; quem entrar depois neste
+    // aparelho não pode ver os capítulos de quem saiu.
+    PhaseStore.instance.clear();
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
   }

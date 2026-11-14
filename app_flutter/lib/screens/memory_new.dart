@@ -29,7 +29,12 @@ TextStyle _diarioItalico(SJScheme s) => TextStyle(
 /// vinculada à jornada (modo jornada — o ponto entra em sequência no rastro).
 class MemoryNewScreen extends StatefulWidget {
   final String? journeyId;
-  const MemoryNewScreen({super.key, this.journeyId});
+
+  /// A fase já escolhida ao abrir — a da lente de onde a pessoa veio. Ignorada
+  /// no modo jornada, onde a memória entra na fase da jornada.
+  final String? initialPhaseId;
+
+  const MemoryNewScreen({super.key, this.journeyId, this.initialPhaseId});
 
   @override
   State<MemoryNewScreen> createState() => _MemoryNewScreenState();
@@ -57,7 +62,10 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
   @override
   void initState() {
     super.initState();
-    if (_choosesPhase) PhaseStore.instance.refresh();
+    if (_choosesPhase) {
+      _phaseId = widget.initialPhaseId;
+      PhaseStore.instance.refresh();
+    }
   }
 
   Future<void> _pickPhotos() async {

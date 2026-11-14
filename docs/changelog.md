@@ -640,3 +640,12 @@ quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de s
   com a tabela do PostGIS fora da comparação.
 - **`httpx2`** no `requirements-dev.txt`: é o cliente que o `TestClient` do Starlette 1.6 pede.
   A suíte roda sem nenhum aviso de deprecação.
+
+### App: a lente chega à estante de jornadas
+- **Jornadas** ganham a mesma lente da timeline e do atlas: entram as marcadas na fase e as
+  que têm alguma memória dela. Vazio com lente tem texto próprio e a saída de volta para a vida
+  toda; a fase apagada noutra tela devolve a estante inteira.
+- **Criar com a lente ligada já marca a fase.** Uma jornada aberta pela estante filtrada, ou
+  uma memória registrada pela timeline filtrada, nasce na fase que a pessoa estava lendo — antes
+  ela criava o momento e ele sumia da lista que ela acabou de deixar. O seletor continua
+  ali para trocar ou tirar.

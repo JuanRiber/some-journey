@@ -5,8 +5,12 @@ import '../design/components.dart';
 import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_domain.dart';
+import '../features/phases/phase_store.dart';
+import '../features/phases/phase_widgets.dart';
 import '../models.dart';
 import '../widgets/api_error_view.dart';
+import 'journey_new.dart';
 
 // ---------------------------------------------------------------------------
 // Vocabulário compartilhado da lane de jornadas
@@ -286,17 +290,58 @@ class _JourneysScreenState extends State<JourneysScreen> {
   /// não pode apagar os capítulos já lidos.
   String _moreError = '';
 
+  final _phases = PhaseStore.instance;
+
+  /// A fase pela qual a estante está sendo lida; null é a vida toda. É a mesma
+  /// lente da timeline e do atlas: entram as jornadas marcadas na fase e as que
+  /// têm alguma memória dela (a regra mora no backend).
+  String? _phaseId;
+
   @override
   void initState() {
     super.initState();
+    _phases.addListener(_onPhases);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _phases.removeListener(_onPhases);
+    super.dispose();
+  }
+
+  /// Se a fase da lente foi apagada noutra tela, a estante volta para a vida
+  /// toda em vez de ficar pedindo uma fase que responde 404.
+  void _onPhases() {
+    if (!mounted) return;
+    final valida = lensFor(_phases.value, _phaseId);
+    if (valida != _phaseId) {
+      _setLens(valida);
+    } else {
+      setState(() {});
+    }
+  }
+
+  /// Troca a lente e relê do começo — o cursor só vale com o mesmo filtro.
+  void _setLens(String? phaseId) {
+    if (phaseId == _phaseId) return;
+    setState(() {
+      _phaseId = phaseId;
+      _journeys = null;
+      _nextCursor = null;
+      _moreError = '';
+    });
     _load();
   }
 
   Future<void> _load() async {
+    final lente = _phaseId;
     setState(() => _error = null);
+    _phases.refresh();
     try {
-      final page = await Api.instance.listJourneys();
-      if (mounted) {
+      final page = await Api.instance.listJourneys(phaseId: lente);
+      // A lente mudou enquanto esta página vinha: ela é de outra estante.
+      if (mounted && lente == _phaseId) {
         setState(() {
           _journeys = page.items;
           _nextCursor = page.nextCursor;
@@ -304,9 +349,14 @@ class _JourneysScreenState extends State<JourneysScreen> {
         });
       }
     } on ApiError catch (e) {
-      if (!mounted) return;
+      if (!mounted || lente != _phaseId) return;
       if (e.isUnauthorized) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      // 404 com lente é a fase apagada noutro aparelho: volta para a vida toda.
+      if (lente != null && e.status == 404) {
+        _setLens(null);
         return;
       }
       setState(() => _error = e);
@@ -316,14 +366,19 @@ class _JourneysScreenState extends State<JourneysScreen> {
   /// Busca a próxima página e ANEXA à estante.
   Future<void> _loadMore() async {
     final cursor = _nextCursor;
+    final lente = _phaseId;
     if (cursor == null || _loadingMore) return;
     setState(() {
       _loadingMore = true;
       _moreError = '';
     });
     try {
-      final page = await Api.instance.listJourneys(cursor: cursor);
+      final page = await Api.instance.listJourneys(cursor: cursor, phaseId: lente);
       if (!mounted) return;
+      if (lente != _phaseId) {
+        setState(() => _loadingMore = false);
+        return;
+      }
       setState(() {
         _journeys = [...?_journeys, ...page.items];
         _nextCursor = page.nextCursor;
@@ -342,8 +397,13 @@ class _JourneysScreenState extends State<JourneysScreen> {
     }
   }
 
+  /// Nova jornada. Com a lente ligada, ela já nasce marcada na fase que a
+  /// pessoa está olhando — é o capítulo que ela tinha em mente.
   Future<void> _openNew() async {
-    await Navigator.of(context).pushNamed('/journey-new');
+    await Navigator.of(context).push(MaterialPageRoute(
+      settings: const RouteSettings(name: '/journey-new'),
+      builder: (_) => JourneyNewScreen(initialPhaseId: _phaseId),
+    ));
     _load();
   }
 
@@ -400,6 +460,14 @@ class _JourneysScreenState extends State<JourneysScreen> {
                 Text('Jornadas', style: SJText.display(color: s.ink)),
                 const SizedBox(height: SJSpace.x2),
                 Text(_headline(journeys), style: journeyMoodStyle(s)),
+                if (_phases.value.isNotEmpty) ...[
+                  const SizedBox(height: SJSpace.x5),
+                  PhaseLens(
+                    phases: _phases.value,
+                    selected: _phaseId,
+                    onChanged: _setLens,
+                  ),
+                ],
                 const SizedBox(height: SJSpace.x8),
                 if (_error != null)
                   _errorState(s)
@@ -455,6 +523,14 @@ class _JourneysScreenState extends State<JourneysScreen> {
   /// Abertura narrativa da estante — soma o que a pessoa já viveu, não conta
   /// registros ("Você já guardou 12 momentos em 3 capítulos.").
   String _headline(List<Journey>? journeys) {
+    final fase = phaseById(_phases.value, _phaseId);
+    if (fase != null) {
+      final n = journeys?.length ?? 0;
+      if (journeys == null || n == 0) return 'Os capítulos da fase “${fase.name}”.';
+      return n == 1
+          ? 'Um capítulo na fase “${fase.name}”.'
+          : '$n capítulos na fase “${fase.name}”.';
+    }
     if (journeys == null || journeys.isEmpty) {
       return 'Sua vida contada através dos lugares.';
     }
@@ -486,7 +562,22 @@ class _JourneysScreenState extends State<JourneysScreen> {
     ),
   );
 
-  Widget _emptyState() => SJEmptyState(
+  Widget _emptyState() {
+    final fase = phaseById(_phases.value, _phaseId);
+    if (fase != null) {
+      // Vazio COM lente não é estante vazia: é uma fase sem capítulo ainda.
+      return SJEmptyState(
+        title: 'Nenhuma jornada nesta fase ainda.',
+        body: 'Marque uma jornada com “${fase.name}” — ou uma memória dela — e '
+            'ela aparece aqui.',
+        actionLabel: 'Ver a vida toda',
+        onAction: () => _setLens(null),
+      );
+    }
+    return _emptyStateGeral();
+  }
+
+  Widget _emptyStateGeral() => SJEmptyState(
     illustration: const SJIllustration(kind: SJIllustrationKind.firstJourney),
     title: 'Seu primeiro capítulo',
     body:

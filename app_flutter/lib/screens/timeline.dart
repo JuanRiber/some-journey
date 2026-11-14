@@ -10,6 +10,7 @@ import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
 import '../models.dart';
 import '../widgets/api_error_view.dart';
+import 'memory_new.dart';
 
 const _meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
@@ -212,8 +213,14 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   /// Nova memória (ação do estado vazio e do rodapé). Recarrega ao voltar para o
   /// álbum já abrir com a página nova.
+  /// Com a lente ligada, a memória nova já nasce marcada na fase que a pessoa
+  /// está lendo — senão ela registraria o momento e ele sumiria do álbum
+  /// filtrado que ela acabou de deixar.
   Future<void> _createMemory() async {
-    await Navigator.of(context).pushNamed('/memory-new');
+    await Navigator.of(context).push(MaterialPageRoute(
+      settings: const RouteSettings(name: '/memory-new'),
+      builder: (_) => MemoryNewScreen(initialPhaseId: _phaseId),
+    ));
     if (!mounted) return;
     await _load();
   }

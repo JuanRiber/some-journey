@@ -18,6 +18,8 @@ import 'package:some_journey/features/phases/phase_domain.dart';
 import 'package:some_journey/features/phases/phase_store.dart';
 import 'package:some_journey/features/phases/phase_widgets.dart';
 import 'package:some_journey/screens/journey_edit.dart';
+import 'package:some_journey/screens/journey_new.dart';
+import 'package:some_journey/screens/journeys.dart';
 import 'package:some_journey/screens/phases.dart';
 import 'package:some_journey/screens/timeline.dart';
 
@@ -343,6 +345,71 @@ void main() {
 
       expect(patches.single.keys, ['life_phase_id']);
       expect(patches.single['life_phase_id'], isNull);
+    });
+  });
+
+
+  // A lente chegou à estante de jornadas, e quem cria com a lente ligada já
+  // nasce na fase que estava olhando — senão o capítulo novo sumiria da lista
+  // filtrada que a pessoa acabou de deixar.
+  group('a estante de jornadas com fases', () {
+    late http.Client original;
+    final pedidos = <http.Request>[];
+
+    setUp(() {
+      pedidos.clear();
+      Api.instance.debugSetToken('token');
+      original = Api.instance.swapClient(MockClient((req) async {
+        pedidos.add(req);
+        if (req.url.path == '/life-phases') return _json([_faseJson(_infancia)]);
+        if (req.method == 'POST' && req.url.path == '/journeys') {
+          return _json({
+            'id': 'j-nova',
+            'title': 'Casa da avó',
+            'status': 'draft',
+            'is_private': true,
+            'points_count': 0,
+            'created_at': '2026-06-01T12:00:00Z',
+          }, status: 201);
+        }
+        return _json(<dynamic>[]);
+      }));
+    });
+    tearDown(() => Api.instance.swapClient(original));
+
+    testWidgets('escolher a fase relê a estante com o filtro e troca o vazio',
+        (tester) async {
+      await tester.pumpWidget(const MaterialApp(home: JourneysScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Infância'));
+      await tester.pumpAndSettle();
+
+      final listas = pedidos.where((r) => r.url.path == '/journeys' && r.method == 'GET');
+      expect(listas.first.url.queryParameters.containsKey('life_phase_id'), isFalse);
+      expect(listas.last.url.queryParameters['life_phase_id'], 'a');
+      expect(find.text('Nenhuma jornada nesta fase ainda.'), findsOneWidget);
+    });
+
+    testWidgets('jornada nova aberta com a fase já escolhida', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: const JourneyNewScreen(initialPhaseId: 'a'),
+        onGenerateRoute: (s) => MaterialPageRoute(
+          settings: s,
+          builder: (_) => const Scaffold(body: Text('detalhe')),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(EditableText).first, 'Casa da avó');
+      final criar = find.text('CRIAR JORNADA');
+      await tester.ensureVisible(criar);
+      await tester.pumpAndSettle();
+      await tester.tap(criar);
+      await tester.pumpAndSettle();
+
+      final post = pedidos.singleWhere((r) => r.method == 'POST');
+      expect(jsonDecode(post.body)['life_phase_id'], 'a');
     });
   });
 }

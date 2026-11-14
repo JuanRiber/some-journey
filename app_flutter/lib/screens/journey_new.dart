@@ -23,7 +23,11 @@ import '../features/phases/phase_widgets.dart';
 /// **Atrito:** só o TÍTULO é obrigatório. Descrição e atmosfera são convites,
 /// não exigências, e a privacidade já vem no padrão mais protetor.
 class JourneyNewScreen extends StatefulWidget {
-  const JourneyNewScreen({super.key});
+  const JourneyNewScreen({super.key, this.initialPhaseId});
+
+  /// A fase já escolhida ao abrir — a da lente de onde a pessoa veio. Ela pode
+  /// trocar ou tirar no seletor, como qualquer outra escolha.
+  final String? initialPhaseId;
 
   @override
   State<JourneyNewScreen> createState() => _JourneyNewScreenState();
@@ -46,6 +50,7 @@ class _JourneyNewScreenState extends State<JourneyNewScreen> {
   @override
   void initState() {
     super.initState();
+    _phaseId = widget.initialPhaseId;
     PhaseStore.instance.refresh();
   }
 

@@ -48,6 +48,13 @@ def fase_do_filtro_inexistente() -> HTTPException:
     return _nao_encontrada()
 
 
+def _nome_repetido(exc: life_phase_service.PhaseNameTakenError) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=f"Você já tem uma fase chamada “{exc.name}”. Dê outro nome a esta.",
+    )
+
+
 def _invalida(exc: InvalidPhaseError) -> HTTPException:
     # A mensagem vem do domínio, já em pt-BR e escrita para quem vai ler.
     return HTTPException(
@@ -74,6 +81,8 @@ def create_phase(
         fase = life_phase_service.create_phase(db, user_id=current_user.id, data=data)
     except InvalidPhaseError as exc:
         raise _invalida(exc)
+    except life_phase_service.PhaseNameTakenError as exc:
+        raise _nome_repetido(exc)
     return LifePhaseRead.model_validate(fase)
 
 
@@ -107,6 +116,8 @@ def update_phase(
         raise _nao_encontrada()
     except InvalidPhaseError as exc:
         raise _invalida(exc)
+    except life_phase_service.PhaseNameTakenError as exc:
+        raise _nome_repetido(exc)
     return LifePhaseRead.model_validate(fase)
 
 

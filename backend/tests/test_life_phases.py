@@ -231,3 +231,49 @@ class TestDatasSemFuso:
             client, h, started_at="2021-01-01T00:00:00Z", ended_at="2020-01-01T00:00:00"
         )
         assert incoerente.status_code == 422, "incoerente é 422, não 500"
+
+
+class TestNomeUnico:
+    """Duas "Faculdade" viram duas etiquetas iguais na lente, e a pessoa não
+    tem como saber qual filtra o quê."""
+
+    def test_mesmo_nome_sem_diferenciar_caixa_e_recusado(self, client, auth_headers):
+        h = auth_headers()
+        assert _criar(client, h, name="Faculdade").status_code == 201
+        r = _criar(client, h, name="  faculdade ")
+        assert r.status_code == 409
+        assert "Faculdade" in r.json()["detail"] or "faculdade" in r.json()["detail"]
+        assert len(client.get("/life-phases", headers=h).json()) == 1
+
+    def test_renomear_para_o_nome_de_outra_e_recusado(self, client, auth_headers):
+        h = auth_headers()
+        _criar(client, h, name="Infância")
+        outra = _criar(client, h, name="Recomeços").json()
+        r = client.patch(f"/life-phases/{outra['id']}", json={"name": "INFÂNCIA"}, headers=h)
+        assert r.status_code == 409
+        assert client.get(f"/life-phases/{outra['id']}", headers=h).json()["name"] == "Recomeços"
+
+    def test_mudar_so_a_caixa_do_proprio_nome_pode(self, client, auth_headers):
+        h = auth_headers()
+        fase = _criar(client, h, name="faculdade").json()
+        r = client.patch(f"/life-phases/{fase['id']}", json={"name": "Faculdade"}, headers=h)
+        assert r.status_code == 200, r.text
+
+    def test_o_nome_de_uma_fase_apagada_fica_livre(self, client, auth_headers):
+        h = auth_headers()
+        fase = _criar(client, h, name="Mudança").json()
+        client.delete(f"/life-phases/{fase['id']}", headers=h)
+        assert _criar(client, h, name="Mudança").status_code == 201
+
+    def test_cada_pessoa_tem_os_proprios_nomes(self, client, auth_headers):
+        assert _criar(client, auth_headers(), name="Infância").status_code == 201
+        assert _criar(client, auth_headers(), name="Infância").status_code == 201
+
+    def test_dois_posts_juntos_com_o_mesmo_nome(self, client, auth_headers, monkeypatch):
+        # A conferência e o INSERT não são atômicos; o índice barra o segundo.
+        from app.repositories import life_phase_repository
+
+        h = auth_headers()
+        assert _criar(client, h, name="Corrida").status_code == 201
+        monkeypatch.setattr(life_phase_repository, "name_taken", lambda *a, **k: False)
+        assert _criar(client, h, name="corrida").status_code == 409

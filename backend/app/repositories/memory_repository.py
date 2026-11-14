@@ -254,15 +254,6 @@ def set_location(db: Session, *, memory: Memory, location: "Location") -> Memory
     return memory
 
 
-def set_image_path(db: Session, *, memory: Memory, image_path: str | None) -> Memory:
-    """Grava (após o upload) ou LIMPA (com None, na remoção) o caminho da imagem.
-    LEGADO: fotos novas vivem em memory_images; mantido para compatibilidade."""
-    memory.image_path = image_path
-    db.commit()
-    db.refresh(memory)
-    return memory
-
-
 # --- Fotos da memória (memory_images) --------------------------------------
 
 

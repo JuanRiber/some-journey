@@ -7,6 +7,7 @@ status — o mesmo arranjo dos outros serviços.
 import uuid
 
 from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.domain.life_phase import validate_color, validate_name, validate_period
@@ -20,6 +21,23 @@ from app.schemas.life_phase import LifePhaseCreate, LifePhaseUpdate
 class PhaseNotFoundError(Exception):
     """Fase inexistente OU de outra pessoa — a rota responde 404 nos dois
     casos, para quem sonda ids não descobrir quais existem."""
+
+
+class PhaseNameTakenError(Exception):
+    """Já existe uma fase ativa com este nome — a rota traduz em 409."""
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.name = name
+
+
+def _nome_livre(
+    db: Session, *, user_id: uuid.UUID, name: str, except_id: uuid.UUID | None = None
+) -> None:
+    if life_phase_repository.name_taken(
+        db, user_id=user_id, name=name, except_id=except_id
+    ):
+        raise PhaseNameTakenError(name)
 
 
 def list_phases(db: Session, *, user_id: uuid.UUID) -> list[LifePhase]:
@@ -52,16 +70,23 @@ def create_phase(db: Session, *, user_id: uuid.UUID, data: LifePhaseCreate) -> L
     nome = validate_name(data.name)
     cor = validate_color(data.color)
     validate_period(data.started_at, data.ended_at)
+    _nome_livre(db, user_id=user_id, name=nome)
     descricao = (data.description or "").strip() or None
-    return life_phase_repository.create(
-        db,
-        user_id=user_id,
-        name=nome,
-        description=descricao,
-        color=cor,
-        started_at=data.started_at,
-        ended_at=data.ended_at,
-    )
+    try:
+        return life_phase_repository.create(
+            db,
+            user_id=user_id,
+            name=nome,
+            description=descricao,
+            color=cor,
+            started_at=data.started_at,
+            ended_at=data.ended_at,
+        )
+    except IntegrityError as exc:
+        # Dois POSTs com o mesmo nome passam juntos pela conferência acima; o
+        # índice único barra o segundo, com a mesma resposta.
+        db.rollback()
+        raise PhaseNameTakenError(nome) from exc
 
 
 def update_phase(
@@ -77,7 +102,9 @@ def update_phase(
     enviados = data.model_fields_set
 
     if "name" in enviados and data.name is not None:
-        fase.name = validate_name(data.name)
+        nome = validate_name(data.name)
+        _nome_livre(db, user_id=user_id, name=nome, except_id=fase.id)
+        fase.name = nome
     if "color" in enviados:
         fase.color = validate_color(data.color)
     if "description" in enviados:
@@ -88,7 +115,11 @@ def update_phase(
         fase.ended_at = data.ended_at
 
     validate_period(fase.started_at, fase.ended_at)
-    return life_phase_repository.save(db, phase=fase)
+    try:
+        return life_phase_repository.save(db, phase=fase)
+    except IntegrityError as exc:
+        db.rollback()
+        raise PhaseNameTakenError(fase.name) from exc
 
 
 def delete_phase(db: Session, *, phase_id: uuid.UUID, user_id: uuid.UUID) -> None:

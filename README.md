@@ -51,7 +51,7 @@ some-journey/
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0010)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (376 testes)
+|   |-- tests/                 # pytest (387 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -418,7 +418,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Migracoes versionadas (Alembic, 0001..0010)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 376 no backend (pytest) e 453 no app (flutter test)
+- [x] Testes automatizados — 387 no backend (pytest) e 453 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -465,7 +465,6 @@ seis meses.
 | --- | --- |
 | Texto da memoria e opcional | O produto pede que o texto seja o nucleo da memoria. O titulo ja deixou de ser obrigatorio; exigir o texto quebraria os dois clientes e o acervo ja gravado, entao segue em aberto. Ver `01-regras-negocio.md`. |
 | Uma memoria por jornada | Limite do MVP, garantido por indice unico parcial em `journey_memories.memory_id`. A modelagem ja suporta varias jornadas — basta trocar a constraint. |
-| `memories.image_path` | Coluna legada da epoca de uma foto so; as fotos atuais vivem em `memory_images`. |
 | Mapa em Mapbox | Planejado. Hoje o Flutter usa `flutter_map` com tiles OSM/CartoDB e o backend entrega pins e rastros independente do provedor visual. |
 
 ---

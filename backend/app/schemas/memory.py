@@ -14,7 +14,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.schemas._fields import AwareUtcDatetime
+from app.schemas._fields import OccurredAt
 
 # Teto das URLs de catálogo (capa, prévia e link do provedor). Eram os três
 # únicos campos de texto da API sem limite próprio, gravados em colunas Text: o
@@ -44,8 +44,9 @@ class MemoryCreate(BaseModel):
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
     # Normaliza para UTC-aware: um horário naive seria reinterpretado no fuso da
-    # sessão do Postgres (TIMESTAMPTZ), corrompendo a ordem da timeline.
-    occurred_at: AwareUtcDatetime
+    # sessão do Postgres (TIMESTAMPTZ), corrompendo a ordem da timeline. E não
+    # aceita um dia que ainda não chegou (ver OccurredAt).
+    occurred_at: OccurredAt
     # Fase da vida (opcional). Precisa ser uma fase ativa DESTA pessoa; a de
     # outra, apagada ou inexistente responde 422 do mesmo jeito.
     life_phase_id: uuid.UUID | None = None
@@ -62,7 +63,7 @@ class MemoryUpdate(BaseModel):
     text: str | None = Field(default=None, max_length=5000)
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
-    occurred_at: AwareUtcDatetime | None = None
+    occurred_at: OccurredAt | None = None
     # A ÚNICA exceção à convenção acima: aqui `null` SOLTA a memória da fase.
     # Para um id não existe o truque da string vazia, e sem isso uma memória
     # marcada numa fase por engano nunca mais voltaria a não ter fase. O

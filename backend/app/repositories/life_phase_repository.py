@@ -9,7 +9,7 @@ no primeiro lugar que alguém esquecesse de filtrar.
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.life_phase import LifePhase
@@ -44,6 +44,23 @@ def get_owned(db: Session, *, phase_id: uuid.UUID, user_id: uuid.UUID) -> LifePh
             LifePhase.deleted_at.is_(None),
         )
     )
+
+
+def name_taken(
+    db: Session, *, user_id: uuid.UUID, name: str, except_id: uuid.UUID | None = None
+) -> bool:
+    """Esta pessoa já tem uma fase ATIVA com este nome (sem diferenciar caixa)?
+
+    `except_id` é a própria fase, num rename: trocar "faculdade" por
+    "Faculdade" não colide com ela mesma."""
+    consulta = select(LifePhase.id).where(
+        LifePhase.user_id == user_id,
+        LifePhase.deleted_at.is_(None),
+        func.lower(LifePhase.name) == name.lower(),
+    )
+    if except_id is not None:
+        consulta = consulta.where(LifePhase.id != except_id)
+    return db.scalar(consulta.limit(1)) is not None
 
 
 def create(

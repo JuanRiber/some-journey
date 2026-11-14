@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, Uuid, func
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -22,6 +22,19 @@ class LifePhase(Base):
     """
 
     __tablename__ = "life_phases"
+    __table_args__ = (
+        # Um nome por pessoa, sem diferenciar maiúsculas, entre as fases ATIVAS.
+        # Duas "Faculdade" viram duas etiquetas iguais na lente, e a pessoa não
+        # tem como saber qual filtra o quê. A apagada sai da conta: dá para
+        # recriar um capítulo com o nome de um que foi descartado.
+        Index(
+            "uq_life_phases_user_name_active",
+            "user_id",
+            func.lower(sql_text("name")),
+            unique=True,
+            postgresql_where=sql_text("deleted_at IS NULL"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True), primary_key=True, server_default=sql_text("gen_random_uuid()")

@@ -587,3 +587,34 @@ Ficaram como observação, sem correção: o limite de tentativas é por process
 quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de segurança
 (`nosniff`, `X-Frame-Options`, `Referrer-Policy`, HSTS) e o servidor se identifica como
 `uvicorn`.
+
+## 2026-11-14 (2)
+
+### Regras de negócio: o documento cobre o produto inteiro
+- [`01-regras-negocio.md`](01-regras-negocio.md) falava de usuários, memórias, jornadas,
+  pontos soltos, imagens e mapa. Ganhou o que já era regra no código e não estava escrito:
+  conta e acesso (senha, revogação, Google, limites de tentativa), perfil (`@username`, foto,
+  contagens), música, percurso GPS e fases da vida — cada item com **(impl.)** só depois de
+  conferido no código e coberto por teste.
+
+### Regras novas
+- **Memória não pode ser de um dia que ainda não chegou.** O seletor do app já não deixava
+  escolher amanhã; o backend aceitava de qualquer outro cliente. A folga de 36 h cobre o fuso
+  — o "hoje" de UTC+14 está ~26 h à frente do relógio do servidor. A regra é só da memória:
+  jornada pode estar planejada, fase pode ter fim marcado, e a data de um ponto de GPS não é
+  conferida contra o relógio do servidor (um celular adiantado não pode custar um trecho).
+- **Um nome de fase por pessoa**, sem diferenciar maiúsculas, entre as ativas: duas
+  "Faculdade" eram duas etiquetas iguais na lente. **409** com o nome; o de uma fase apagada
+  fica livre. Garantido também por índice único (migration 0015), que renomeia com sufixo
+  " (2)" os repetidos que já existirem.
+
+### Divergência fechada
+- **`memories.image_path` saiu** (migration 0014). A 0003 já tinha copiado as fotos dela para
+  `memory_images`, e nada mais a escrevia. A migration copia de novo o que tiver sobrado
+  antes de soltar a coluna — nenhuma foto se perde.
+
+### Testes
+- O banco de teste agora é **recriado do zero a cada sessão**. `create_all` só cria o que
+  falta: num banco de teste antigo, índice ou coluna nova nunca chegava, e a suíte local
+  testava um schema velho — foi assim que o índice único de fase "passou" num teste sem
+  existir. A suíte se recusa a derrubar tabelas num banco cujo nome não termine em `_test`.

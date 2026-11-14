@@ -12,7 +12,7 @@ Termos do domínio, para evitar ambiguidade.
 - **Status da jornada** — `draft` (criada, não iniciada) → `active` → `paused` → `finished` (terminal).
 - **`occurred_at`** — Data em que o acontecimento ocorreu.
 - **`created_at`** — Data em que o registro foi criado no sistema.
-- **`image_path`** — Referência (caminho) da imagem no Supabase Storage. A API expõe uma `image_url` assinada e temporária.
+- **`image_path`** — Referência (caminho) da imagem no Supabase Storage, em `memory_images` (a coluna antiga em `memories` saiu na migration 0014). A API expõe uma `image_url` assinada e temporária.
 - **Ownership** — Regra de que um usuário só acessa e altera os próprios dados.
 - **Soft delete** — Exclusão lógica via `deleted_at`, sem apagar imediatamente o registro.
 - **Fase da vida** — Capítulo que a pessoa reconhece na própria história (a faculdade, um recomeço). Opcional, sem lista predefinida; memórias e jornadas podem ser marcadas nela.

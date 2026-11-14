@@ -3,7 +3,7 @@
 Fluxo de segurança: o cliente envia o arquivo para o backend; o backend repassa
 ao Supabase usando o SERVICE KEY (que nunca chega ao cliente). Na leitura, o
 backend gera URLs ASSINADAS de curta duração — nunca uma URL pública. Guardamos
-apenas o caminho no banco (memories.image_path); a URL é efêmera.
+apenas o caminho no banco (memory_images.image_path); a URL é efêmera.
 
 Sem SUPABASE_URL + SUPABASE_SERVICE_KEY o storage fica desabilitado: upload
 levanta StorageNotConfigured (rota -> 503) e as assinaturas viram None.

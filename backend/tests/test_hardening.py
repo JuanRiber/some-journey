@@ -371,10 +371,14 @@ def test_data_fora_do_intervalo_e_recusada_antes_de_gravar(client, auth_headers,
 
 def test_datas_de_uma_vida_continuam_valendo(client, auth_headers):
     h = auth_headers()
-    for quando in ["1900-01-01T00:00:00Z", "1000-01-01T12:00:00Z", "2999-06-01T00:00:00Z"]:
+    for quando in ["1900-01-01T00:00:00Z", "1000-01-01T12:00:00Z"]:
         r = client.post("/memories", json={**_MEMORIA, "occurred_at": quando}, headers=h)
         assert r.status_code == 201, (quando, r.text)
     assert client.get("/memories", headers=h).status_code == 200
+    # O teto vale para quem pode olhar para frente: memória não pode ser do
+    # futuro (regra de negócio à parte), jornada planejada pode.
+    r = client.post("/journeys", json={"title": "J", "started_at": "2999-06-01T00:00:00Z"}, headers=h)
+    assert r.status_code == 201, r.text
 
 
 def test_o_limite_vale_para_todas_as_datas_de_entrada(client, auth_headers):

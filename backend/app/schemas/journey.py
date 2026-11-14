@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.schemas._fields import AwareUtcDatetime
+from app.schemas._fields import AwareUtcDatetime, OccurredAt
 
 
 JourneyStatus = Literal["draft", "active", "paused", "finished"]
@@ -128,8 +128,8 @@ class JourneyMemoryCreate(BaseModel):
     text: str = Field(default="", max_length=5000)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
-    # UTC-aware (a coluna occurred_at da memória é TIMESTAMPTZ).
-    occurred_at: AwareUtcDatetime
+    # Mesma regra da memória avulsa: UTC-aware e nunca de um dia que não chegou.
+    occurred_at: OccurredAt
 
 
 class JourneyReorder(BaseModel):

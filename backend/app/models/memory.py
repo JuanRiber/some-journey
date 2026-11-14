@@ -91,10 +91,6 @@ class Memory(Base):
         Geography(geometry_type="POINT", srid=4326)
     )
 
-    # Apenas o caminho no Storage (bucket privado) — nunca uma URL pública.
-    # Não é preenchido pelo POST /memories: upload é fluxo separado do backend.
-    image_path: Mapped[str | None] = mapped_column(Text)
-
     # --- O LUGAR (objeto de localização achatado em colunas) -----------------
     # Preenchido por reverse geocoding na escrita e PERSISTIDO: o app nunca volta
     # ao provedor para saber onde a memória aconteceu. Tudo nullable — geocodificar
@@ -145,7 +141,8 @@ class Memory(Base):
 class MemoryImage(Base):
     """Foto de uma memória. Uma memória tem VÁRIAS (o teto é imposto no service).
     Guarda só o caminho no Storage privado; soft delete via deleted_at. O legado
-    `memories.image_path` continua para compatibilidade, mas fotos novas vivem aqui."""
+    A coluna `memories.image_path`, da época de uma foto só, saiu na 0014: a 0003
+    já tinha copiado as fotos dela para cá, e nada mais a escrevia."""
 
     __tablename__ = "memory_images"
 

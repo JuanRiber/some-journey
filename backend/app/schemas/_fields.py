@@ -16,7 +16,7 @@ ela apagar a memória pelo app. Datas no limite oposto quebram igual em fusos
 positivos. Mil a 2999 cobre qualquer vida, com folga para os dois lados.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from pydantic import AfterValidator
@@ -46,3 +46,25 @@ def _ensure_utc(value: datetime) -> datetime:
 
 
 AwareUtcDatetime = Annotated[datetime, AfterValidator(_ensure_utc)]
+
+
+# Folga para o fuso, não para o futuro. O app manda o DIA escolhido ancorado ao
+# meio-dia UTC; "hoje" em UTC+14 chega a ficar 26 h à frente do relógio do
+# servidor. 36 h cobre qualquer fuso da Terra e ainda recusa amanhã.
+TOLERANCIA_FUTURO = timedelta(hours=36)
+
+
+def _ja_aconteceu(value: datetime) -> datetime:
+    if value > datetime.now(timezone.utc) + TOLERANCIA_FUTURO:
+        raise ValueError("a memória não pode ser de um dia que ainda não chegou")
+    return value
+
+
+# A data de uma MEMÓRIA: tudo o que AwareUtcDatetime garante, mais a regra de
+# negócio de que uma lembrança é de algo que já aconteceu. O seletor do app já
+# não deixa escolher amanhã; sem isto o backend aceitava de qualquer outro
+# cliente, e a timeline abriria com um capítulo do ano que vem.
+# Jornadas, fases e pontos de GPS NÃO usam: uma viagem pode estar planejada, uma
+# fase pode ter fim marcado, e o relógio de um celular adiantado não pode custar
+# o rastro inteiro de um trecho.
+OccurredAt = Annotated[AwareUtcDatetime, AfterValidator(_ja_aconteceu)]

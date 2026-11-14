@@ -39,11 +39,10 @@ Usuário é o **dono** das memórias e jornadas.
 |---|---|---|
 | id | UUID | PK |
 | user_id | UUID | FK → users (ON DELETE CASCADE) |
-| title | varchar(120) | hoje obrigatório (ver regras) |
+| title | varchar(120) | opcional na API (default `""`), `NOT NULL` no banco |
 | text | text | opcional na API (default `""`), `NOT NULL` no banco |
 | location | `GEOGRAPHY(POINT, 4326)` | PostGIS; guarda `POINT(longitude, latitude)` |
-| image_path | text \| null | **legado** de quando era uma foto só; ver `memory_images` |
-| occurred_at | timestamptz | quando aconteceu |
+| occurred_at | timestamptz | quando aconteceu — nunca um dia que ainda não chegou; anos 1000 a 2999 |
 | created_at / updated_at | timestamptz | |
 | deleted_at | timestamptz \| null | soft delete |
 
@@ -174,7 +173,7 @@ Jornada é uma **trajetória** formada por pontos/memórias em sequência.
 | --- | --- | --- |
 | id | uuid | PK |
 | user_id | uuid | FK users, ON DELETE CASCADE |
-| name | varchar(60) | único campo obrigatório |
+| name | varchar(60) | único campo obrigatório; **único por pessoa** entre as ativas, sem diferenciar maiúsculas (`uq_life_phases_user_name_active`) |
 | description | text | opcional |
 | color | varchar(20) | PAPEL da paleta: primary, secondary, accent, moss, highlight |
 | started_at | timestamptz | **nulo** — nem toda pessoa sabe quando a fase começou |

@@ -4,7 +4,8 @@ Usa um banco DEDICADO (some_journey_test) — nunca o de desenvolvimento. A
 DATABASE_URL de teste é definida em os.environ ANTES de qualquer import de
 `app` (precedência sobre o .env no pydantic-settings), então o engine da app já
 nasce apontando para o banco de teste. O schema é criado com create_all (que
-hoje produz o mesmo schema das migrations) e TODA tabela da app é truncada a
+hoje produz o mesmo schema das migrations), recriado do zero a cada sessão, e
+TODA tabela da app é truncada a
 cada teste para isolamento — a lista sai do metadata do ORM, não da mão de
 ninguém (ver `_tabelas_a_truncar`), e `_assert_schema_coberto` para a suíte se
 ela e o banco discordarem.
@@ -140,6 +141,18 @@ def _schema():
     import app.models  # noqa: F401 - registra os models
     from app.db.base import Base
 
+    # Recria do ZERO a cada sessão. `create_all` só cria o que falta: num banco
+    # de teste que já existia, índice ou coluna nova nunca chegava, e a suíte
+    # local passava a testar um schema velho — foi assim que um índice único
+    # "passou" num teste sem existir no banco. A trava do nome é o mínimo antes
+    # de derrubar tabelas: o TRUNCATE de cada teste já supõe um banco de teste.
+    nome = make_url(TEST_DATABASE_URL).database or ""
+    if not nome.endswith("_test"):
+        raise RuntimeError(
+            f"TEST_DATABASE_URL aponta para '{nome}', que não termina em _test — "
+            "a suíte derruba e recria as tabelas, e não vai fazer isso nele."
+        )
+    Base.metadata.drop_all(_engine)
     Base.metadata.create_all(_engine)
     tabelas = _tabelas_a_truncar(Base.metadata)
     _assert_schema_coberto(tabelas)

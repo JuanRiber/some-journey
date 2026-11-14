@@ -5,6 +5,7 @@ hash Argon2 no login e docs desabilitados em produção."""
 import asyncio
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -338,3 +339,149 @@ def test_avatar_between_json_and_image_limits_not_rejected(client, auth_headers,
     )
     assert r.status_code != 413, "avatar barrado pelo limite JSON"
     assert r.status_code == 200, r.text
+
+
+# --- 11. O que um ataque simulado transformou em 500 -----------------------
+# Cada caso abaixo veio de um ataque contra uma cópia local da API em modo
+# produção. Nos cinco a culpa é do que o cliente mandou: a resposta tem de ser
+# uma recusa (4xx), nunca "o servidor quebrou".
+
+_MEMORIA = {"title": "x", "latitude": 1.0, "longitude": 1.0, "occurred_at": "2024-01-01T12:00:00Z"}
+
+
+@pytest.mark.parametrize(
+    "quando",
+    [
+        "0001-01-01T00:00:00Z",       # o que envenenava a conta
+        "0999-12-31T23:59:59Z",
+        "1000-01-01T00:00:00+14:00",  # vira o ano 999 em UTC
+        "3000-01-01T00:00:00Z",
+    ],
+)
+def test_data_fora_do_intervalo_e_recusada_antes_de_gravar(client, auth_headers, quando):
+    """Regressão: o ano 1 era gravado e depois não voltava — lido no fuso da
+    sessão do banco, caía antes do ano 1. A criação dava 500 com a memória já
+    gravada, e a timeline e o mapa da dona davam 500 para sempre."""
+    h = auth_headers()
+    r = client.post("/memories", json={**_MEMORIA, "occurred_at": quando}, headers=h)
+    assert r.status_code == 422, r.text
+    assert client.get("/memories", headers=h).json() == []
+    assert client.get("/map", headers=h).status_code == 200
+
+
+def test_datas_de_uma_vida_continuam_valendo(client, auth_headers):
+    h = auth_headers()
+    for quando in ["1900-01-01T00:00:00Z", "1000-01-01T12:00:00Z", "2999-06-01T00:00:00Z"]:
+        r = client.post("/memories", json={**_MEMORIA, "occurred_at": quando}, headers=h)
+        assert r.status_code == 201, (quando, r.text)
+    assert client.get("/memories", headers=h).status_code == 200
+
+
+def test_o_limite_vale_para_todas_as_datas_de_entrada(client, auth_headers):
+    # O mesmo tipo protege fases, jornadas e pontos de GPS.
+    h = auth_headers()
+    assert client.post(
+        "/life-phases", json={"name": "Antiga", "started_at": "0001-01-01T00:00:00Z"}, headers=h
+    ).status_code == 422
+    assert client.post(
+        "/journeys", json={"title": "J", "started_at": "0001-01-01T00:00:00Z"}, headers=h
+    ).status_code == 422
+
+
+@pytest.mark.parametrize("numero", ["NaN", "Infinity", "-Infinity", "1e400"])
+def test_numero_que_nao_e_numero_da_422_e_nao_500(client, auth_headers, numero):
+    """Regressão: a validação recusava a latitude, mas o 422 repete o valor
+    recebido, e NaN/Infinity não cabem em JSON — a resposta de erro quebrava."""
+    corpo = (
+        '{"title":"x","latitude":%s,"longitude":1,"occurred_at":"2024-01-01T12:00:00Z"}' % numero
+    )
+    r = client.post(
+        "/memories", content=corpo,
+        headers={**auth_headers(), "Content-Type": "application/json"},
+    )
+    assert r.status_code == 422
+    detalhe = r.json()["detail"]  # a resposta é JSON válido
+    assert detalhe[0]["loc"] == ["body", "latitude"]
+    assert isinstance(detalhe[0]["input"], str)
+
+
+def test_o_422_comum_continua_no_mesmo_formato(client, auth_headers):
+    # O tratador novo não pode mudar o contrato que os clientes já leem.
+    r = client.post("/memories", json={**_MEMORIA, "latitude": 91}, headers=auth_headers())
+    assert r.status_code == 422
+    assert r.json()["detail"][0]["loc"] == ["body", "latitude"]
+    assert "msg" in r.json()["detail"][0]
+
+
+@pytest.mark.parametrize(
+    "rota,corpo",
+    [
+        ("/memories", {**_MEMORIA, "title": "nulo\x00byte"}),
+        ("/life-phases", {"name": "fase\x00nula"}),
+        ("/journeys", {"title": "j\x00"}),
+    ],
+)
+def test_byte_nul_no_texto_e_recusado_sem_gravar(client, auth_headers, rota, corpo):
+    """Regressão: o Postgres não guarda NUL em texto e nada barrava antes — o
+    INSERT levantava DataError e a resposta era 500."""
+    h = auth_headers()
+    r = client.post(rota, json=corpo, headers=h)
+    assert r.status_code == 422, r.text
+    assert "caractere" in r.json()["detail"]
+    assert client.get(rota, headers=h).json() == []
+    # A sessão desfeita não contamina a próxima requisição.
+    assert client.post("/memories", json=_MEMORIA, headers=h).status_code == 201
+
+
+def test_troca_de_senha_no_mesmo_segundo_derruba_o_token_antigo(client):
+    """Regressão: o `pcat` é em segundos inteiros. Trocar a senha no mesmo
+    segundo em que ela foi definida empatava os dois valores, e o token antigo
+    sobrevivia à troca. O relógio da senha anterior vai para o futuro aqui só
+    para tornar o empate certo, em vez de depender da sorte do relógio."""
+    from sqlalchemy import func, text
+
+    from app.db.session import SessionLocal
+    from app.models.user import User
+
+    email = f"pcat_{uuid.uuid4().hex[:10]}@t.com"
+    senha = "Sup3rSecret!pw"
+    client.post("/auth/register", json={"name": "P", "email": email, "password": senha})
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.email == email).one()
+        user.password_changed_at = func.now() + text("interval '10 seconds'")
+        db.commit()
+    token = client.post("/auth/login", json={"email": email, "password": senha}).json()["access_token"]
+    h = {"Authorization": f"Bearer {token}"}
+    assert client.get("/auth/me", headers=h).status_code == 200
+
+    r = client.post(
+        "/auth/change-password",
+        json={"current_password": senha, "new_password": "OutraSenhaForte123"},
+        headers=h,
+    )
+    assert r.status_code == 204, r.text
+    assert client.get("/auth/me", headers=h).status_code == 401
+
+    # E quem entra com a senha nova não é derrubado pelo segundo adiantado.
+    novo = client.post(
+        "/auth/login", json={"email": email, "password": "OutraSenhaForte123"}
+    ).json()["access_token"]
+    assert client.get("/auth/me", headers={"Authorization": f"Bearer {novo}"}).status_code == 200
+
+
+def test_corpo_em_pedacos_acima_do_teto_da_413_e_nao_400(client, auth_headers):
+    """Regressão: sem Content-Length, o estouro era detectado durante a leitura
+    — e o FastAPI engole qualquer exceção ali e responde 400. O corpo já era
+    recusado; o motivo é que estava errado."""
+
+    def pedacos():
+        for _ in range(40):
+            yield b"x" * 65536  # ~2,6 MB > 1 MB
+
+    r = client.post(
+        "/memories",
+        content=pedacos(),
+        headers={**auth_headers(), "Content-Type": "application/json"},
+    )
+    assert r.status_code == 413
+    assert r.json()["detail"] == "Request body too large."

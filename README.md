@@ -51,7 +51,7 @@ some-journey/
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0010)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (360 testes)
+|   |-- tests/                 # pytest (376 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -418,7 +418,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Migracoes versionadas (Alembic, 0001..0010)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 360 no backend (pytest) e 453 no app (flutter test)
+- [x] Testes automatizados — 376 no backend (pytest) e 453 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -473,7 +473,7 @@ seis meses.
 ## Seguranca
 
 - Senhas sempre como hash; `password_hash` nunca retorna pela API.
-- Trocar a senha invalida os tokens emitidos antes (`password_changed_at`).
+- Trocar a senha invalida os tokens emitidos antes (`password_changed_at`), inclusive quando a troca cai no mesmo segundo da senha anterior.
 - Tokens de reset de senha ficam no banco como hash, com validade e uso unico.
 - Secrets (`JWT_SECRET_KEY`, credenciais de banco, service key do Supabase) ficam em variaveis de ambiente.
 - UUID nativo do PostgreSQL evita IDs sequenciais previsiveis.
@@ -485,6 +485,8 @@ seis meses.
 - STARTTLS do SMTP confere o certificado e o nome do servidor.
 - Um e-mail ja ligado a uma conta Google nao e religado a outra (`409`): e-mail de dominio que troca de dono nao herda as memorias de ninguem.
 - Senhas, tokens e dados sensiveis nao devem ir para logs.
+- Entrada que o banco nao guarda (caractere NUL no texto) ou que nao cabe em JSON (`NaN`, `Infinity`) responde 422, nunca 500.
+- Datas de entrada ficam entre os anos 1000 e 2999: fora disso, a leitura de volta quebrava a conta inteira.
 
 ---
 

@@ -558,3 +558,32 @@ confirmado no código, corrigido e ganhou um teste que falha sem a correção.
   `HTTP_413_REQUEST_ENTITY_TOO_LARGE`) trocadas pelos nomes novos; os códigos não mudam.
 - Imports e variável sem uso nos testes; um teste de imutabilidade que aceitava qualquer
   exceção passou a exigir a do dataclass congelado.
+
+### Ataque simulado
+Um ataque contra uma cópia local da API em modo produção (mesmo `start.sh` do Render, 2
+workers, banco descartável, geocoding, storage e SMTP desligados): 112 golpes em acesso a
+dados alheios, tokens forjados, força bruta com IP forjado, injeção, corpos absurdos, corridas
+e inundação. Na primeira rodada, 96 resistiram e 5 defeitos apareceram; na segunda, depois das
+correções abaixo, 107 resistiram, nenhum quebrou, e o servidor não deu um único 500.
+
+- **Data fora do intervalo envenenava a conta.** Uma memória do ano 1 era gravada e depois não
+  voltava: lida no fuso da sessão do banco, caía antes do ano 1. A criação respondia 500 com a
+  memória já gravada, e a timeline e o mapa da dona davam 500 para sempre. As datas de entrada
+  agora ficam entre os anos 1000 e 2999 (`AwareUtcDatetime`), conferidas antes e depois da
+  conversão para UTC.
+- **`NaN`, `Infinity` e `1e400` davam 500.** A validação recusava, mas o 422 repete o valor
+  recebido e ele não cabe em JSON. O tratador de erro de validação devolve esses valores como
+  texto, no mesmo formato de sempre (`app/core/error_handlers.py`).
+- **Caractere NUL no texto dava 500.** O Postgres não o guarda. O `DataError` vira 422, a
+  transação é desfeita e o log registra só o tipo do erro, nunca o valor.
+- **Token antigo sobrevivia à troca de senha no mesmo segundo.** O `pcat` é em segundos
+  inteiros; trocar a senha no mesmo segundo em que ela foi definida empatava os dois valores. A
+  troca agora sempre avança pelo menos um segundo inteiro (`GREATEST(now(), segundo anterior +
+  1s)`).
+- **Corpo em pedaços acima do teto dava 400.** O FastAPI engole a exceção levantada durante a
+  leitura do corpo e responde 400; o middleware agora troca essa resposta pelo 413.
+
+Ficaram como observação, sem correção: o limite de tentativas é por processo (com 2 workers,
+quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de segurança
+(`nosniff`, `X-Frame-Options`, `Referrer-Policy`, HSTS) e o servidor se identifica como
+`uvicorn`.

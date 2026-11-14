@@ -16,6 +16,7 @@ com a injeção de dependência do FastAPI.
 """
 
 import uuid
+from datetime import timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -157,11 +158,21 @@ def set_password_hash(db: Session, *, user: User, password_hash: str) -> User:
     remediação (o cadastro fica fechado em produção), o buraco estava justamente
     em quem é chamado para fechar uma conta.
 
-    Recebe o hash JÁ pronto — quem gera é o service/security. func.now() é
+    Recebe o hash JÁ pronto — quem gera é o service/security. O instante é
     avaliado no servidor, no mesmo UPDATE do hash.
+
+    O claim `pcat` guarda SEGUNDOS inteiros, e a revogação compara
+    `pcat < password_changed_at` nessa mesma unidade. Se a troca caísse no
+    mesmo segundo da senha anterior, os dois valores empatavam e o token antigo
+    sobrevivia à troca. Por isso o novo instante é o maior entre agora e o
+    segundo SEGUINTE ao do valor anterior: a troca sempre avança pelo menos um
+    segundo inteiro, e todo token emitido antes dela cai.
     """
     user.password_hash = password_hash
-    user.password_changed_at = func.now()
+    user.password_changed_at = func.greatest(
+        func.now(),
+        func.date_trunc("second", User.password_changed_at) + timedelta(seconds=1),
+    )
     db.commit()
     db.refresh(user)
     return user

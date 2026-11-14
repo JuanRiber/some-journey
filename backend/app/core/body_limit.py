@@ -62,20 +62,33 @@ class BodySizeLimitMiddleware:
 
         # 2) Conta os bytes recebidos (cobre ausência/mentira de Content-Length).
         total = 0
+        estourou = False
 
         async def counting_receive() -> Message:
-            nonlocal total
+            nonlocal total, estourou
             message = await receive()
             if message["type"] == "http.request":
                 total += len(message.get("body", b""))
                 if total > limit:
+                    estourou = True
                     raise _BodyTooLarge()
             return message
 
         started = False
+        trocada = False
 
         async def guarded_send(message: Message) -> None:
-            nonlocal started
+            nonlocal started, trocada
+            if trocada:
+                return  # o corpo da resposta que o app montou não sai
+            if estourou and not started and message["type"] == "http.response.start":
+                # O FastAPI pega QUALQUER exceção ao ler o corpo e responde 400
+                # ("error parsing the body") — a nossa nunca chegava aqui fora.
+                # O corpo foi recusado do mesmo jeito, mas o motivo certo é 413:
+                # troca a resposta do app pela nossa.
+                started = trocada = True
+                await self._reject(send)
+                return
             if message["type"] == "http.response.start":
                 started = True
             await send(message)
@@ -84,6 +97,8 @@ class BodySizeLimitMiddleware:
             await self.app(scope, counting_receive, guarded_send)
         except _BodyTooLarge:
             # Se a resposta ainda não começou, devolve 413 limpo; senão, propaga.
+            if trocada:
+                return
             if started:
                 raise
             await self._reject(send)

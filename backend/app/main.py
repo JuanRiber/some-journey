@@ -9,6 +9,7 @@ import app.models  # noqa: F401 - register models in SQLAlchemy metadata
 from app.api.routes import auth, journey, life_phase, map, memory, profile, track
 from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import settings
+from app.core.error_handlers import register_error_handlers
 from app.core.pagination import NEXT_CURSOR_HEADER
 from app.db.session import SessionLocal
 
@@ -63,6 +64,8 @@ def create_app() -> FastAPI:
         # header; sem expô-lo, o navegador o esconde do cliente (fetch/XHR).
         expose_headers=[NEXT_CURSOR_HEADER],
     )
+
+    register_error_handlers(application)
 
     application.include_router(auth.router)
     application.include_router(memory.router)

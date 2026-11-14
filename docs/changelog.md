@@ -678,3 +678,15 @@ quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de s
   reconstrução com 100 memórias.
 - **Surgimento**: memória ou capítulo que chega de novo aparece com um fade curto; o que já
   estava na tela não repete a animação, e "reduzir movimento" no aparelho a desliga.
+
+### CI: o `alembic check` comparava as extensões do PostGIS
+- O check entrou no CI e falhou na primeira rodada: a imagem `postgis/postgis` instala também
+  o geocodificador TIGER e a topologia, com dezenas de tabelas (`county`, `addr`, `faces`,
+  `topology`…) nos schemas do `search_path`, e o check as via como "a mais". O Postgres local,
+  sem essas extensões, passava. Agora o `alembic/env.py` pergunta ao catálogo
+  (`pg_depend`, `deptype = 'e'`) quais tabelas pertencem a extensões e as deixa fora da
+  comparação — com os índices delas. Diferença de verdade nas tabelas da app continua
+  reprovando.
+- A consulta ao catálogo roda numa conexão só dela: na mesma conexão das migrations ela abria
+  uma transação implícita, e o Alembic não fazia o commit — as migrations eram desfeitas em
+  silêncio. Visto localmente, antes de sair daqui.

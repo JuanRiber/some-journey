@@ -87,8 +87,8 @@ do Render mostrar erro de permissão em `CREATE EXTENSION postgis`, habilite-o �
 
 1. Em <https://render.com>, entre com o GitHub e vá em **New → Blueprint**. Escolha o
    repositório: o Render lê o `render.yaml` e cria o serviço `some-journey-api` no plano free,
-   na região **Virginia**. O pool de conexões (`DB_POOL_SIZE=3`, `DB_MAX_OVERFLOW=2`) também vem
-   do blueprint: 2 workers × 5 = 10 conexões, abaixo das ~15 que o pooler do Supabase grátis
+   na região **Virginia**. O pool de conexões (`DB_POOL_SIZE=5`, `DB_MAX_OVERFLOW=5`) também vem
+   do blueprint: 1 processo × 10 = 10 conexões, abaixo das ~15 que o pooler do Supabase grátis
    aceita, com folga para os scripts do passo 5.
 2. Ele pede as variáveis marcadas `sync: false`:
 

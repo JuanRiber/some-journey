@@ -93,6 +93,10 @@ jobs:
           alembic upgrade head
           alembic downgrade base
           alembic upgrade head
+          # E os models dizem o mesmo que as migrations. A suíte monta o banco
+          # pelos models; sem isto, um índice que só existe numa das pontas
+          # (já aconteceu duas vezes) passa despercebido.
+          alembic check
 
   flutter:
     name: App Flutter (analyze + test)

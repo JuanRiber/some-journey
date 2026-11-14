@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, Text, Uuid, func, text
+from sqlalchemy import Boolean, DateTime, Index, String, Text, Uuid, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -24,6 +24,17 @@ class User(Base):
     """
 
     __tablename__ = "users"
+    __table_args__ = (
+        # Existia só na migration 0010: o banco de teste, montado pelos models,
+        # não tinha a garantia de unicidade sem caixa — e o `alembic check`
+        # acusava a diferença. Agora os dois dizem a mesma coisa.
+        Index(
+            "uq_users_username_lower",
+            func.lower(text("username")),
+            unique=True,
+            postgresql_where=text("username IS NOT NULL"),
+        ),
+    )
 
     # UUID NATIVO gerado pelo BANCO (gen_random_uuid(), nativo no PG 13+).
     # Quem gera é o banco (server_default), não o app -> sem default=uuid.uuid4.

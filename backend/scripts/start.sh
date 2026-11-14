@@ -41,5 +41,15 @@ done
 # o cliente pode escrever se o proxy acrescenta em vez de sobrescrever. O balde
 # por e-mail do rate limit (app/api/routes/auth.py) não depende de IP e segura
 # o brute-force numa conta; acertar o IP pede ver o XFF real em produção.
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers 2 \
+#
+# UM processo por padrão (WEB_CONCURRENCY sobrepõe). No plano grátis do Render a
+# máquina tem uma fração de CPU: um segundo processo não traz CPU, só gasta RAM
+# — e partia ao meio tudo o que mora em memória de processo. Com 2, o teto de
+# tentativas de login era ~40 por janela em vez de 20 (cada processo contava o
+# seu), e o intervalo de 1 s do Nominatim virava ~2 por segundo. As rotas
+# síncronas rodam num pool de threads; um processo atende vários pedidos.
+#
+# --no-server-header: a resposta não anuncia qual servidor está do outro lado.
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" \
+  --workers "${WEB_CONCURRENCY:-1}" --no-server-header \
   --proxy-headers --forwarded-allow-ips='*'

@@ -8,6 +8,7 @@ no primeiro lugar que alguém esquecesse de filtrar.
 
 import uuid
 from datetime import UTC, datetime
+from typing import Literal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -30,20 +31,34 @@ def list_for_user(db: Session, *, user_id: uuid.UUID) -> list[LifePhase]:
     return list(db.scalars(consulta))
 
 
-def get_owned(db: Session, *, phase_id: uuid.UUID, user_id: uuid.UUID) -> LifePhase | None:
+def get_owned(
+    db: Session,
+    *,
+    phase_id: uuid.UUID,
+    user_id: uuid.UUID,
+    lock: Literal["share", "update"] | None = None,
+) -> LifePhase | None:
     """A fase, SE for desta pessoa e não estiver apagada.
 
     Id de outra pessoa e id inexistente devolvem a mesma coisa (None), para a
     rota responder 404 nos dois casos — quem sonda ids não descobre quais
     existem.
+
+    `lock` trava a linha até o fim da transação: "share" para quem vai
+    APONTAR para a fase (marcar uma memória), "update" para quem vai APAGÁ-la.
+    As duas travas não convivem, e é isso que impede uma memória de terminar
+    marcada numa fase apagada (ver life_phase_service.delete_phase).
     """
-    return db.scalar(
-        select(LifePhase).where(
-            LifePhase.id == phase_id,
-            LifePhase.user_id == user_id,
-            LifePhase.deleted_at.is_(None),
-        )
+    consulta = select(LifePhase).where(
+        LifePhase.id == phase_id,
+        LifePhase.user_id == user_id,
+        LifePhase.deleted_at.is_(None),
     )
+    if lock == "share":
+        consulta = consulta.with_for_update(read=True)
+    elif lock == "update":
+        consulta = consulta.with_for_update()
+    return db.scalar(consulta)
 
 
 def name_taken(

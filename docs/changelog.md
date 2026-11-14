@@ -618,3 +618,25 @@ quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de s
   falta: num banco de teste antigo, índice ou coluna nova nunca chegava, e a suíte local
   testava um schema velho — foi assim que o índice único de fase "passou" num teste sem
   existir. A suíte se recusa a derrubar tabelas num banco cujo nome não termine em `_test`.
+
+### Segurança e infraestrutura: o que o ataque deixou como observação
+- **Cabeçalhos de segurança em toda resposta** (`app/core/security_headers.py`): `nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`; em produção também HSTS e
+  `Content-Security-Policy: default-src 'none'`. Fora de produção ficam de fora — o HSTS
+  prenderia o navegador num HTTPS que o localhost não tem, e a CSP apagaria o `/docs`.
+- **O servidor não se anuncia** (`--no-server-header`).
+- **Um processo** por padrão (`WEB_CONCURRENCY` sobrepõe). No plano grátis do Render o
+  segundo processo não trazia CPU, só RAM — e partia ao meio o que mora em memória: o teto de
+  tentativas de login era ~40 por janela em vez de 20, e o intervalo do Nominatim virava ~2 por
+  segundo. O pool passou a 5 + 5, mantendo o teto de 10 conexões no pooler do Supabase.
+- **Contêiner sem root** (usuário `app`, uid 10001) e sem gravar `.pyc`.
+- **Apagar uma fase enquanto alguém marca uma memória nela.** O DELETE soltava os vínculos
+  antes de a outra transação gravar o dela, e a memória terminava apontando para uma fase
+  apagada. Agora quem marca trava a fase em modo compartilhado e quem apaga em modo exclusivo:
+  um espera o outro, e o resultado é sempre coerente (a memória solta, ou um 422).
+- **Models e migrations dizem o mesmo.** O índice de leitura dos pontos de GPS ganhou o `id`
+  que o model sempre declarou (migration 0016), e o índice de `@username` sem caixa, que
+  existia só na 0010, entrou no model. O CI agora roda `alembic check` depois das migrations,
+  com a tabela do PostGIS fora da comparação.
+- **`httpx2`** no `requirements-dev.txt`: é o cliente que o `TestClient` do Starlette 1.6 pede.
+  A suíte roda sem nenhum aviso de deprecação.

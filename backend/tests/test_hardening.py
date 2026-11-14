@@ -489,3 +489,33 @@ def test_corpo_em_pedacos_acima_do_teto_da_413_e_nao_400(client, auth_headers):
     )
     assert r.status_code == 413
     assert r.json()["detail"] == "Request body too large."
+
+
+# --- 12. Cabeçalhos de segurança --------------------------------------------
+def test_toda_resposta_traz_os_cabecalhos_de_seguranca(client, auth_headers):
+    for r in (
+        client.get("/health"),
+        client.get("/memories", headers=auth_headers()),
+        client.get("/memories/nao-e-uuid", headers=auth_headers()),  # 422
+    ):
+        assert r.headers["x-content-type-options"] == "nosniff"
+        assert r.headers["x-frame-options"] == "DENY"
+        assert r.headers["referrer-policy"] == "no-referrer"
+    # Fora de produção não há HSTS (prenderia o navegador num HTTPS que o
+    # localhost não tem) nem CSP (deixaria o /docs em branco).
+    r = client.get("/health")
+    assert "strict-transport-security" not in r.headers
+    assert "content-security-policy" not in r.headers
+
+
+def test_em_producao_entram_hsts_e_csp_ate_nas_recusas(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+    from app.main import create_app
+
+    with TestClient(create_app(), base_url="http://localhost") as tc:
+        for r in (tc.get("/health"), tc.get("/health", headers={"Host": "evil.test"})):
+            assert r.headers["strict-transport-security"].startswith("max-age=")
+            assert "default-src 'none'" in r.headers["content-security-policy"]
+            assert r.headers["x-content-type-options"] == "nosniff"

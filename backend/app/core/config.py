@@ -32,8 +32,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: Literal["HS256"] = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, gt=0, le=1440)
 
-    # Per-process guard for public auth endpoints. In production, keep this and
-    # add an infrastructure-level limiter shared by all workers.
+    # Limitador POR PROCESSO dos endpoints públicos de autenticação. Por isso a
+    # API sobe com um processo só (scripts/start.sh): com mais, cada um conta o
+    # seu e o teto real se multiplica.
     AUTH_RATE_LIMIT_ATTEMPTS: int = Field(default=8, gt=0, le=100)
     AUTH_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=300, ge=30, le=3600)
     # Teto por IP (independe do email) na mesma janela — trava password spraying

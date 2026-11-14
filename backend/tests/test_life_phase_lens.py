@@ -10,6 +10,8 @@ jornada e filtra por "Intercâmbio" não encontra as lembranças dela — e a fa
 viraria uma etiqueta que a pessoa precisa colar à mão em cada foto.
 """
 
+import uuid
+
 import pytest
 
 
@@ -328,4 +330,54 @@ class TestFaseQueNaoExisteNoFiltro:
 
     def test_id_malformado_e_422(self, client, auth_headers):
         r = client.get("/memories?life_phase_id=nao-e-uuid", headers=auth_headers())
+        assert r.status_code == 422
+
+
+class TestApagarEnquantoMarca:
+    def test_apagar_espera_quem_esta_marcando_e_solta_a_memoria(self, client, auth_headers):
+        """Sem trava, o DELETE soltava os vínculos antes de a outra transação
+        gravar o dela, e a memória terminava apontando para uma fase apagada.
+        Aqui a marcação fica aberta de propósito: o apagar tem de ESPERAR, e
+        quando passa, soltar também a memória que acabou de ser marcada."""
+        import threading
+
+        from app.db.session import SessionLocal
+        from app.models.memory import Memory
+        from app.services import life_phase_service
+
+        h = auth_headers()
+        fase = _fase(client, h)
+        mem = _memoria(client, h)
+        uid = uuid.UUID(client.get("/auth/me", headers=h).json()["id"])
+
+        fim = {}
+
+        def apagar():
+            with SessionLocal() as db:
+                life_phase_service.delete_phase(db, phase_id=uuid.UUID(fase), user_id=uid)
+                fim["apagou"] = True
+
+        with SessionLocal() as marcando:
+            life_phase_service.owned_phase_id(
+                marcando, user_id=uid, phase_id=uuid.UUID(fase)
+            )
+            marcando.get(Memory, uuid.UUID(mem["id"])).life_phase_id = uuid.UUID(fase)
+
+            t = threading.Thread(target=apagar)
+            t.start()
+            t.join(0.5)
+            assert t.is_alive(), "o apagar não esperou a marcação em andamento"
+            marcando.commit()
+
+        t.join(5)
+        assert fim.get("apagou")
+        lida = client.get(f"/memories/{mem['id']}", headers=h).json()
+        assert lida["life_phase_id"] is None
+
+    def test_marcar_depois_do_apagar_recebe_422(self, client, auth_headers):
+        h = auth_headers()
+        fase = _fase(client, h)
+        mem = _memoria(client, h)
+        client.delete(f"/life-phases/{fase}", headers=h)
+        r = client.patch(f"/memories/{mem['id']}", json={"life_phase_id": fase}, headers=h)
         assert r.status_code == 422

@@ -25,13 +25,14 @@ services:
         value: "false"
       - key: SUPABASE_BUCKET
         value: memories
-      # Pool pequeno: o Session pooler do Supabase grátis aceita ~15 conexões, e
-      # são 2 workers. 2 × (3 + 2) = 10, sobrando folga para os scripts
-      # (seed, reset) rodados da máquina de quem administra.
+      # O Session pooler do Supabase grátis aceita ~15 conexões. Um processo
+      # (scripts/start.sh) × (5 + 5) = 10, sobrando folga para os scripts
+      # (seed, reset) rodados da máquina de quem administra. Subir
+      # WEB_CONCURRENCY multiplica este teto: reduza o pool junto.
       - key: DB_POOL_SIZE
-        value: "3"
+        value: "5"
       - key: DB_MAX_OVERFLOW
-        value: "2"
+        value: "5"
       # --- definir no painel (Environment) ---
       # Postgres do Supabase: a string do SESSION pooler (a conexão direta é só
       # IPv6 e o Render não alcança), com o prefixo trocado para

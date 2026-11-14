@@ -63,7 +63,14 @@ def owned_phase_id(
     """
     if phase_id is None:
         return None
-    return get_phase(db, phase_id=phase_id, user_id=user_id).id
+    # Trava a fase até o commit do vínculo: um DELETE da mesma fase espera, e
+    # quando passa já enxerga a memória marcada e a solta junto.
+    fase = life_phase_repository.get_owned(
+        db, phase_id=phase_id, user_id=user_id, lock="share"
+    )
+    if fase is None:
+        raise PhaseNotFoundError()
+    return fase.id
 
 
 def create_phase(db: Session, *, user_id: uuid.UUID, data: LifePhaseCreate) -> LifePhase:
@@ -129,8 +136,18 @@ def delete_phase(db: Session, *, phase_id: uuid.UUID, user_id: uuid.UUID) -> Non
     voltam a não ter fase, e continuam inteiras. O banco faria isso sozinho
     num DELETE de verdade (ON DELETE SET NULL), mas aqui o apagar é suave —
     então quem desfaz os vínculos é este serviço, explicitamente.
+
+    A fase é travada ANTES de soltar os vínculos. Sem a trava, uma memória
+    sendo marcada nesta fase ao mesmo tempo gravava o vínculo depois de o
+    UPDATE abaixo ter passado, e terminava apontando para uma fase apagada.
+    Com ela, quem marca espera o apagar terminar (e recebe 422), ou o apagar
+    espera quem marca (e solta a memória junto).
     """
-    fase = get_phase(db, phase_id=phase_id, user_id=user_id)
+    fase = life_phase_repository.get_owned(
+        db, phase_id=phase_id, user_id=user_id, lock="update"
+    )
+    if fase is None:
+        raise PhaseNotFoundError()
     for modelo in (Memory, Journey):
         db.execute(
             update(modelo)

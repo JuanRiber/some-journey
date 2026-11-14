@@ -4,3 +4,7 @@
 
 pytest==9.1.1
 httpx==0.28.1
+# O cliente que o TestClient do Starlette 1.6 passou a pedir (com o httpx ele
+# avisa que o uso está deprecado). Mantido pela organização do Pydantic, do
+# mesmo autor do httpx. O app em si continua no httpx (requirements.txt).
+httpx2==2.16.0

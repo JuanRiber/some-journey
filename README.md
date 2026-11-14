@@ -51,7 +51,7 @@ some-journey/
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0010)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (387 testes)
+|   |-- tests/                 # pytest (391 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -418,7 +418,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Migracoes versionadas (Alembic, 0001..0010)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 387 no backend (pytest) e 453 no app (flutter test)
+- [x] Testes automatizados — 391 no backend (pytest) e 453 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -482,6 +482,8 @@ seis meses.
 - Middleware rejeita corpos acima de `MAX_JSON_BODY_BYTES` com 413 (uploads de foto, capa e avatar tem o teto de imagem).
 - Login e recuperacao de senha tem um teto por e-mail (`AUTH_RATE_LIMIT_EMAIL_ATTEMPTS`), que nao depende de IP: um `X-Forwarded-For` forjado nao o contorna.
 - STARTTLS do SMTP confere o certificado e o nome do servidor.
+- Toda resposta leva `nosniff`, `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`; em producao, tambem HSTS e uma CSP que nao carrega nada. O servidor nao se identifica.
+- O conteiner roda sem root, e a API sobe com um processo so: os limites que vivem em memoria (tentativas de login, intervalo do Nominatim) valem exatos.
 - Um e-mail ja ligado a uma conta Google nao e religado a outra (`409`): e-mail de dominio que troca de dono nao herda as memorias de ninguem.
 - Senhas, tokens e dados sensiveis nao devem ir para logs.
 - Entrada que o banco nao guarda (caractere NUL no texto) ou que nao cabe em JSON (`NaN`, `Infinity`) responde 422, nunca 500.

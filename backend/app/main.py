@@ -10,6 +10,7 @@ from app.api.routes import auth, journey, life_phase, map, memory, profile, trac
 from app.core.body_limit import BodySizeLimitMiddleware
 from app.core.config import settings
 from app.core.error_handlers import register_error_handlers
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.pagination import NEXT_CURSOR_HEADER
 from app.db.session import SessionLocal
 
@@ -63,6 +64,12 @@ def create_app() -> FastAPI:
         # O contrato de paginação por cursor devolve o próximo cursor neste
         # header; sem expô-lo, o navegador o esconde do cliente (fetch/XHR).
         expose_headers=[NEXT_CURSOR_HEADER],
+    )
+
+    # Adicionado POR ÚLTIMO => o mais EXTERNO: decora toda resposta, inclusive o
+    # 400 do TrustedHost e o 413 do limite de corpo.
+    application.add_middleware(
+        SecurityHeadersMiddleware, production=settings.is_production
     )
 
     register_error_handlers(application)

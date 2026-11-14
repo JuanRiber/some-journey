@@ -28,6 +28,15 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def _incluir(objeto, nome, tipo, refletido, comparado_a) -> bool:
+    """O que o autogenerate/`alembic check` deve comparar.
+
+    `spatial_ref_sys` vem com a extensão PostGIS, não com os models: sem esta
+    exclusão o `alembic check` sempre veria "uma tabela a mais" e nunca
+    passaria — e um check que nunca passa é um check que ninguém roda."""
+    return not (tipo == "table" and refletido and comparado_a is None and nome == "spatial_ref_sys")
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=settings.DATABASE_URL,
@@ -35,6 +44,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=_incluir,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -47,6 +57,7 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             compare_type=True,
+            include_object=_incluir,
         )
         with context.begin_transaction():
             context.run_migrations()

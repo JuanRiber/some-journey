@@ -137,6 +137,12 @@ class SJBasemap {
           // tileSize pela metade e desloca o zoom — configuração errada para
           // esta base. Desligado, ele pede as telhas 256px que existem de fato.
           retinaMode: false,
+          // Telha aparece pronta, sem fade. O `AtlasMap` recria esta camada a
+          // cada reenquadramento; com fade, o mapa inteiro sumiria e voltaria
+          // a cada troca de fase. Sem ele, as telhas da camada nova voltam do
+          // cache de imagens no mesmo quadro. E a animação do mapa, pelo
+          // design system, é uma só: o traço do rastro (`AtlasMap`).
+          tileDisplay: const TileDisplay.instantaneous(),
         ),
       );
 

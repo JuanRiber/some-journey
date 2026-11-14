@@ -55,6 +55,19 @@ class GeoBounds {
         maxLat: math.min(85, maxLat + degrees),
         maxLng: math.min(180, maxLng + degrees),
       );
+
+  // Igualdade por valor: é ela que diz se a câmera precisa reenquadrar ou se
+  // os mesmos pontos só foram relidos (ver `AtlasDomain.shouldRefit`).
+  @override
+  bool operator ==(Object other) =>
+      other is GeoBounds &&
+      other.minLat == minLat &&
+      other.minLng == minLng &&
+      other.maxLat == maxLat &&
+      other.maxLng == maxLng;
+
+  @override
+  int get hashCode => Object.hash(minLat, minLng, maxLat, maxLng);
 }
 
 /// Um AGRUPAMENTO de pontos próximos — o "cluster elegante" do produto: ao
@@ -99,17 +112,37 @@ abstract final class AtlasDomain {
 
   /// Enquadramento de todos os pontos. Null quando não há nada a mostrar (a UI
   /// então cai numa visão ampla padrão).
-  static GeoBounds? boundsOf(Iterable<AtlasPoint> points) {
-    if (points.isEmpty) return null;
+  static GeoBounds? boundsOf(Iterable<AtlasPoint> points) =>
+      boundsOfCoords(points.map((p) => (p.latitude, p.longitude)));
+
+  /// O mesmo enquadramento a partir de pares (lat, lng) soltos — o mapa junta
+  /// pins e percursos de GPS, que não são [AtlasPoint].
+  static GeoBounds? boundsOfCoords(Iterable<(double, double)> coords) {
+    if (coords.isEmpty) return null;
     var minLat = 90.0, maxLat = -90.0, minLng = 180.0, maxLng = -180.0;
-    for (final p in points) {
-      minLat = math.min(minLat, p.latitude);
-      maxLat = math.max(maxLat, p.latitude);
-      minLng = math.min(minLng, p.longitude);
-      maxLng = math.max(maxLng, p.longitude);
+    for (final (lat, lng) in coords) {
+      minLat = math.min(minLat, lat);
+      maxLat = math.max(maxLat, lat);
+      minLng = math.min(minLng, lng);
+      maxLng = math.max(maxLng, lng);
     }
     return GeoBounds(minLat: minLat, minLng: minLng, maxLat: maxLat, maxLng: maxLng);
   }
+
+  /// Zoom máximo ao enquadrar. Um ponto só (ou pontos na mesma rua) daria zoom
+  /// infinito; 13 é onde o agrupamento solta cada memória como pin próprio
+  /// (ver [cellDegreesForZoom]) e ainda se lê o bairro em volta.
+  static const frameMaxZoom = 13.0;
+
+  /// Se a câmera deve reenquadrar ao receber [next], tendo enquadrado
+  /// [previous] por último.
+  ///
+  /// Só quando o retângulo MUDA: o app relê os dados em silêncio depois de cada
+  /// escrita, e reenquadrar a cada releitura arrancaria a câmera de quem tinha
+  /// arrastado o mapa para olhar outro canto. Sem pontos (`next` nulo), a
+  /// câmera fica onde está — uma fase vazia não é motivo para voltar ao mundo.
+  static bool shouldRefit(GeoBounds? previous, GeoBounds? next) =>
+      next != null && next != previous;
 
   /// Agrupa por GRADE em graus — barato (O(n)) e estável: o mesmo conjunto de
   /// pontos sempre gera os mesmos clusters, então o mapa não "tremula" ao

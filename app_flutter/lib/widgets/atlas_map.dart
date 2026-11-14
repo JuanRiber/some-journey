@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -55,6 +56,49 @@ class _AtlasMapState extends State<AtlasMap>
 
   bool _jaTracou = false;
 
+  /// A câmera ENQUADRA os pontos: abre mostrando todos eles, com respiro, e
+  /// reenquadra quando o conjunto muda (os dados chegaram, a lente de fase
+  /// trocou, uma parada entrou na jornada).
+  ///
+  /// Uma câmera fixada só ao nascer não basta: o atlas nasce antes da resposta
+  /// da API — o mapa ficava no zoom de continente com tudo empilhado num pin.
+  final MapController _camera = MapController();
+  bool _cameraPronta = false;
+
+  /// O retângulo enquadrado por último e o que os dados pedem agora.
+  GeoBounds? _enquadrado;
+  GeoBounds? _desejado;
+
+  static const _respiro = EdgeInsets.all(36);
+
+  CameraFit _fit(GeoBounds b) => CameraFit.bounds(
+        bounds: LatLngBounds(LatLng(b.minLat, b.minLng), LatLng(b.maxLat, b.maxLng)),
+        padding: _respiro,
+        maxZoom: AtlasDomain.frameMaxZoom,
+      );
+
+  /// Geração da camada de telhas: trocar a `key` recria a camada.
+  int _geracaoTelhas = 0;
+
+  void _reenquadrar() {
+    if (!_cameraPronta || !mounted) return;
+    if (!AtlasDomain.shouldRefit(_enquadrado, _desejado)) return;
+    _enquadrado = _desejado;
+    _camera.fitCamera(_fit(_desejado!));
+    // A camada de telhas poda o que sobrou usando a câmera do ÚLTIMO build
+    // dela, e o enquadramento acontece fora de um quadro. As telhas do zoom
+    // novo voltam do cache em milissegundos — antes de a camada se reconstruir
+    // — e a poda, ainda com a câmera antiga, apagava justamente elas: os pins
+    // no lugar e o fundo vazio (ou o zoom de continente esticado) até alguém
+    // arrastar o mapa. Depois do quadro, uma camada NOVA nasce lendo a
+    // câmera já enquadrada e pede e poda com ela. (O `reset` do TileLayer
+    // seria o caminho natural, mas no flutter_map 7.0.2 a assinatura dele é
+    // um `late final` que ninguém lê — os eventos não chegam a lugar nenhum.)
+    SchedulerBinding.instance.endOfFrame.then((_) {
+      if (mounted) setState(() => _geracaoTelhas++);
+    });
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -67,6 +111,7 @@ class _AtlasMapState extends State<AtlasMap>
 
   @override
   void dispose() {
+    _camera.dispose();
     _traco.dispose();
     super.dispose();
   }
@@ -145,12 +190,12 @@ class _AtlasMapState extends State<AtlasMap>
       all.addAll(line.map((c) => LatLng(c[1], c[0])));
     }
 
-    final center = all.isEmpty
-        ? const LatLng(-14.235, -51.925) // Brasil (visão ampla)
-        : LatLng(
-            all.map((p) => p.latitude).reduce((a, b) => a + b) / all.length,
-            all.map((p) => p.longitude).reduce((a, b) => a + b) / all.length,
-          );
+    _desejado = AtlasDomain.boundsOfCoords(all.map((p) => (p.latitude, p.longitude)));
+    // Cada mudança de retângulo reenquadra ao fim do quadro; antes de a câmera
+    // ficar pronta, quem enquadra é o `onMapReady`.
+    if (AtlasDomain.shouldRefit(_enquadrado, _desejado)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reenquadrar());
+    }
 
     return Container(
       height: widget.height,
@@ -165,9 +210,20 @@ class _AtlasMapState extends State<AtlasMap>
       // pipeline de camadas.
       child: Stack(children: [
         FlutterMap(
+        mapController: _camera,
         options: MapOptions(
-          initialCenter: center,
-          initialZoom: all.isEmpty ? 3 : 4,
+          // Sem pontos: o Brasil em visão ampla.
+          initialCenter: const LatLng(-14.235, -51.925),
+          initialZoom: 3,
+          // O enquadramento inicial também passa por `_reenquadrar`, e não por
+          // `initialCameraFit`: é lá que mora o recarregamento das telhas
+          // depois do quadro. Uma volta do event loop depois do onMapReady,
+          // para vir depois do evento de tamanho que o flutter_map 7 adia
+          // para o fim do primeiro quadro.
+          onMapReady: () {
+            _cameraPronta = true;
+            Future(_reenquadrar);
+          },
           minZoom: 2,
           maxZoom: 19,
           // Mundo ÚNICO: a câmera não sai dos limites [-180, 180] — nada de
@@ -178,7 +234,10 @@ class _AtlasMapState extends State<AtlasMap>
           backgroundColor: esquema.bgDeep,
         ),
         children: [
-          SJBasemap.layer(context, esquema),
+          KeyedSubtree(
+            key: ValueKey(_geracaoTelhas),
+            child: SJBasemap.layer(context, esquema),
+          ),
           AnimatedBuilder(
             animation: _traco,
             builder: (_, _) => PolylineLayer(polylines: tracar(_traco.value)),

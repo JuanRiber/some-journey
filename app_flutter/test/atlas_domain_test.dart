@@ -27,6 +27,37 @@ void main() {
       expect(b.maxLat, lessThanOrEqualTo(85));
       expect(b.maxLng, lessThanOrEqualTo(180));
     });
+
+    test('pares soltos dão o mesmo retângulo que os pontos', () {
+      expect(AtlasDomain.boundsOfCoords([(-3.73, -38.53), (-2.79, -40.51)]),
+          AtlasDomain.boundsOf([p(-3.73, -38.53), p(-2.79, -40.51)]));
+    });
+  });
+
+  // O mapa abria no zoom de continente, com as memórias de uma cidade
+  // empilhadas num pin só: a câmera era fixada ao nascer, antes de os dados
+  // chegarem, e nunca mais se mexia. Estes testes guardam QUANDO ela se mexe.
+  group('reenquadrar', () {
+    final fortaleza = AtlasDomain.boundsOf([p(-3.72, -38.54), p(-3.73, -38.49)]);
+    final jeri = AtlasDomain.boundsOf([p(-3.73, -38.53), p(-2.79, -40.51)]);
+
+    test('os dados chegaram: enquadra', () {
+      expect(AtlasDomain.shouldRefit(null, fortaleza), isTrue);
+    });
+
+    test('a lente de fase trocou o conjunto: enquadra de novo', () {
+      expect(AtlasDomain.shouldRefit(fortaleza, jeri), isTrue);
+    });
+
+    test('releitura com os mesmos pontos: não arranca a câmera de quem arrastou',
+        () {
+      final relido = AtlasDomain.boundsOf([p(-3.73, -38.49), p(-3.72, -38.54)]);
+      expect(AtlasDomain.shouldRefit(fortaleza, relido), isFalse);
+    });
+
+    test('fase sem pontos: a câmera fica onde está', () {
+      expect(AtlasDomain.shouldRefit(fortaleza, null), isFalse);
+    });
   });
 
   group('agrupamento (cluster elegante)', () {

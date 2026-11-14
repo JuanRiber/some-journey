@@ -13,7 +13,8 @@
 #             CLOUDFLARE_ACCOUNT_ID  id da conta Cloudflare
 #   variables API_URL                https://<servico>.onrender.com (obrigatória)
 #             GOOGLE_CLIENT_ID       client id WEB do Google (opcional)
-#             CF_PAGES_PROJECT       nome do projeto no Pages (padrão: some-journey)
+#             CF_PAGES_PROJECT       nome do projeto no Pages (padrão: some-journey-atlas;
+#                                    "some-journey" já é de outro site no Pages)
 #
 # Sem os secrets o trabalho termina em verde com um aviso, em vez de falhar:
 # enquanto a hospedagem não está configurada, um X vermelho a cada push só
@@ -47,7 +48,7 @@ jobs:
     env:
       API_URL: ${{ vars.API_URL }}
       GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
-      CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT || 'some-journey' }}
+      CF_PAGES_PROJECT: ${{ vars.CF_PAGES_PROJECT || 'some-journey-atlas' }}
       HAS_CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
 
     steps:

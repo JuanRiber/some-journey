@@ -690,3 +690,14 @@ quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de s
 - A consulta ao catálogo roda numa conexão só dela: na mesma conexão das migrations ela abria
   uma transação implícita, e o Alembic não fazia o commit — as migrations eram desfeitas em
   silêncio. Visto localmente, antes de sair daqui.
+
+### Deploy: a API vai para Ohio, e o app para `some-journey-atlas.pages.dev`
+- O projeto do Supabase nasceu em **East US (Ohio)**, `us-east-2`. Em vez de recriá-lo, a API
+  acompanhou: `render.yaml` passa a `region: ohio`. API e banco continuam lado a lado, que é o
+  que importa — cada consulta custa ~1 ms. O guia agora pede Ohio na criação do Supabase e
+  avisa que, se o projeto nascer noutra região, a `region` do `render.yaml` tem de mudar ANTES
+  de criar o serviço no Render.
+- O endereço `some-journey.pages.dev` já é de outro site no Cloudflare Pages. O padrão do
+  workflow de deploy web passa a `some-journey-atlas` (a variável `CF_PAGES_PROJECT` só é
+  preciso se esse também estiver tomado), e o guia e o `render.yaml` usam
+  `https://some-journey-atlas.pages.dev` no `CORS_ALLOWED_ORIGINS`.

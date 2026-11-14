@@ -13,7 +13,7 @@ são criadas por script.
 | App (Flutter web) | **Cloudflare Pages** — `.github/workflows/deploy-web.yml` | Estático, sem limite prático. |
 | Manter acordado | **UptimeRobot** (ou cron-job.org) | Ping a cada 5 min, grátis. |
 
-**Tudo fica na mesma região: East US (Virginia).** O Render não tem região no Brasil, e cada
+**Tudo fica na mesma região: East US (Ohio), `us-east-2`.** O Render não tem região no Brasil, e cada
 request faz várias consultas ao banco. Com API e banco lado a lado, cada consulta custa ~1 ms e o
 tester paga uma única ida aos EUA por request (~120 ms). Com o banco em São Paulo e a API nos EUA,
 *cada consulta* cruzaria o continente — 3 ou 4 por tela já tornam o app lento. A região não muda
@@ -28,8 +28,9 @@ A ordem abaixo importa: cada passo usa um valor que o anterior gerou.
 
 ## 1. Supabase — banco e fotos
 
-1. Em <https://supabase.com>, crie um projeto. Região: **East US (North Virginia)** — a mesma
-   da API (ver "Visão geral").
+1. Em <https://supabase.com>, crie um projeto. Região: **East US (Ohio)** — a mesma
+   da API (ver "Visão geral"). Se o projeto nascer noutra região, troque a `region` do
+   `render.yaml` ANTES de criar o serviço no Render: depois, nenhum dos dois muda.
    Na senha do banco, use **só letras e números** — caractere especial teria de ir
    percent-encoded na URL, e é a causa mais comum de "senha errada" que não está errada.
    Guarde a senha.
@@ -42,13 +43,13 @@ A ordem abaixo importa: cada passo usa um valor que o anterior gerou.
    assim:
 
    ```
-   postgresql://postgres.<ref>:[YOUR-PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres
+   postgresql://postgres.<ref>:[YOUR-PASSWORD]@aws-0-us-east-2.pooler.supabase.com:5432/postgres
    ```
 
    Monte a `DATABASE_URL` trocando **o prefixo** e a senha, e exigindo TLS:
 
    ```
-   postgresql+psycopg://postgres.<ref>:<senha>@aws-0-us-east-1.pooler.supabase.com:5432/postgres?sslmode=require
+   postgresql+psycopg://postgres.<ref>:<senha>@aws-0-us-east-2.pooler.supabase.com:5432/postgres?sslmode=require
    ```
 
    (O host exato — `aws-0` ou `aws-1` — é o que o painel mostrar.)
@@ -87,7 +88,7 @@ do Render mostrar erro de permissão em `CREATE EXTENSION postgis`, habilite-o �
 
 1. Em <https://render.com>, entre com o GitHub e vá em **New → Blueprint**. Escolha o
    repositório: o Render lê o `render.yaml` e cria o serviço `some-journey-api` no plano free,
-   na região **Virginia**. O pool de conexões (`DB_POOL_SIZE=5`, `DB_MAX_OVERFLOW=5`) também vem
+   na região **Ohio**. O pool de conexões (`DB_POOL_SIZE=5`, `DB_MAX_OVERFLOW=5`) também vem
    do blueprint: 1 processo × 10 = 10 conexões, abaixo das ~15 que o pooler do Supabase grátis
    aceita, com folga para os scripts do passo 5.
 2. Ele pede as variáveis marcadas `sync: false`:
@@ -98,7 +99,7 @@ do Render mostrar erro de permissão em `CREATE EXTENSION postgis`, habilite-o �
    | `JWT_SECRET_KEY` | uma **nova**: `python3 -c "import secrets; print(secrets.token_urlsafe(48))"` |
    | `SUPABASE_URL` | a Project URL (sem `/rest/v1`) |
    | `SUPABASE_SERVICE_KEY` | a service_role |
-   | `CORS_ALLOWED_ORIGINS` | `https://some-journey.pages.dev` (o nome do passo 3; ajuste se mudar) |
+   | `CORS_ALLOWED_ORIGINS` | `https://some-journey-atlas.pages.dev` (o nome do passo 3; ajuste se mudar) |
    | `TRUSTED_HOSTS` | `some-journey-api.onrender.com` (o host que o Render mostrar) |
    | `GOOGLE_CLIENT_ID`, `SMTP_*` | deixe vazias por enquanto — o resto funciona sem elas |
 
@@ -128,10 +129,11 @@ pasta pronta.
 3. No GitHub, **Settings → Secrets and variables → Actions**:
    - aba *Secrets*: `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`;
    - aba *Variables*: `API_URL` = `https://some-journey-api.onrender.com`.
-     Opcionais: `GOOGLE_CLIENT_ID` (o client id **web**) e `CF_PAGES_PROJECT`, se o nome
-     `some-journey` já estiver tomado no Pages.
+     Opcionais: `GOOGLE_CLIENT_ID` (o client id **web**) e `CF_PAGES_PROJECT`, só se o nome
+     padrão `some-journey-atlas` também estiver tomado.
 4. **Actions → Deploy web → Run workflow**. Na primeira execução ele cria o projeto no Pages; o
-   app fica em `https://some-journey.pages.dev`.
+   app fica em `https://some-journey-atlas.pages.dev`. (O nome `some-journey` já é de outro
+   site no Pages; por isso o padrão do workflow é `some-journey-atlas`.)
 
 Daqui em diante, todo push na `main` com CI verde republica o app. Enquanto os secrets não
 existem, o workflow termina verde com um aviso, em vez de falhar.
@@ -165,7 +167,7 @@ recuperação de senha pelo app não envia e-mail em produção — o caminho é
 
 ## O que o tester recebe
 
-- O endereço `https://some-journey.pages.dev`, que funciona no navegador do computador e do
+- O endereço `https://some-journey-atlas.pages.dev`, que funciona no navegador do computador e do
   celular (no celular, *Adicionar à tela inicial* abre como app).
 - O e-mail e a senha do passo 5.
 
@@ -180,7 +182,7 @@ graça; no iOS, o TestFlight exige a conta Apple Developer (US$ 99/ano).
 | Resposta `400 Invalid host header` | `TRUSTED_HOSTS` sem o host do Render. Se o log mostrar o health check do próprio Render sendo recusado, acrescente o host que aparece no log. |
 | Deploy falha em `alembic upgrade head` | `DATABASE_URL` errada (prefixo sem `+psycopg`, senha, ou *Direct connection* em vez do pooler), ou o projeto Supabase pausado — restaure no painel. O `scripts.check_database` (passo 1.5) diz qual dos dois. |
 | Erro `max clients reached` nos logs | Conexões demais no pooler: confira `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` no Render e se algum script local ficou aberto. |
-| Tudo funciona, mas cada tela demora | API e banco em regiões diferentes. Confira a região dos dois (Virginia / East US). |
+| Tudo funciona, mas cada tela demora | API e banco em regiões diferentes. Confira a região dos dois (Ohio / East US, `us-east-2`). |
 | Foto responde 503 | `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` vazias ou bucket com nome diferente de `memories`. |
 | Primeira abertura do dia demora ~1 min | O ping não está rodando: confira o monitor no UptimeRobot. |
 | App abre mas chama `127.0.0.1` | A variável `API_URL` não estava definida no build; o workflow hoje recusa esse caso. |

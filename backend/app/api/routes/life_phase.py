@@ -51,7 +51,7 @@ def fase_do_filtro_inexistente() -> HTTPException:
 def _invalida(exc: InvalidPhaseError) -> HTTPException:
     # A mensagem vem do domínio, já em pt-BR e escrita para quem vai ler.
     return HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
     )
 
 

@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     # Teto por IP (independe do email) na mesma janela — trava password spraying
     # (uma senha testada contra muitos e-mails do mesmo IP). Maior que o por-conta.
     AUTH_RATE_LIMIT_IP_ATTEMPTS: int = Field(default=40, gt=0, le=1000)
+    # Teto por E-MAIL, de qualquer IP, na mesma janela — o único que um
+    # X-Forwarded-For forjado não contorna. Mais folgado que o por-conta porque
+    # estourá-lo trava a conta para todo mundo, inclusive para a dona.
+    AUTH_RATE_LIMIT_EMAIL_ATTEMPTS: int = Field(default=20, gt=0, le=1000)
 
     # Cadastro público. Se não definido, herda do ambiente: aberto em dev/test e
     # FECHADO em produção (as contas dos testers vêm do seed). Force com

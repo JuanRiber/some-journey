@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Body,
     Depends,
     File,
@@ -34,7 +35,7 @@ from app.api.routes.life_phase import (
     fase_do_filtro_inexistente,
 )
 from app.schemas.memory import MemoryRead
-from app.services import journey_service
+from app.services import journey_service, memory_service
 from app.services.life_phase_service import PhaseNotFoundError
 from app.services.journey_service import (
     ActiveJourneyExistsError,
@@ -131,7 +132,9 @@ def update_journey(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> JourneyRead:
-    """Edita título/descrição da jornada (não mexe no status/ciclo de vida)."""
+    """Edita título/descrição da jornada (não mexe no status/ciclo de vida).
+    Período incoerente (fim antes do início, contando o que já está gravado)
+    responde 422, como no create e no finish."""
     try:
         return journey_service.update(
             db, user_id=current_user.id, journey_id=journey_id, data=data
@@ -140,6 +143,11 @@ def update_journey(
         raise _not_found
     except PhaseNotFoundError:
         raise fase_do_corpo_inexistente()
+    except InvalidJourneyDatesError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="ended_at cannot be earlier than started_at.",
+        )
 
 
 @router.post("/{journey_id}/start", response_model=JourneyRead)
@@ -208,7 +216,7 @@ def finish_journey(
         raise _conflict("Only an active or paused journey can be finished.")
     except InvalidJourneyDatesError:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="ended_at cannot be earlier than started_at.",
         )
 
@@ -252,11 +260,14 @@ def list_journey_memories(
 def create_memory_in_journey(
     journey_id: uuid.UUID,
     data: JourneyMemoryCreate,
+    background: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> JourneyDetailRead:
+    """Cria a memória já vinculada. O lugar é resolvido em segundo plano, como
+    em POST /memories — a resposta não espera o provedor."""
     try:
-        return journey_service.create_memory_in_journey(
+        detalhe, memoria_id = journey_service.create_memory_in_journey(
             db, user_id=current_user.id, journey_id=journey_id, data=data
         )
     except JourneyNotFoundError:
@@ -265,6 +276,12 @@ def create_memory_in_journey(
         raise _conflict("Cannot add points to a finished journey.")
     except JourneyConflictError:
         raise _conflict("Could not add the point due to a conflict. Try again.")
+    background.add_task(
+        memory_service.geocode_memory,
+        user_id=current_user.id,
+        memory_id=memoria_id,
+    )
+    return detalhe
 
 
 @router.delete(
@@ -325,7 +342,7 @@ def set_journey_cover(
         total += len(chunk)
         if total > max_bytes:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail="Image too large.",
             )
         chunks.append(chunk)

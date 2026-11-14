@@ -51,7 +51,7 @@ some-journey/
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0010)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (341 testes)
+|   |-- tests/                 # pytest (360 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -403,7 +403,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Health check e readiness com checagem de banco
 - [x] Configuracao por variaveis de ambiente
 - [x] Autenticacao com cadastro, login, JWT e `/auth/me`
-- [x] Rate limit simples para auth (por conta e por IP)
+- [x] Rate limit simples para auth (por conta, por IP e por e-mail)
 - [x] CRUD de memorias com ownership por usuario
 - [x] Jornadas com ciclo de vida (draft/active/paused/finished), pontos, reordenacao e desvinculo
 - [x] Edicao de jornada (`PATCH`), capa, `mood` e `is_private`
@@ -418,7 +418,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Migracoes versionadas (Alembic, 0001..0010)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 341 no backend (pytest) e 453 no app (flutter test)
+- [x] Testes automatizados — 360 no backend (pytest) e 453 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -480,7 +480,10 @@ seis meses.
 - Cada usuario acessa somente os proprios dados.
 - IDs inexistentes e IDs de outro usuario retornam o mesmo 404 nas rotas protegidas.
 - Bucket de imagens privado: a API devolve URL assinada e temporaria.
-- Middleware rejeita corpos acima de `MAX_JSON_BODY_BYTES` com 413.
+- Middleware rejeita corpos acima de `MAX_JSON_BODY_BYTES` com 413 (uploads de foto, capa e avatar tem o teto de imagem).
+- Login e recuperacao de senha tem um teto por e-mail (`AUTH_RATE_LIMIT_EMAIL_ATTEMPTS`), que nao depende de IP: um `X-Forwarded-For` forjado nao o contorna.
+- STARTTLS do SMTP confere o certificado e o nome do servidor.
+- Um e-mail ja ligado a uma conta Google nao e religado a outra (`409`): e-mail de dominio que troca de dono nao herda as memorias de ninguem.
 - Senhas, tokens e dados sensiveis nao devem ir para logs.
 
 ---

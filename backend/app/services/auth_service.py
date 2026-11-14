@@ -37,6 +37,14 @@ class InvalidCredentialsError(Exception):
     """E-mail ou senha inválidos — a rota traduz para 401 (mensagem genérica)."""
 
 
+class GoogleAccountConflictError(Exception):
+    """O e-mail já tem conta ligada a OUTRA conta Google — a rota traduz em 409."""
+
+
+class PasswordNotSetError(Exception):
+    """Conta que só entra pelo Google: não há senha atual para conferir — 409."""
+
+
 class InactiveUserError(Exception):
     """Conta inativa — a rota traduz para 403 Forbidden."""
 
@@ -121,6 +129,12 @@ def login_with_google(db: Session, id_token: str) -> LoginResponse:
     user = user_repository.get_by_google_sub(db, identidade.sub)
     if user is None:
         existente = user_repository.get_by_email(db, identidade.email)
+        if existente is not None and existente.google_sub is not None:
+            # O e-mail já está ligado a OUTRO `sub` (o passo 1 teria achado o
+            # mesmo). É o caso que o vínculo pelo `sub` existe para barrar: um
+            # e-mail de domínio que trocou de dono. Sobrescrever entregaria as
+            # memórias da pessoa anterior a quem herdou o endereço.
+            raise GoogleAccountConflictError()
         if existente is not None:
             user = user_repository.link_google(
                 db, user=existente, google_sub=identidade.sub
@@ -156,7 +170,13 @@ def change_password(
 
     Quem avança password_changed_at é o set_password_hash, no mesmo UPDATE do
     hash — é lá que a regra vive, para nenhum chamador poder esquecê-la. Isso
-    invalida NA HORA os tokens emitidos antes (claim pcat < novo valor)."""
+    invalida NA HORA os tokens emitidos antes (claim pcat < novo valor).
+
+    Conta que só entra pelo Google não tem senha atual para conferir: levanta
+    PasswordNotSetError em vez de passar None ao verificador, que quebraria
+    com TypeError (500)."""
+    if user.password_hash is None:
+        raise PasswordNotSetError()
     if not verify_password(current_password, user.password_hash):
         raise InvalidCredentialsError()
     user_repository.set_password_hash(

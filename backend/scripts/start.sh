@@ -37,5 +37,9 @@ done
 # proxy-headers, o uvicorn lê o X-Forwarded-For e request.client passa a refletir
 # o IP real do cliente. Confiamos no XFF porque no Render só o proxy da própria
 # plataforma alcança o container (borda controlada); daí o '*'.
+# LIMITE CONHECIDO: com '*' o uvicorn usa a entrada mais à ESQUERDA do XFF, que
+# o cliente pode escrever se o proxy acrescenta em vez de sobrescrever. O balde
+# por e-mail do rate limit (app/api/routes/auth.py) não depende de IP e segura
+# o brute-force numa conta; acertar o IP pede ver o XFF real em produção.
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --workers 2 \
   --proxy-headers --forwarded-allow-ips='*'

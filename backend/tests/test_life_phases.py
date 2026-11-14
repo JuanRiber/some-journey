@@ -11,6 +11,7 @@ A etiqueta é descartável; a lembrança não.
 """
 
 import uuid
+from datetime import UTC, datetime
 
 from app.models.journey import Journey
 from app.models.memory import Memory
@@ -201,3 +202,32 @@ class TestApagar:
     def test_nao_apaga_fase_alheia(self, client, auth_headers):
         alheia = _criar(client, auth_headers()).json()["id"]
         assert client.delete(f"/life-phases/{alheia}", headers=auth_headers()).status_code == 404
+
+
+class TestDatasSemFuso:
+    """Regressão: as datas da fase não eram normalizadas para UTC. Uma data sem
+    fuso ao lado de uma com fuso quebrava a comparação do período com
+    TypeError, e a resposta era 500."""
+
+    def test_patch_com_data_sem_fuso_numa_fase_com_fuso(self, client, auth_headers):
+        h = auth_headers()
+        fase = _criar(client, h, started_at="2020-01-01T00:00:00Z").json()
+
+        r = client.patch(
+            f"/life-phases/{fase['id']}", json={"ended_at": "2021-01-01T00:00:00"}, headers=h
+        )
+        assert r.status_code == 200, r.text
+        # Sem fuso vira UTC — não o fuso da sessão do banco.
+        fim = datetime.fromisoformat(r.json()["ended_at"])
+        assert fim == datetime(2021, 1, 1, tzinfo=UTC)
+
+    def test_post_misturando_os_dois_formatos(self, client, auth_headers):
+        h = auth_headers()
+        ok = _criar(
+            client, h, started_at="2020-01-01T00:00:00Z", ended_at="2021-01-01T00:00:00"
+        )
+        assert ok.status_code == 201, ok.text
+        incoerente = _criar(
+            client, h, started_at="2021-01-01T00:00:00Z", ended_at="2020-01-01T00:00:00"
+        )
+        assert incoerente.status_code == 422, "incoerente é 422, não 500"

@@ -139,17 +139,27 @@ def get_memory(
 def update_memory(
     memory_id: uuid.UUID,
     data: MemoryUpdate,
+    background: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> MemoryRead:
+    """Edição parcial. Se a memória mudou de lugar, o lugar antigo some na hora
+    e o novo é resolvido em segundo plano — o mesmo arranjo do create."""
     try:
-        return memory_service.update(
+        atualizada, mudou_de_lugar = memory_service.update(
             db, user_id=current_user.id, memory_id=memory_id, data=data
         )
     except MemoryNotFoundError:
         raise _not_found
     except PhaseNotFoundError:
         raise fase_do_corpo_inexistente()
+    if mudou_de_lugar:
+        background.add_task(
+            memory_service.geocode_memory,
+            user_id=current_user.id,
+            memory_id=memory_id,
+        )
+    return atualizada
 
 
 @router.delete("/{memory_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -185,7 +195,7 @@ def add_memory_image(
         total += len(chunk)
         if total > max_bytes:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail="Image too large.",
             )
         chunks.append(chunk)

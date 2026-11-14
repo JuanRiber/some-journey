@@ -25,22 +25,38 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _client_ip(request: Request) -> str:
-    # Usa o peer direto (request.client.host). NÃO lemos X-Forwarded-For aqui:
-    # confiar nele sem validação deixaria forjar o IP e furar o rate limit. Em
-    # produção atrás de proxy, suba o uvicorn com --proxy-headers e
-    # --forwarded-allow-ips=<ip do proxy> para que request.client venha do XFF
-    # SOMENTE do proxy confiável.
+    # O peer que o uvicorn entrega. Em produção ele sobe com --proxy-headers e
+    # --forwarded-allow-ips='*' (scripts/start.sh), e com '*' o uvicorn devolve
+    # a entrada MAIS À ESQUERDA do X-Forwarded-For — que é o que o cliente
+    # quiser escrever, se o proxy da plataforma acrescenta em vez de
+    # sobrescrever. Por isso nenhum limite que importa depende só daqui: o
+    # balde por E-MAIL (em _limit_auth) não lê IP nenhum.
     return request.client.host if request.client else "unknown"
 
 
-def _limit_auth(request: Request, scope: str, email: str) -> None:
-    """Duas camadas: por CONTA (IP+email) contra brute-force numa conta, e por
-    IP (independe do email) contra password spraying. Ambas são checadas sempre
-    (as duas contam a tentativa); 429 se qualquer uma estourar."""
+def _limit_auth(
+    request: Request, scope: str, email: str, *, per_email: bool = True
+) -> None:
+    """Três camadas, todas checadas sempre (cada uma conta a tentativa); 429 se
+    qualquer uma estourar:
+
+    - por CONTA neste IP (IP+email): brute-force numa conta, apertado;
+    - por IP (independe do email): password spraying;
+    - por E-MAIL, de qualquer IP: o teto que um X-Forwarded-For forjado não
+      fura. Sem ele, quem troca o IP a cada tentativa cai sempre num balde
+      novo nas duas camadas acima e adivinha a senha de uma conta sem limite —
+      ou enche de e-mails de recuperação a caixa de alguém. É mais folgado que
+      o por-conta porque trava a conta para todo mundo, inclusive para a dona.
+
+    `per_email=False` só para quem não tem e-mail na chave (o login do Google
+    usa o começo do token, que é igual para todo token do mesmo emissor — um
+    balde "por e-mail" ali seria um teto GLOBAL de logins pelo Google).
+    """
     ip = _client_ip(request)
+    conta = email.lower().strip()
     ok_account, retry_account = check_rate_limit(
         scope,
-        [ip, email.lower().strip()],
+        [ip, conta],
         max_attempts=settings.AUTH_RATE_LIMIT_ATTEMPTS,
         window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
     )
@@ -50,9 +66,21 @@ def _limit_auth(request: Request, scope: str, email: str) -> None:
         max_attempts=settings.AUTH_RATE_LIMIT_IP_ATTEMPTS,
         window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
     )
-    if ok_account and ok_ip:
+    ok_email, retry_email = (True, 0)
+    if per_email:
+        ok_email, retry_email = check_rate_limit(
+            f"{scope}:email",
+            [conta],
+            max_attempts=settings.AUTH_RATE_LIMIT_EMAIL_ATTEMPTS,
+            window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
+        )
+    if ok_account and ok_ip and ok_email:
         return
-    retry_after = max(0 if ok_account else retry_account, 0 if ok_ip else retry_ip)
+    retry_after = max(
+        0 if ok_account else retry_account,
+        0 if ok_ip else retry_ip,
+        0 if ok_email else retry_email,
+    )
     raise HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         detail="Too many attempts. Try again later.",
@@ -209,9 +237,13 @@ def login_with_google(
     conta inativa, igual ao login por senha.
 
     O limitador usa o próprio token como chave de balde: sem e-mail no corpo,
-    é o que identifica a tentativa antes de sabermos quem é.
+    é o que identifica a tentativa antes de sabermos quem é. Sem o balde por
+    e-mail: o começo do token é o cabeçalho do JWT, igual para todo token do
+    Google, e ali ele viraria um teto global.
+
+    **409** quando o e-mail já está ligado a OUTRA conta Google (outro `sub`).
     """
-    _limit_auth(request, "google", data.id_token[:64])
+    _limit_auth(request, "google", data.id_token[:64], per_email=False)
     try:
         return auth_service.login_with_google(db, data.id_token)
     except google_oauth.GoogleNotConfigured:
@@ -228,6 +260,16 @@ def login_with_google(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This account is inactive.",
+        )
+    except auth_service.GoogleAccountConflictError:
+        # Quem pede provou controlar o e-mail (o token veio verificado), então
+        # dizer que ele já tem dono no Google não vaza nada a um estranho.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Este e-mail já está ligado a outra conta Google. Entre com "
+                "e-mail e senha — ou use \"Esqueci minha senha\" para criar uma."
+            ),
         )
 
 
@@ -251,4 +293,12 @@ def change_password(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Current password is incorrect.",
+        )
+    except auth_service.PasswordNotSetError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Esta conta entra pelo Google e ainda não tem senha. Para criar "
+                "uma, use \"Esqueci minha senha\" na tela de entrada."
+            ),
         )

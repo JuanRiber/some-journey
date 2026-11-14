@@ -1,5 +1,6 @@
 """Location (Value Object) + derivação de continente. Domínio puro, sem banco."""
 
+from dataclasses import FrozenInstanceError
 from datetime import UTC, datetime
 
 import pytest
@@ -48,7 +49,9 @@ def test_igualdade_por_valor():
 
 def test_e_imutavel():
     loc = Location(**FORTALEZA)
-    with pytest.raises(Exception):
+    # O erro específico do dataclass congelado: `Exception` passaria com
+    # qualquer falha, até um AttributeError de digitação no nome do campo.
+    with pytest.raises(FrozenInstanceError):
         loc.city = "outra"  # type: ignore[misc]
 
 

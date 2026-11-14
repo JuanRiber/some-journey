@@ -53,8 +53,11 @@ class JourneyUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=5000)
     mood: str | None = Field(default=None, max_length=120)
     is_private: bool | None = None
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
+    # UTC-aware, como no create: naive seria lido no fuso da sessão do banco.
+    # A coerência do período (fim >= início) é conferida no serviço, contra o
+    # que já está gravado — aqui só se vê metade do período.
+    started_at: AwareUtcDatetime | None = None
+    ended_at: AwareUtcDatetime | None = None
     # Exceção deliberada ao "null não mexe" deste PATCH: aqui `null` SOLTA a
     # jornada da fase. Um id não tem string vazia que o substitua, e sem isso
     # uma jornada marcada por engano ficaria presa à fase para sempre.
@@ -117,7 +120,10 @@ class JourneyMemoryAdd(BaseModel):
 class JourneyMemoryCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str = Field(min_length=1, max_length=120)
+    # Título OPCIONAL, como em MemoryCreate. Esta cópia tinha ficado para trás
+    # quando o título deixou de ser obrigatório: o app manda "" e a memória
+    # sem título criada DENTRO de uma jornada voltava 422.
+    title: str = Field(default="", max_length=120)
     # Descrição OPCIONAL (mesmo critério da memória avulsa).
     text: str = Field(default="", max_length=5000)
     latitude: float = Field(ge=-90, le=90)

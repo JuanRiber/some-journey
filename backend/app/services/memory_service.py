@@ -7,10 +7,12 @@ filtra por user_id (ownership) e deleted_at (soft delete).
 """
 
 import logging
+import math
 import uuid
 from datetime import datetime
 
 from geoalchemy2.shape import to_shape
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core import images, storage
@@ -238,12 +240,31 @@ def get(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> MemoryRead:
     return _read_with_images(db, memory)
 
 
+def _moved(memory: Memory, data: MemoryUpdate) -> bool:
+    """A edição leva a memória para OUTRO ponto?
+
+    O app manda latitude e longitude em todo salvar, mesmo sem mexer no mapa —
+    por isso "veio coordenada" não basta. Comparar com o ponto gravado evita
+    apagar e refazer o lugar de toda memória editada só no texto."""
+    if data.latitude is None or data.longitude is None:
+        return False
+    atual = to_shape(memory.location)
+    return not (
+        math.isclose(atual.y, data.latitude, abs_tol=1e-9)
+        and math.isclose(atual.x, data.longitude, abs_tol=1e-9)
+    )
+
+
 def update(
     db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID, data: MemoryUpdate
-) -> MemoryRead:
+) -> tuple[MemoryRead, bool]:
+    """Edição parcial. Devolve a memória e se ela MUDOU DE LUGAR — nesse caso o
+    lugar antigo foi apagado e quem chama agenda `geocode_memory` (a rota faz
+    isso em segundo plano, como no create)."""
     memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
     if memory is None:
         raise MemoryNotFoundError()
+    mudou_de_lugar = _moved(memory, data)
     # exclude_unset: só os campos realmente enviados chegam ao repository.
     campos = data.model_dump(exclude_unset=True)
     # A fase sai do pacote ANTES do repository, porque é o único campo em que
@@ -253,8 +274,10 @@ def update(
         memory.life_phase_id = life_phase_service.owned_phase_id(
             db, user_id=user_id, phase_id=campos.pop("life_phase_id")
         )
-    updated = memory_repository.update(db, memory=memory, **campos)
-    return _read_with_images(db, updated)
+    updated = memory_repository.update(
+        db, memory=memory, reset_place=mudou_de_lugar, **campos
+    )
+    return _read_with_images(db, updated), mudou_de_lugar
 
 
 def delete(db: Session, *, user_id: uuid.UUID, memory_id: uuid.UUID) -> None:
@@ -366,12 +389,20 @@ def add_music(
     if memory_repository.count_music(db, memory_id=memory.id) >= _MAX_TRACKS:
         raise TooManyTracksError
 
-    memory_repository.add_music(
-        db,
-        memory_id=memory.id,
-        data=data.model_dump(),
-        position=memory_repository.next_music_position(db, memory_id=memory.id),
-    )
+    try:
+        memory_repository.add_music(
+            db,
+            memory_id=memory.id,
+            data=data.model_dump(),
+            position=memory_repository.next_music_position(db, memory_id=memory.id),
+        )
+    except IntegrityError as exc:
+        # A conferência acima e o INSERT não são atômicos: um toque duplo no
+        # "anexar" manda dois POSTs que passam juntos por ela, e o índice único
+        # (uq_memory_music_track_active) barra o segundo. É a mesma resposta
+        # que o caminho sem corrida dá — 409, não 500.
+        db.rollback()
+        raise DuplicateMusicError from exc
     return _read_with_images(db, memory)
 
 

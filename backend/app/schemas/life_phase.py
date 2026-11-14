@@ -11,6 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.life_phase import DESCRICAO_MAX, NOME_MAX
+from app.schemas._fields import AwareUtcDatetime
 
 
 class LifePhaseCreate(BaseModel):
@@ -21,8 +22,10 @@ class LifePhaseCreate(BaseModel):
     # O formato é validado no DOMÍNIO (app.domain.life_phase), que tem a lista
     # de papéis e a mensagem em pt-BR; aqui só o teto de tamanho.
     color: str | None = Field(default=None, max_length=20)
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
+    # UTC-aware: uma data naive ao lado de uma aware (a do banco, ou a outra do
+    # mesmo corpo) quebrava a comparação do período com TypeError — 500.
+    started_at: AwareUtcDatetime | None = None
+    ended_at: AwareUtcDatetime | None = None
 
 
 class LifePhaseUpdate(BaseModel):
@@ -39,8 +42,8 @@ class LifePhaseUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=NOME_MAX)
     description: str | None = Field(default=None, max_length=DESCRICAO_MAX)
     color: str | None = Field(default=None, max_length=20)
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
+    started_at: AwareUtcDatetime | None = None
+    ended_at: AwareUtcDatetime | None = None
 
 
 class LifePhaseRead(BaseModel):

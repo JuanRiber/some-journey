@@ -24,7 +24,7 @@ class BodySizeLimitMiddleware:
         *,
         max_body_bytes: int,
         upload_max_body_bytes: int,
-        upload_path_suffixes: tuple[str, ...] = ("/images", "/cover"),
+        upload_path_suffixes: tuple[str, ...] = ("/images", "/cover", "/avatar"),
     ) -> None:
         self.app = app
         self.max_body_bytes = max_body_bytes
@@ -33,7 +33,9 @@ class BodySizeLimitMiddleware:
 
     def _limit_for(self, scope: Scope) -> int:
         # Rotas de upload multipart (POST .../images = foto de memória,
-        # .../cover = capa de jornada) têm teto maior por causa do arquivo.
+        # .../cover = capa de jornada, /me/avatar = foto do perfil) têm teto
+        # maior por causa do arquivo. Sem o /avatar aqui, a foto do perfil
+        # morria em 1 MB (o teto de JSON), longe dos 5 MB prometidos.
         if scope.get("method") == "POST" and scope.get("path", "").endswith(
             self.upload_path_suffixes
         ):

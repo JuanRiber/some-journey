@@ -212,9 +212,16 @@ def update(
     latitude: float | None = None,
     longitude: float | None = None,
     occurred_at: datetime | None = None,
+    reset_place: bool = False,
 ) -> Memory:
     """Atualização parcial de uma memória já carregada (e do dono). Só altera os
-    campos passados; latitude/longitude vêm juntas e viram um novo POINT."""
+    campos passados; latitude/longitude vêm juntas e viram um novo POINT.
+
+    `reset_place=True` (a memória MUDOU de lugar) apaga o lugar resolvido —
+    cidade, país, rótulo, fuso — e zera `geocoded_at`, pondo a memória de volta
+    na fila do backfill. Sem isso ela continuaria dizendo "Fortaleza" depois de
+    ir para Lisboa, e o Passaporte contaria o lugar errado para sempre: o
+    `geocoded_at` preenchido a deixava fora da fila."""
     if title is not None:
         memory.title = title
     if text is not None:
@@ -223,6 +230,12 @@ def update(
         memory.occurred_at = occurred_at
     if latitude is not None and longitude is not None:
         memory.location = _point(latitude, longitude)
+        if reset_place:
+            # Um Location só com as coordenadas: tudo nulo, menos o geohash,
+            # que é derivado do ponto novo.
+            vazio = Location(latitude=latitude, longitude=longitude)
+            for column, value in vazio.to_columns().items():
+                setattr(memory, column, value)
     db.commit()
     db.refresh(memory)
     return memory

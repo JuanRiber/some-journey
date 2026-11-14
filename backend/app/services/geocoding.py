@@ -10,7 +10,9 @@ na fila de backfill (índice `ix_memories_pending_geocode`). Perder o nome do lu
 """
 
 import logging
+import threading
 from datetime import UTC, datetime
+from functools import lru_cache
 from typing import Protocol
 
 import httpx
@@ -70,6 +72,10 @@ class NominatimGeocodingProvider:
         self._timezone_resolver = timezone_resolver
         self._now = now
         self._last_call_at: datetime | None = None
+        # A conferência do intervalo e a reserva da vaga precisam ser uma coisa
+        # só: as tarefas de fundo rodam em threads, e duas olhando ao mesmo
+        # tempo veriam as duas a vaga livre.
+        self._lock = threading.Lock()
 
     def _respect_rate_limit(self) -> bool:
         """True quando é permitido chamar agora. Preferimos PULAR (e deixar para
@@ -80,9 +86,12 @@ class NominatimGeocodingProvider:
         return (self._now() - last).total_seconds() >= self._MIN_INTERVAL_SECONDS
 
     def reverse(self, latitude: float, longitude: float) -> Location | None:
-        if not self._respect_rate_limit():
-            logger.info("Geocoding pulado (rate limit); ficará para o backfill.")
-            return None
+        with self._lock:
+            if not self._respect_rate_limit():
+                logger.info("Geocoding pulado (rate limit); ficará para o backfill.")
+                return None
+            # Reserva ANTES da rede: a chamada conta mesmo se falhar.
+            self._last_call_at = self._now()
 
         params = {
             "lat": f"{latitude}",
@@ -94,7 +103,6 @@ class NominatimGeocodingProvider:
         headers = {"User-Agent": self._user_agent, "Accept-Language": "pt-BR,pt,en"}
 
         try:
-            self._last_call_at = self._now()
             if self._client is not None:
                 response = self._client.get(
                     self._ENDPOINT, params=params, headers=headers, timeout=self._timeout
@@ -186,8 +194,23 @@ def get_provider() -> GeocodingProvider:
     """
     if not settings.geocoding_enabled:
         return NullGeocodingProvider()
+    return _nominatim(settings.GEOCODING_USER_AGENT)
+
+
+@lru_cache(maxsize=1)
+def _nominatim(user_agent: str) -> "NominatimGeocodingProvider":
+    """UM provedor por processo.
+
+    O intervalo mínimo entre chamadas (a política de uso do Nominatim) mora no
+    provedor. Quando cada geocodificação construía o seu, o relógio dele
+    nascia zerado e o limite nunca valia: uma rajada de memórias saía em
+    rajada para o Nominatim, que bloqueia o IP de saída — e aí a
+    geocodificação para para todo mundo, em silêncio.
+
+    É por processo: com os 2 workers do start.sh o teto real é ~2 por
+    segundo, e o backfill, rodado à parte, tem o próprio relógio."""
     return NominatimGeocodingProvider(
-        user_agent=settings.GEOCODING_USER_AGENT,
+        user_agent=user_agent,
         timezone_resolver=resolve_timezone,
     )
 

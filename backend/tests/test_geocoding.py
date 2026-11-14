@@ -150,3 +150,56 @@ class TestFusoHorario:
     def test_desligado_continua_sem_provedor(self, monkeypatch):
         monkeypatch.setattr(geocoding.settings, "GEOCODING_ENABLED", False)
         assert isinstance(get_provider(), NullGeocodingProvider)
+
+
+class TestUmProvedorPorProcesso:
+    def test_get_provider_devolve_sempre_o_mesmo(self, monkeypatch):
+        """Regressão: um provedor novo a cada chamada nascia com o relógio
+        zerado, e o intervalo mínimo da política do Nominatim nunca valia."""
+        monkeypatch.setattr(geocoding.settings, "APP_ENV", "development")
+        assert get_provider() is get_provider()
+
+    def test_o_intervalo_vale_entre_chamadas_do_mesmo_provedor(self):
+        chamadas = []
+
+        def responde(req):
+            chamadas.append(req)
+            return httpx.Response(200, json=_PAYLOAD)
+
+        p = _provider(responde)
+        assert p.reverse(*FORTALEZA) is not None
+        assert p.reverse(*FORTALEZA) is None, "a segunda, no mesmo segundo, fica para o backfill"
+        assert len(chamadas) == 1
+
+    def test_duas_threads_ao_mesmo_tempo_fazem_uma_chamada(self):
+        # As tarefas de fundo rodam em threads: conferir o intervalo e reservar
+        # a vaga precisam ser um passo só.
+        import threading
+        import time
+
+        chamadas = []
+        largada = threading.Barrier(2)
+        instante = datetime(2026, 7, 26, 12, 0, tzinfo=UTC)
+
+        def responde(req):
+            chamadas.append(req)
+            return httpx.Response(200, json=_PAYLOAD)
+
+        def relogio_lento():
+            # Alarga a janela entre "a vaga está livre" e "reservei a vaga":
+            # sem a trava, a outra thread passa por ela e chama também.
+            time.sleep(0.05)
+            return instante
+
+        p = _provider(responde, now=relogio_lento)
+
+        def chama():
+            largada.wait()
+            p.reverse(*FORTALEZA)
+
+        threads = [threading.Thread(target=chama) for _ in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert len(chamadas) == 1

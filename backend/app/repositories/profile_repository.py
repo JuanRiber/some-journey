@@ -105,6 +105,13 @@ def tracked_meters(db: Session, *, user_id: uuid.UUID) -> float:
 
     Trechos com menos de 2 pontos viram linha degenerada; o filtro
     `count(*) > 1` os descarta antes de medir.
+
+    Só trechos ATIVOS: apagar um trecho, ou a jornada (que apaga os trechos
+    dela), marca `journey_tracks.deleted_at` e não toca nos pontos. Lendo os
+    pontos direto, o perfil continuava somando o caminho apagado. O filtro por
+    dono sai da tabela de trechos — pequena — e os pontos vêm pelo índice
+    (track_id, recorded_at), em vez de uma varredura de todos os pontos de
+    todo mundo atrás de `user_id`, que não tem índice ali.
     """
     # SQL cru: os casts geometry/geography e o ORDER BY dentro do agregado são
     # mais claros (e mais confiáveis) escritos à mão do que montados no ORM.
@@ -113,11 +120,12 @@ def tracked_meters(db: Session, *, user_id: uuid.UUID) -> float:
         """
         SELECT COALESCE(SUM(meters), 0.0) FROM (
             SELECT ST_Length(
-                       ST_MakeLine(location::geometry ORDER BY recorded_at, id)::geography
+                       ST_MakeLine(p.location::geometry ORDER BY p.recorded_at, p.id)::geography
                    ) AS meters
-            FROM journey_track_points
-            WHERE user_id = :user_id
-            GROUP BY track_id
+            FROM journey_track_points AS p
+            JOIN journey_tracks AS t ON t.id = p.track_id
+            WHERE t.user_id = :user_id AND t.deleted_at IS NULL
+            GROUP BY p.track_id
             HAVING COUNT(*) > 1
         ) AS per_track
         """

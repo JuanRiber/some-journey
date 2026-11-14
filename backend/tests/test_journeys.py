@@ -2,6 +2,7 @@
 um-ponto-por-jornada, desvínculo, edição de metadados e ownership."""
 
 import uuid
+from datetime import UTC, datetime
 
 
 def _journey(client, headers, title="Viagem"):
@@ -401,3 +402,37 @@ def test_delete_journey_soft_deletes_its_tracks(client, auth_headers):
         assert track.deleted_at is not None  # mas marcada como apagada
     finally:
         db.close()
+
+
+class TestPeriodoNoPatch:
+    """Regressão: create e finish recusavam fim antes do início, e o PATCH
+    deixava passar — gravando um período impossível."""
+
+    def test_fim_antes_do_inicio_gravado_e_recusado(self, client, auth_headers):
+        h = auth_headers()
+        jid = client.post(
+            "/journeys",
+            json={"title": "Viagem", "started_at": "2024-06-01T00:00:00Z"},
+            headers=h,
+        ).json()["id"]
+
+        r = client.patch(f"/journeys/{jid}", json={"ended_at": "2020-01-01T00:00:00Z"}, headers=h)
+        assert r.status_code == 422, r.text
+        assert client.get(f"/journeys/{jid}", headers=h).json()["ended_at"] is None
+
+    def test_mover_os_dois_juntos_e_aceito(self, client, auth_headers):
+        h = auth_headers()
+        jid = client.post(
+            "/journeys",
+            json={"title": "Viagem", "started_at": "2024-06-01T00:00:00Z"},
+            headers=h,
+        ).json()["id"]
+        r = client.patch(
+            f"/journeys/{jid}",
+            json={"started_at": "2019-01-01T00:00:00Z", "ended_at": "2019-02-01T00:00:00"},
+            headers=h,
+        )
+        # A data sem fuso vira UTC em vez de ser lida no fuso do banco.
+        assert r.status_code == 200, r.text
+        fim = datetime.fromisoformat(r.json()["ended_at"])
+        assert fim == datetime(2019, 2, 1, tzinfo=UTC)

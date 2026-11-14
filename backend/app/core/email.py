@@ -16,6 +16,7 @@ Regras de ouro:
 
 import logging
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 from app.core.config import settings
@@ -68,7 +69,11 @@ def send_password_reset(to_email: str, raw_token: str) -> None:
             settings.SMTP_HOST, settings.SMTP_PORT, timeout=settings.SMTP_TIMEOUT_SECONDS
         ) as server:
             if settings.SMTP_STARTTLS:
-                server.starttls()
+                # Contexto PADRÃO, que confere certificado e nome do host. Sem
+                # ele o smtplib usa um contexto que não verifica nada: quem
+                # estiver no meio do caminho leria a senha do SMTP e todo link
+                # de recuperação — e com o link, trocaria a senha de qualquer um.
+                server.starttls(context=ssl.create_default_context())
             if settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
                 server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
             server.send_message(message)

@@ -43,7 +43,7 @@ def update_profile(
     except InvalidUsernameError as exc:
         # Mensagem de domínio, em pt-BR, pronta para a UI.
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         )
     except profile_service.UsernameTakenError:
         raise HTTPException(
@@ -72,7 +72,7 @@ def set_avatar(
         total += len(chunk)
         if total > max_bytes:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail="Image too large.",
             )
         chunks.append(chunk)

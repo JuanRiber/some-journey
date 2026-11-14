@@ -81,7 +81,15 @@ reprocessar quando o provedor melhorar. Nada disso exige nova migração depois.
   ao `timezonefinder`, 53 MB, por causa do peso da imagem no free tier) — evita mais uma
   dependência de rede por memória.
 - **Nominatim exige** User-Agent identificável e **máx. 1 req/s**: rate limit e
-  cabeçalho ficam DENTRO do adapter, nunca espalhados.
+  cabeçalho ficam DENTRO do adapter, nunca espalhados. O adapter é **um por processo**
+  (`geocoding._nominatim`, em cache) — enquanto cada chamada construía o seu, o relógio
+  nascia zerado e o limite nunca valia. Com os 2 workers do `start.sh` o teto real é
+  ~2 req/s.
+- **Mudar a memória de lugar** apaga o lugar antigo e zera `geocoded_at` na hora; o novo
+  é resolvido em segundo plano, como no create. Salvar com o MESMO ponto (o app manda as
+  coordenadas em todo salvar) não mexe no lugar.
+- Memória criada **dentro de uma jornada** (`POST /journeys/{id}/memories`) também é
+  geocodificada em segundo plano — antes ficava sem lugar até alguém rodar o backfill.
 
 ## `GET /me/profile` (depois da 0009)
 

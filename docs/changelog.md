@@ -513,3 +513,48 @@ Registro das mudanças de **documentação** (`/docs`). Mudanças de código fic
 ### Paridade
 - Saíram de `KNOWN_GAPS` as rotas que o app passou a chamar. Fica `GET /life-phases/{id}`,
   com o motivo escrito: a lista já traz cada fase inteira e o formulário abre com ela na mão.
+
+## 2026-11-14
+
+### Revisão geral do backend
+Uma leitura de ponta a ponta atrás de defeitos reais — não de estilo. Cada achado foi
+confirmado no código, corrigido e ganhou um teste que falha sem a correção.
+
+**Segurança**
+- **Teto por e-mail no rate limit** (`AUTH_RATE_LIMIT_EMAIL_ATTEMPTS`, padrão 20 por janela)
+  no login e na recuperação de senha. Com `--forwarded-allow-ips='*'` o uvicorn usa a entrada
+  mais à esquerda do `X-Forwarded-For`, que o cliente escreve: trocando o IP a cada tentativa,
+  os baldes por conta e por IP nunca enchiam. O balde por e-mail não lê IP nenhum. Acertar a
+  leitura do IP fica para quando der para ver o `X-Forwarded-For` real do Render.
+- **STARTTLS confere o certificado.** Sem contexto, o `smtplib` aceitava qualquer um: quem
+  estivesse no meio do caminho leria a senha do SMTP e os links de recuperação.
+- **Google: e-mail já ligado não troca de dono.** O passo de vínculo por e-mail sobrescrevia o
+  `google_sub` de quem já tinha um. Um e-mail de domínio reatribuído a outra pessoa (outro
+  `sub`) entregaria a ela as memórias da anterior. Agora responde **409**.
+
+**Correção**
+- Mudar uma memória de lugar deixava o lugar antigo para sempre ("Fortaleza" depois de ir para
+  Lisboa), e o `geocoded_at` preenchido a mantinha fora do backfill.
+- `POST /journeys/{id}/memories` não geocodificava e ainda exigia título — a cópia do contrato
+  tinha ficado para trás quando o título virou opcional; memória sem título criada dentro de
+  uma jornada voltava 422.
+- Datas sem fuso: nas fases da vida, misturar uma data com fuso e outra sem dava **500**
+  (TypeError ao comparar o período). No PATCH de jornada, eram lidas no fuso da sessão do
+  banco. Agora as duas viram UTC, como no resto da API.
+- O PATCH de jornada aceitava fim antes do início, que o create e o finish recusam. Agora
+  confere contra o que já está gravado e responde **422**.
+- Trocar a senha numa conta que só entra pelo Google dava **500**. Agora **409** com o caminho:
+  "Esqueci minha senha".
+- A distância percorrida do perfil somava trechos e jornadas apagados, e procurava os pontos
+  numa coluna sem índice. Agora parte dos trechos ativos.
+- A foto do perfil morria em 1 MB (o teto de JSON) em vez dos 5 MB das outras fotos.
+- O intervalo mínimo do Nominatim nunca valia (um provedor novo a cada chamada). Agora é um
+  por processo, com a vaga reservada sob trava.
+- Toque duplo em "anexar música" dava **500** no segundo POST. Agora **409**, como o caminho
+  sem corrida.
+
+**Limpeza**
+- As constantes HTTP deprecadas no Starlette 1.6 (`HTTP_422_UNPROCESSABLE_ENTITY`,
+  `HTTP_413_REQUEST_ENTITY_TOO_LARGE`) trocadas pelos nomes novos; os códigos não mudam.
+- Imports e variável sem uso nos testes; um teste de imutabilidade que aceitava qualquer
+  exceção passou a exigir a do dataclass congelado.

@@ -200,3 +200,34 @@ def test_dias_ativos_contam_dias_distintos(client, auth_headers):
     _memory(client, headers, title="B")  # mesmo dia de criação
     stats = client.get("/me/profile", headers=headers).json()["stats"]
     assert stats["active_days"] == 1
+
+
+def test_trecho_e_jornada_apagados_saem_da_distancia(client, auth_headers):
+    """Regressão: a soma lia os pontos de GPS direto, e apagar um trecho ou a
+    jornada só marca o trecho — o perfil continuava contando o caminho que a
+    pessoa apagou."""
+    headers = auth_headers()
+
+    def gravar(titulo):
+        jid = client.post("/journeys", json={"title": titulo}, headers=headers).json()["id"]
+        tid = client.post(f"/journeys/{jid}/tracks/start", headers=headers).json()["id"]
+        r = client.post(
+            f"/journeys/{jid}/tracks/{tid}/points", json={"points": TRACK_PTS}, headers=headers
+        )
+        assert r.status_code == 200, r.text
+        return jid, tid
+
+    jornada_a, trecho_a = gravar("Trecho apagado")
+    jornada_b, _ = gravar("Jornada apagada")
+    _track(client, headers, "Fica")
+
+    def metros():
+        return client.get("/me/profile", headers=headers).json()["stats"]["tracked_meters"]
+
+    assert metros() == pytest.approx(3 * TRACK_METERS, rel=0.005)
+
+    assert client.delete(f"/journeys/{jornada_a}/tracks/{trecho_a}", headers=headers).status_code == 204
+    assert metros() == pytest.approx(2 * TRACK_METERS, rel=0.005)
+
+    assert client.delete(f"/journeys/{jornada_b}", headers=headers).status_code == 204
+    assert metros() == pytest.approx(TRACK_METERS, rel=0.005)

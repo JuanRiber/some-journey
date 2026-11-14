@@ -222,3 +222,119 @@ def test_registration_open_in_dev(client):
         json={"name": "x", "email": f"dev_{uuid.uuid4().hex}@t.com", "password": "whatever12345"},
     )
     assert r.status_code == 201
+
+
+# --- 8. Balde por E-MAIL: o teto que um X-Forwarded-For forjado não fura ----
+def _ip_a_cada_chamada(monkeypatch):
+    """Faz cada requisição parecer vir de um IP novo — o que um cliente consegue
+    escrevendo o X-Forwarded-For quando o uvicorn confia em '*'."""
+    import itertools
+
+    from app.api.routes import auth as auth_routes
+
+    contador = itertools.count()
+    monkeypatch.setattr(auth_routes, "_client_ip", lambda _r: f"10.0.0.{next(contador)}")
+
+
+def test_email_bucket_holds_when_ip_changes_every_attempt(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "AUTH_RATE_LIMIT_EMAIL_ATTEMPTS", 3)
+    _ip_a_cada_chamada(monkeypatch)
+    alvo = f"alvo_{uuid.uuid4().hex}@t.com"
+
+    codes = [
+        client.post("/auth/login", json={"email": alvo, "password": "chute12345"}).status_code
+        for _ in range(5)
+    ]
+    # Com IP novo a cada tentativa, o por-conta e o por-IP nunca enchem; só o
+    # por-e-mail segura o brute-force.
+    assert codes == [401, 401, 401, 429, 429]
+
+    # E ele é por e-mail, não global: outra conta continua respondendo normal.
+    outro = client.post(
+        "/auth/login", json={"email": f"outro_{uuid.uuid4().hex}@t.com", "password": "x" * 10}
+    )
+    assert outro.status_code == 401
+
+
+def test_email_bucket_also_guards_forgot_password(client, monkeypatch):
+    # Sem ele, trocar de IP a cada pedido enche a caixa de alguém de e-mails de
+    # recuperação.
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "AUTH_RATE_LIMIT_EMAIL_ATTEMPTS", 2)
+    _ip_a_cada_chamada(monkeypatch)
+    alvo = f"caixa_{uuid.uuid4().hex}@t.com"
+
+    codes = [
+        client.post("/auth/forgot-password", json={"email": alvo}).status_code
+        for _ in range(3)
+    ]
+    assert codes == [202, 202, 429]
+
+
+# --- 9. STARTTLS confere o certificado do servidor SMTP --------------------
+def test_starttls_verifies_the_server_certificate(monkeypatch):
+    import ssl
+
+    from app.core import email as email_delivery
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.exemplo.test")
+    monkeypatch.setattr(settings, "SMTP_FROM", "Some Journey <nao-responda@exemplo.test>")
+    monkeypatch.setattr(settings, "SMTP_STARTTLS", True)
+    visto: dict[str, object] = {}
+
+    class _SMTPFalso:
+        def __init__(self, *_a, **_k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+        def starttls(self, context=None):
+            visto["contexto"] = context
+
+        def login(self, *_a):
+            pass
+
+        def send_message(self, _m):
+            visto["enviado"] = True
+
+    monkeypatch.setattr(email_delivery.smtplib, "SMTP", _SMTPFalso)
+    email_delivery.send_password_reset("alguem@exemplo.test", "token-cru")
+
+    contexto = visto["contexto"]
+    # Sem contexto o smtplib usa um que aceita qualquer certificado: quem
+    # estivesse no meio leria a senha do SMTP e todo link de recuperação.
+    assert isinstance(contexto, ssl.SSLContext)
+    assert contexto.verify_mode == ssl.CERT_REQUIRED
+    assert contexto.check_hostname is True
+    assert visto.get("enviado") is True
+
+
+# --- 10. A foto do perfil tem o teto de upload, não o de JSON --------------
+def test_avatar_between_json_and_image_limits_not_rejected(client, auth_headers, monkeypatch):
+    """Regressão: /me/avatar não estava entre as rotas de upload do middleware,
+    então todo avatar acima de 1 MB (o teto de JSON) virava 413, longe dos 5 MB
+    prometidos."""
+    from app.core import storage
+
+    monkeypatch.setattr(storage, "enabled", lambda: True)
+    monkeypatch.setattr(storage, "upload", lambda *a, **k: None)
+    monkeypatch.setattr(storage, "delete", lambda *a, **k: None)
+    monkeypatch.setattr(
+        storage, "sign_urls", lambda paths, ttl=None: {p: "https://signed.example/x" for p in paths}
+    )
+    monkeypatch.setattr(storage, "sign_url", lambda path, ttl=None: "https://signed.example/x")
+    big = b"\xff\xd8\xff\xe0" + b"0" * 1_500_000  # ~1.5MB: >1MB JSON, <5MB imagem
+
+    r = client.post(
+        "/me/avatar", files={"file": ("a.jpg", big, "image/jpeg")}, headers=auth_headers()
+    )
+    assert r.status_code != 413, "avatar barrado pelo limite JSON"
+    assert r.status_code == 200, r.text

@@ -4,7 +4,6 @@ from datetime import UTC, datetime
 
 from app.db.session import SessionLocal
 from app.domain.location import Location
-from app.repositories import memory_repository
 from app.services import geocoding
 from scripts import backfill_geocoding
 

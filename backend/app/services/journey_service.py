@@ -202,6 +202,13 @@ def update(
     if journey is None:
         raise JourneyNotFoundError()
     campos = data.model_dump(exclude_unset=True)
+    # O período que vai ficar gravado: o que veio, ou o que já estava (null é
+    # no-op neste PATCH). Conferido ANTES de gravar — create e finish já
+    # recusavam fim antes do início, e o PATCH deixava passar.
+    inicio = campos.get("started_at") or journey.started_at
+    fim = campos.get("ended_at") or journey.ended_at
+    if inicio is not None and fim is not None and fim < inicio:
+        raise InvalidJourneyDatesError()
     # A fase sai antes do repository, que ignora nulos: aqui `null` quer dizer
     # SOLTAR. Gravada no objeto, ela vai no mesmo commit do update abaixo.
     if "life_phase_id" in campos:
@@ -446,7 +453,11 @@ def add_existing_memory(
 
 def create_memory_in_journey(
     db: Session, *, user_id: uuid.UUID, journey_id: uuid.UUID, data: JourneyMemoryCreate
-) -> JourneyDetailRead:
+) -> tuple[JourneyDetailRead, uuid.UUID]:
+    """Cria a memória já dentro da jornada. Devolve o detalhe e o id da memória
+    nova — a rota precisa dele para resolver o LUGAR em segundo plano, como o
+    POST /memories faz; sem isso estas memórias nasciam sem cidade nem país e
+    só ganhavam lugar se alguém rodasse o backfill à mão."""
     journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
     if journey is None:
         raise JourneyNotFoundError()
@@ -476,7 +487,7 @@ def create_memory_in_journey(
     except Exception:
         db.rollback()
         raise
-    return _detail(db, user_id=user_id, journey=journey)
+    return _detail(db, user_id=user_id, journey=journey), memory.id
 
 
 def unlink_memory(

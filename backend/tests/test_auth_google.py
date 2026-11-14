@@ -172,3 +172,37 @@ class TestVerificacaoDeVerdade:
         monkeypatch.setattr(google_oauth.settings, "GOOGLE_CLIENT_ID", "cliente.apps.googleusercontent.com")
         with pytest.raises(InvalidGoogleToken):
             google_oauth.verify("")
+
+
+def test_email_ja_ligado_a_outro_google_nao_troca_de_dono(client, db_session, google):
+    # O caso que o vínculo pelo `sub` existe para barrar: um e-mail de domínio
+    # que mudou de dono. Quem herdou o endereço tem OUTRO `sub`, e sobrescrever
+    # o vínculo entregaria a ela as memórias da pessoa anterior.
+    email = _email()
+    google(sub="sub-dona-antiga", email=email)
+    assert _entrar(client).status_code == 200
+
+    google(sub="sub-dona-nova", email=email)
+    r = _entrar(client)
+
+    assert r.status_code == 409, r.text
+    user = db_session.query(User).filter(User.email == email).one()
+    assert user.google_sub == "sub-dona-antiga"
+    # E a dona antiga continua entrando normalmente.
+    google(sub="sub-dona-antiga", email=email)
+    assert _entrar(client).status_code == 200
+
+
+def test_trocar_senha_de_conta_so_google_explica_em_vez_de_quebrar(client, google):
+    # Sem senha gravada, o verificador recebia None e levantava TypeError: 500.
+    google(sub="sub-sem-senha", email=_email())
+    token = _entrar(client).json()["access_token"]
+
+    r = client.post(
+        "/auth/change-password",
+        json={"current_password": "qualquer-coisa", "new_password": "UmaSenhaNova123"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert r.status_code == 409, r.text
+    assert "Esqueci minha senha" in r.json()["detail"]

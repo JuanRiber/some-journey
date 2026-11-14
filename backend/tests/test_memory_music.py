@@ -326,7 +326,6 @@ class TestRemover:
 
 class TestOwnership:
     def test_memoria_de_outro_usuario_e_404_ao_anexar(self, client, auth_headers):
-        h = auth_headers()
         dono = auth_headers()
         intruso = auth_headers()
         alheia = _memory(client, dono)
@@ -372,3 +371,22 @@ class TestPerfil:
 
         stats = client.get("/me/profile", headers=h).json()["stats"]
         assert stats["tracks"] == 0
+
+
+def test_toque_duplo_no_anexar_responde_409_e_nao_500(client, auth_headers, monkeypatch):
+    """Dois POSTs da mesma faixa passam juntos pela conferência de duplicata
+    antes de qualquer um gravar. O índice único barra o segundo — e a resposta
+    tem de ser a mesma do caminho sem corrida: 409."""
+    from app.repositories import memory_repository
+
+    h = auth_headers()
+    mid = _memory(client, h)
+    assert client.post(f"/memories/{mid}/music", json=_faixa(), headers=h).status_code in (200, 201)
+
+    # Simula a corrida: a conferência não enxerga a faixa que o outro POST gravou.
+    monkeypatch.setattr(memory_repository, "find_music_track", lambda *a, **k: None)
+    r = client.post(f"/memories/{mid}/music", json=_faixa(), headers=h)
+
+    assert r.status_code == 409, r.text
+    # E a sessão segue usável: a memória lê normal, com a faixa uma vez só.
+    assert len(client.get(f"/memories/{mid}", headers=h).json()["music"]) == 1

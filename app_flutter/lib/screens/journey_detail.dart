@@ -6,6 +6,7 @@ import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../features/atlas/atlas_domain.dart';
 import '../features/phases/phase_widgets.dart';
+import '../features/places/place_domain.dart';
 import '../features/tracks/track_panel.dart';
 import '../features/tracks/track_recorder.dart';
 import '../models.dart';
@@ -434,7 +435,7 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                       const SizedBox(height: 2),
                     ],
                     Text(
-                      '${p.latitude.toStringAsFixed(3)}, ${p.longitude.toStringAsFixed(3)}',
+                      placeLine(p.placeLabel, p.latitude, p.longitude),
                       style: TextStyle(color: s.inkSoft, fontSize: 12),
                     ),
                   ],

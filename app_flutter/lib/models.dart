@@ -38,6 +38,10 @@ class Memory {
   /// o seletor da edição dizer que a memória foi marcada onde não foi.
   final String? lifePhaseId;
 
+  /// O nome do lugar ("Praia de Iracema, Fortaleza"), resolvido pelo backend
+  /// em segundo plano. Null enquanto não resolve — ver `placeLine`.
+  final String? placeLabel;
+
   /// Título em branco não é erro: é uma memória que dispensou rótulo.
   bool get hasTitle => title.trim().isNotEmpty;
 
@@ -53,6 +57,7 @@ class Memory {
     this.music = const [],
     this.imageUrl,
     this.lifePhaseId,
+    this.placeLabel,
   });
 
   factory Memory.fromJson(Map<String, dynamic> j) => Memory(
@@ -71,6 +76,7 @@ class Memory {
             .toList(),
         imageUrl: j['image_url'] as String?,
         lifePhaseId: j['life_phase_id'] as String?,
+        placeLabel: j['place_label'] as String?,
       );
 }
 
@@ -182,6 +188,9 @@ class JourneyPoint {
   final String occurredAt;
   final int? position;
 
+  /// O nome do lugar, o mesmo de [Memory.placeLabel]. Null enquanto não resolve.
+  final String? placeLabel;
+
   /// Título em branco não é erro: é uma memória que dispensou rótulo.
   bool get hasTitle => title.trim().isNotEmpty;
 
@@ -192,6 +201,7 @@ class JourneyPoint {
     required this.longitude,
     required this.occurredAt,
     this.position,
+    this.placeLabel,
   });
 
   factory JourneyPoint.fromJson(Map<String, dynamic> j) => JourneyPoint(
@@ -201,6 +211,7 @@ class JourneyPoint {
         longitude: (j['longitude'] as num).toDouble(),
         occurredAt: j['occurred_at'] as String,
         position: j['position'] as int?,
+        placeLabel: j['place_label'] as String?,
       );
 }
 

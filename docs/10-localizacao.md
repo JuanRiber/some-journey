@@ -17,7 +17,7 @@ provedor mudar de política ou sair do ar.
 | --- | --- | --- |
 | `latitude`, `longitude` | já existem | `GEOGRAPHY(POINT)` continua a fonte espacial |
 | `place_name` | `text` | nome do ponto (ex.: "Praia de Iracema") |
-| `place_label` | `text` | rótulo exibido ao usuário (hoje é descartado pelo picker) |
+| `place_label` | `text` | rótulo exibido ao usuário na timeline, no detalhe da memória e no rastro da jornada (também em `JourneyPointRead`); enquanto é nulo, o app mostra a coordenada. O picker não o envia: quem preenche é a geocodificação |
 | `city` | `text` | agregado no Perfil |
 | `state_province` | `text` | estado/província |
 | `country` | `text` | nome por extenso |

@@ -89,6 +89,10 @@ class JourneyPointRead(BaseModel):
     longitude: float
     occurred_at: datetime
     created_at: datetime
+    # O nome do lugar, o mesmo de MemoryRead: a lista do rastro mostra onde
+    # cada parada foi, não a coordenada. Nulo enquanto a geocodificação não
+    # resolve — o cliente cai para a coordenada nesse intervalo.
+    place_label: str | None = None
 
 
 class JourneyRoute(BaseModel):

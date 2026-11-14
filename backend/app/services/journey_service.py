@@ -136,6 +136,7 @@ def _point_to_read(memory: Memory, position: int) -> JourneyPointRead:
         longitude=point.x,
         occurred_at=memory.occurred_at,
         created_at=memory.created_at,
+        place_label=memory.place_label,
     )
 
 

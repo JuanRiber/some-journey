@@ -6,6 +6,7 @@ import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../features/phases/phase_domain.dart';
+import '../features/places/place_domain.dart';
 import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
 import '../features/sync/data_changes.dart';
@@ -25,14 +26,6 @@ String _dayMonth(String iso) {
 }
 
 int _yearOf(String iso) => DateTime.parse(iso).toUtc().year;
-
-/// Coordenada em linguagem de atlas ("23.55° S · 46.63° O") em vez de dois
-/// números com sinal. É o mesmo dado — só deixou de parecer log de sistema.
-String _coords(double lat, double lng) {
-  final ns = lat >= 0 ? 'N' : 'S';
-  final eo = lng >= 0 ? 'L' : 'O';
-  return '${lat.abs().toStringAsFixed(2)}° $ns · ${lng.abs().toStringAsFixed(2)}° $eo';
-}
 
 /// Colapsa o corpo da memória numa linha de apoio (o texto inteiro é o prêmio da
 /// tela de detalhe; aqui ele só dá um gosto do que vem).
@@ -566,7 +559,7 @@ class _TimelineScreenState extends State<TimelineScreen>
   Widget _photoEntry(SJScheme s, Memory m) => SJPhotoCard(
         title: m.title,
         overline: _dayMonth(m.occurredAt),
-        subtitle: _coords(m.latitude, m.longitude),
+        subtitle: placeLine(m.placeLabel, m.latitude, m.longitude),
         aspectRatio: 4 / 5,
         onTap: () => _openMemory(m.id),
         imageChild: SJNetworkImage(
@@ -648,7 +641,7 @@ class _TimelineScreenState extends State<TimelineScreen>
               const SizedBox(width: SJSpace.x2),
               Expanded(
                 child: Text(
-                  _coords(m.latitude, m.longitude),
+                  placeLine(m.placeLabel, m.latitude, m.longitude),
                   style: SJText.caption(color: s.inkFaint),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

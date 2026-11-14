@@ -258,3 +258,16 @@ def test_memoria_criada_dentro_da_jornada_tambem_ganha_lugar(client, auth_header
     lida = client.get(f"/memories/{memoria_id}", headers=headers).json()
     assert lida["title"] == ""
     assert lida["city"] == "Fortaleza"
+
+
+def test_ponto_da_jornada_traz_o_nome_do_lugar(client, auth_headers, monkeypatch):
+    """A lista do rastro mostrava a coordenada crua porque o ponto da jornada não
+    carregava o `place_label` que a memória já tinha."""
+    headers = auth_headers()
+    monkeypatch.setattr(geocoding, "get_provider", lambda: _Provedor("Fortaleza"))
+    jornada = client.post("/journeys", json={"title": "Litoral"}, headers=headers).json()
+    r = client.post(f"/journeys/{jornada['id']}/memories", json=PAYLOAD, headers=headers)
+    assert r.status_code == 201, r.text
+
+    detalhe = client.get(f"/journeys/{jornada['id']}", headers=headers).json()
+    assert detalhe["points"][-1]["place_label"] == "Fortaleza"

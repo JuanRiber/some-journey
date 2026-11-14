@@ -7,6 +7,7 @@ import '../design/tokens.dart';
 import '../models.dart';
 import '../features/music/memory_music_section.dart';
 import '../features/phases/phase_widgets.dart';
+import '../features/places/place_domain.dart';
 import '../widgets/photo_viewer.dart';
 import '../widgets/sj_image.dart';
 
@@ -130,7 +131,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                 const SizedBox(width: 7),
                                 Expanded(
                                   child: Text(
-                                    '${m.latitude.toStringAsFixed(3)}, ${m.longitude.toStringAsFixed(3)} • ${_formatFull(m.occurredAt)}',
+                                    '${placeLine(m.placeLabel, m.latitude, m.longitude)} • ${_formatFull(m.occurredAt)}',
                                     style: SJText.overline(color: s.accent),
                                   ),
                                 ),

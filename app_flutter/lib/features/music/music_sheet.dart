@@ -13,6 +13,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../widgets/sj_image.dart';
 import '../../design/components.dart';
 import '../../design/sj_theme.dart';
 import '../../design/tokens.dart';
@@ -255,8 +256,10 @@ class _MusicSheetState extends State<_MusicSheet> {
         height: 44,
         child: url == null
             ? _semCapa(s)
-            : Image.network(
+            : SJNetworkImage(
                 url,
+                width: 44,
+                height: 44,
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => _semCapa(s),
               ),

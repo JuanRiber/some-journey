@@ -8,6 +8,7 @@ import '../models.dart';
 import '../features/music/memory_music_section.dart';
 import '../features/phases/phase_widgets.dart';
 import '../widgets/photo_viewer.dart';
+import '../widgets/sj_image.dart';
 
 const _mesesLong = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -168,7 +169,7 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                                 color: s.frame, width: 3)),
                                         child: AspectRatio(
                                           aspectRatio: 4 / 3,
-                                          child: Image.network(entry.value.url,
+                                          child: SJNetworkImage(entry.value.url,
                                               fit: BoxFit.cover),
                                         ),
                                       ),

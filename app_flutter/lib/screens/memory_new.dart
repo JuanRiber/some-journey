@@ -12,6 +12,7 @@ import '../features/phases/phase_widgets.dart';
 import '../widgets/common.dart';
 import '../widgets/date_field.dart';
 import '../widgets/location_picker.dart';
+import '../widgets/sj_image.dart';
 
 /// Itálico serifado da linha de abertura — a "voz de diário" que apresenta o
 /// formulário. Composto só a partir dos tokens: tamanho e entrelinha saem da
@@ -214,7 +215,7 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: Image.network(_picks[i].path,
+                child: SJNetworkImage(_picks[i].path,
                     width: 84,
                     height: 84,
                     fit: BoxFit.cover,

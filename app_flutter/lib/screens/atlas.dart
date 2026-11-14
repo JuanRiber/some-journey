@@ -10,6 +10,7 @@ import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
 import '../models.dart';
 import '../widgets/api_error_view.dart';
+import '../features/sync/data_changes.dart';
 import '../widgets/atlas_map.dart';
 
 /// # Atlas — a capa do produto (aba padrão pós-login)
@@ -49,12 +50,18 @@ class AtlasScreen extends StatefulWidget {
   State<AtlasScreen> createState() => _AtlasScreenState();
 }
 
-class _AtlasScreenState extends State<AtlasScreen> {
+class _AtlasScreenState extends State<AtlasScreen>
+    with AtualizaQuandoMuda<AtlasScreen> {
   MapResponse? _map;
   ApiError? _error;
   bool _loading = true;
 
   final _phases = PhaseStore.instance;
+
+  /// Algo mudou no servidor por este app: relê em silêncio — o mapa antigo
+  /// fica na tela até o novo chegar.
+  @override
+  void dadosMudaram() => _load();
 
   /// A fase pela qual o atlas está sendo lido; null é a vida toda.
   String? _phaseId;
@@ -129,12 +136,11 @@ class _AtlasScreenState extends State<AtlasScreen> {
     }
   }
 
-  /// Registrar a primeira memória (ação do estado vazio). Ao voltar, recarrega —
-  /// senão o atlas continuaria "em branco" mesmo já tendo um pin.
+  /// Registrar a primeira memória (ação do estado vazio). O atlas se relê
+  /// sozinho quando ela é gravada (AtualizaQuandoMuda) — voltar sem gravar não
+  /// gasta uma ida à rede.
   Future<void> _createMemory() async {
     await Navigator.of(context).pushNamed('/memory-new');
-    if (!mounted) return;
-    await _load();
   }
 
   // As utilidades de conta (alterar senha, sair) MIGRARAM para Configurações,

@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../widgets/sj_image.dart';
 import '../../api.dart';
 import '../../design/components.dart';
 import '../../design/sj_theme.dart';
@@ -188,8 +189,11 @@ class _MemoryMusicSectionState extends State<MemoryMusicSection> {
         height: 40,
         child: url == null
             ? _semCapa(s)
-            : Image.network(url,
-                fit: BoxFit.cover, errorBuilder: (_, _, _) => _semCapa(s)),
+            : SJNetworkImage(url,
+                width: 40,
+                height: 40,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _semCapa(s)),
       ),
     );
   }

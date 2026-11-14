@@ -13,6 +13,7 @@ import '../models.dart';
 import '../widgets/common.dart';
 import '../widgets/date_field.dart';
 import '../widgets/location_picker.dart';
+import '../widgets/sj_image.dart';
 
 /// Itálico serifado da linha de abertura — a mesma "voz de diário" da tela de
 /// criar, para editar e criar soarem como a mesma página. Composto só a partir
@@ -239,12 +240,12 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
       runSpacing: 10,
       children: [
         for (final img in _saved)
-          _thumb(s, Image.network(img.url, width: 84, height: 84, fit: BoxFit.cover),
+          _thumb(s, SJNetworkImage(img.url, width: 84, height: 84, fit: BoxFit.cover),
               onRemove: () => _removeSaved(img.id)),
         for (var i = 0; i < _picks.length; i++)
           _thumb(
             s,
-            Image.network(_picks[i].path,
+            SJNetworkImage(_picks[i].path,
                 width: 84,
                 height: 84,
                 fit: BoxFit.cover,

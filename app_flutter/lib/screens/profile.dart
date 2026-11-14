@@ -9,7 +9,13 @@ import '../features/phases/phase_domain.dart';
 import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
 import '../features/profile/profile_models.dart';
+import '../features/sync/data_changes.dart';
+import '../features/sync/session_cache.dart';
+import '../widgets/sj_image.dart';
 import 'profile_edit.dart';
+
+/// O último perfil visto, para a tela abrir já preenchida enquanto relê.
+final _perfilEmCache = SessionCache<Profile>();
 
 const _meses = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -40,8 +46,12 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  Profile? _profile;
+class _ProfileScreenState extends State<ProfileScreen>
+    with AtualizaQuandoMuda<ProfileScreen> {
+  Profile? _profile = _perfilEmCache.valor;
+
+  @override
+  void dadosMudaram() => _load();
   ApiError? _error;
 
   @override
@@ -57,6 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     PhaseStore.instance.refresh();
     try {
       final data = await Api.instance.getProfile();
+      _perfilEmCache.valor = data;
       if (mounted) setState(() => _profile = data);
     } on ApiError catch (e) {
       if (!mounted) return;
@@ -183,7 +194,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             image: identity.avatarUrl == null
                 ? null
                 : DecorationImage(
-                    image: NetworkImage(identity.avatarUrl!), fit: BoxFit.cover),
+                    image: sjFoto(context, identity.avatarUrl!, lado: 104),
+                    fit: BoxFit.cover),
           ),
           alignment: Alignment.center,
           child: identity.avatarUrl != null

@@ -8,8 +8,11 @@ import '../design/tokens.dart';
 import '../features/phases/phase_domain.dart';
 import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
+import '../features/sync/data_changes.dart';
 import '../models.dart';
 import '../widgets/api_error_view.dart';
+import '../widgets/sj_image.dart';
+import '../widgets/surge.dart';
 import 'memory_new.dart';
 
 const _meses = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
@@ -71,7 +74,8 @@ class TimelineScreen extends StatefulWidget {
   State<TimelineScreen> createState() => _TimelineScreenState();
 }
 
-class _TimelineScreenState extends State<TimelineScreen> {
+class _TimelineScreenState extends State<TimelineScreen>
+    with AtualizaQuandoMuda<TimelineScreen> {
   List<Memory>? _memories;
   ApiError? _error;
   bool _loading = true;
@@ -91,6 +95,20 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   /// A fase pela qual o álbum está sendo lido; null é a vida toda.
   String? _phaseId;
+
+  /// A lente acabou de mudar e a página nova ainda não chegou. O álbum antigo
+  /// FICA na tela, esmaecido, em vez de virar esqueleto: trocar de lente é
+  /// folhear, e uma página em branco no meio do gesto parece travamento.
+  bool _trocandoLente = false;
+
+  /// Entradas que já apareceram uma vez. Só a memória que chega de novo faz o
+  /// surgimento — rolar de volta, ou reler o álbum, não repete a animação.
+  final Set<String> _vistas = {};
+
+  /// Algo mudou no servidor por este app (uma memória criada pelo botão
+  /// central, editada, apagada): relê em silêncio, sem esqueleto.
+  @override
+  void dadosMudaram() => _load();
 
   @override
   void initState() {
@@ -124,7 +142,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
     if (phaseId == _phaseId) return;
     setState(() {
       _phaseId = phaseId;
-      _memories = null;
+      _trocandoLente = _memories != null;
       _nextCursor = null;
       _moreError = '';
     });
@@ -141,8 +159,13 @@ class _TimelineScreenState extends State<TimelineScreen> {
     // As fases vêm junto, sem segurar o álbum: a lente se redesenha quando
     // chegarem, e uma falha nelas não impede ninguém de ver as memórias.
     _phases.refresh();
+    // Numa releitura, traz tantas quantas já estavam na tela (até o teto da
+    // API): quem rolou fundo no álbum não pode vê-lo encolher para a primeira
+    // página e pular de lugar só porque uma memória mudou.
+    final atuais = _trocandoLente ? 0 : (_memories?.length ?? 0);
+    final limite = atuais > 30 ? (atuais > 100 ? 100 : atuais) : null;
     try {
-      final page = await Api.instance.listMemories(phaseId: lente);
+      final page = await Api.instance.listMemories(limit: limite, phaseId: lente);
       // A lente mudou enquanto esta página vinha: ela é de outro álbum.
       if (!mounted || lente != _phaseId) return;
       setState(() {
@@ -150,6 +173,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
         _nextCursor = page.nextCursor;
         _moreError = '';
         _loading = false;
+        _trocandoLente = false;
       });
     } on ApiError catch (e) {
       if (!mounted || lente != _phaseId) return;
@@ -165,6 +189,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
       setState(() {
         _error = e;
         _loading = false;
+        _trocandoLente = false;
       });
     }
   }
@@ -211,8 +236,9 @@ class _TimelineScreenState extends State<TimelineScreen> {
     }
   }
 
-  /// Nova memória (ação do estado vazio e do rodapé). Recarrega ao voltar para o
-  /// álbum já abrir com a página nova.
+  /// Nova memória (ação do estado vazio e do rodapé). O álbum se relê sozinho
+  /// quando ela é gravada (AtualizaQuandoMuda) — voltar sem gravar não gasta
+  /// uma ida à rede.
   /// Com a lente ligada, a memória nova já nasce marcada na fase que a pessoa
   /// está lendo — senão ela registraria o momento e ele sumiria do álbum
   /// filtrado que ela acabou de deixar.
@@ -221,8 +247,6 @@ class _TimelineScreenState extends State<TimelineScreen> {
       settings: const RouteSettings(name: '/memory-new'),
       builder: (_) => MemoryNewScreen(initialPhaseId: _phaseId),
     ));
-    if (!mounted) return;
-    await _load();
   }
 
   void _openMemory(String id) =>
@@ -333,17 +357,30 @@ class _TimelineScreenState extends State<TimelineScreen> {
     }
 
     // Monta capítulos (ano) + entradas na ordem que a API devolveu.
+    //
+    // O ano de cada memória é lido UMA vez. A contagem por capítulo era um
+    // laço dentro do laço — cada memória relia a data de todas as outras —, e
+    // isso a cada reconstrução: com 100 memórias, 10 mil leituras de data
+    // por quadro.
+    final anos = [for (final m in memories) _yearOf(m.occurredAt)];
+    final porAno = <int, int>{};
+    for (final a in anos) {
+      porAno[a] = (porAno[a] ?? 0) + 1;
+    }
     final children = <Widget>[];
     int? lastYear;
     for (var i = 0; i < memories.length; i++) {
       final m = memories[i];
-      final year = _yearOf(m.occurredAt);
+      final year = anos[i];
       if (year != lastYear) {
-        children.add(_chapterHeader(
-          s,
-          year,
-          count: memories.where((x) => _yearOf(x.occurredAt) == year).length,
-          first: lastYear == null,
+        children.add(KeyedSubtree(
+          key: ValueKey('ano-$year'),
+          child: _chapterHeader(
+            s,
+            year,
+            count: porAno[year]!,
+            first: lastYear == null,
+          ),
         ));
         lastYear = year;
       }
@@ -361,7 +398,12 @@ class _TimelineScreenState extends State<TimelineScreen> {
           SJSpace.screenX,
           SJSpace.x16,
         ),
-        sliver: SliverList(delegate: SliverChildListDelegate(children)),
+        // Trocando de lente, o álbum anterior esmaece em vez de sumir.
+        sliver: SliverAnimatedOpacity(
+          opacity: _trocandoLente ? 0.4 : 1,
+          duration: SJMotion.fast,
+          sliver: SliverList(delegate: SliverChildListDelegate(children)),
+        ),
       ),
     ];
   }
@@ -402,6 +444,13 @@ class _TimelineScreenState extends State<TimelineScreen> {
   String _narrative() {
     final memories = _memories;
     final fase = phaseById(_phases.value, _phaseId);
+    // Enquanto a página da lente nova não chega, a lista na tela é a antiga:
+    // contá-la sob o nome da fase nova diria um número que não é dela.
+    if (_trocandoLente) {
+      return fase == null
+          ? 'As memórias do seu atlas em ordem viva.'
+          : 'O que você guardou na fase “${fase.name}”.';
+    }
     if (memories == null || memories.isEmpty || _error != null) {
       return fase == null
           ? 'As memórias do seu atlas em ordem viva.'
@@ -471,50 +520,46 @@ class _TimelineScreenState extends State<TimelineScreen> {
 
   /// Uma entrada do álbum. A espinha (fio + ponto) fica na goteira; o conteúdo
   /// muda de natureza conforme EXISTIR foto ou não.
+  ///
+  /// A espinha é desenhada POR TRÁS do conteúdo, num Stack que mede só ele: o
+  /// fio vai de ponta a ponta da entrada (top 0, bottom 0), então entradas
+  /// consecutivas se conectam. Antes era um `IntrinsicHeight`, que mede o
+  /// layout duas vezes por entrada — a cada quadro de rolagem.
   Widget _entry(SJScheme s, Memory m) {
     final hasPhoto = m.imageUrl != null;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    final nova = _vistas.add(m.id);
+    return SJSurge(
+      key: ValueKey(m.id),
+      ativo: nova,
+      child: Stack(
         children: [
-          _rail(s),
-          const SizedBox(width: SJSpace.x3),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: SJSpace.x6),
-              child: hasPhoto ? _photoEntry(s, m) : _typographicEntry(s, m),
+          Positioned(
+            left: (_railWidth - 1) / 2,
+            top: 0,
+            bottom: 0,
+            child: Container(width: 1, color: s.line),
+          ),
+          Positioned(
+            // Alinha o ponto com a primeira linha de texto/topo da foto.
+            left: (_railWidth - 9) / 2,
+            top: SJSpace.x5,
+            child: Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(color: s.primary, shape: BoxShape.circle),
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(
+              left: _railWidth + SJSpace.x3,
+              bottom: SJSpace.x6,
+            ),
+            child: hasPhoto ? _photoEntry(s, m) : _typographicEntry(s, m),
           ),
         ],
       ),
     );
   }
-
-  /// Espinha contínua + ponto da entrada. O fio segue de ponta a ponta da linha
-  /// (por isso o `Positioned.fill`), então entradas consecutivas se conectam.
-  Widget _rail(SJScheme s) => SizedBox(
-        width: _railWidth,
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            Positioned.fill(
-              child: Center(child: Container(width: 1, color: s.line)),
-            ),
-            Padding(
-              // Alinha o ponto com a primeira linha de texto/topo da foto.
-              padding: const EdgeInsets.only(top: SJSpace.x5),
-              child: Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(
-                  color: s.primary,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
 
   /// Entrada FOTO-PROTAGONISTA: a imagem ocupa a entrada inteira em retrato 4:5;
   /// data (overline) e lugar (subtítulo) vivem SOBRE a foto, sem roubar espaço.
@@ -524,7 +569,7 @@ class _TimelineScreenState extends State<TimelineScreen> {
         subtitle: _coords(m.latitude, m.longitude),
         aspectRatio: 4 / 5,
         onTap: () => _openMemory(m.id),
-        imageChild: Image.network(
+        imageChild: SJNetworkImage(
           m.imageUrl!,
           fit: BoxFit.cover,
           // A foto "revela" ao chegar (fade curto) em vez de estalar na tela.

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Page;
 
 import '../api.dart';
 import '../design/components.dart';
@@ -8,8 +8,12 @@ import '../design/tokens.dart';
 import '../features/phases/phase_domain.dart';
 import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
+import '../features/sync/data_changes.dart';
+import '../features/sync/session_cache.dart';
 import '../models.dart';
 import '../widgets/api_error_view.dart';
+import '../widgets/sj_image.dart';
+import '../widgets/surge.dart';
 import 'journey_new.dart';
 
 // ---------------------------------------------------------------------------
@@ -278,7 +282,12 @@ class JourneysScreen extends StatefulWidget {
   State<JourneysScreen> createState() => _JourneysScreenState();
 }
 
-class _JourneysScreenState extends State<JourneysScreen> {
+/// A última estante vista (a vida toda, primeira página), para a tela abrir já
+/// preenchida enquanto relê.
+final _estanteEmCache = SessionCache<Page<Journey>>();
+
+class _JourneysScreenState extends State<JourneysScreen>
+    with AtualizaQuandoMuda<JourneysScreen> {
   List<Journey>? _journeys;
   ApiError? _error;
 
@@ -297,12 +306,28 @@ class _JourneysScreenState extends State<JourneysScreen> {
   /// têm alguma memória dela (a regra mora no backend).
   String? _phaseId;
 
+  /// A lente mudou e a estante nova ainda não chegou: a antiga fica, esmaecida.
+  bool _trocandoLente = false;
+
+  /// Capítulos já mostrados — só o que chega de novo faz o surgimento.
+  final Set<String> _vistas = {};
+
   @override
   void initState() {
     super.initState();
     _phases.addListener(_onPhases);
+    // Abre com a última estante vista; a releitura logo abaixo a troca.
+    final guardada = _estanteEmCache.valor;
+    if (guardada != null) {
+      _journeys = guardada.items;
+      _nextCursor = guardada.nextCursor;
+      _vistas.addAll(guardada.items.map((j) => j.id));
+    }
     _load();
   }
+
+  @override
+  void dadosMudaram() => _load();
 
   @override
   void dispose() {
@@ -327,7 +352,7 @@ class _JourneysScreenState extends State<JourneysScreen> {
     if (phaseId == _phaseId) return;
     setState(() {
       _phaseId = phaseId;
-      _journeys = null;
+      _trocandoLente = _journeys != null;
       _nextCursor = null;
       _moreError = '';
     });
@@ -342,10 +367,12 @@ class _JourneysScreenState extends State<JourneysScreen> {
       final page = await Api.instance.listJourneys(phaseId: lente);
       // A lente mudou enquanto esta página vinha: ela é de outra estante.
       if (mounted && lente == _phaseId) {
+        if (lente == null) _estanteEmCache.valor = page;
         setState(() {
           _journeys = page.items;
           _nextCursor = page.nextCursor;
           _moreError = '';
+          _trocandoLente = false;
         });
       }
     } on ApiError catch (e) {
@@ -359,7 +386,10 @@ class _JourneysScreenState extends State<JourneysScreen> {
         _setLens(null);
         return;
       }
-      setState(() => _error = e);
+      setState(() {
+        _error = e;
+        _trocandoLente = false;
+      });
     }
   }
 
@@ -404,12 +434,12 @@ class _JourneysScreenState extends State<JourneysScreen> {
       settings: const RouteSettings(name: '/journey-new'),
       builder: (_) => JourneyNewScreen(initialPhaseId: _phaseId),
     ));
-    _load();
   }
 
+  /// Abre o capítulo. A estante se relê sozinha se algo for gravado lá dentro
+  /// (AtualizaQuandoMuda); só olhar não custa uma ida à rede na volta.
   Future<void> _open(Journey j) async {
     await Navigator.of(context).pushNamed('/journey', arguments: j.id);
-    _load();
   }
 
   @override
@@ -477,9 +507,18 @@ class _JourneysScreenState extends State<JourneysScreen> {
                   _emptyState()
                 else
                   for (var i = 0; i < journeys.length; i++)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: SJSpace.x6),
-                      child: _chapterCard(journeys[i], i, s),
+                    SJSurge(
+                      key: ValueKey(journeys[i].id),
+                      ativo: _vistas.add(journeys[i].id),
+                      child: AnimatedOpacity(
+                        // Trocando de lente, a estante anterior esmaece.
+                        opacity: _trocandoLente ? 0.4 : 1,
+                        duration: SJMotion.fast,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: SJSpace.x6),
+                          child: _chapterCard(journeys[i], i, s),
+                        ),
+                      ),
                     ),
                 if (_nextCursor != null) _more(s),
               ],
@@ -619,7 +658,7 @@ class _JourneysScreenState extends State<JourneysScreen> {
           aspectRatio: 4 / 3,
           trailing: selo,
           onTap: () => _open(j),
-          imageChild: Image.network(
+          imageChild: SJNetworkImage(
             j.coverImageUrl!,
             fit: BoxFit.cover,
             loadingBuilder: (_, child, progress) =>

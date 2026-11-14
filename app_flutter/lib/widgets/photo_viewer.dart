@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'sj_image.dart';
 import '../design/components.dart';
 import '../design/tokens.dart';
 
@@ -186,8 +187,11 @@ class _ZoomableState extends State<_Zoomable> {
         minScale: 1,
         maxScale: 5,
         child: Center(
-          child: Image.network(
-            widget.url,
+          // Resolução completa — é aqui que o zoom precisa dela —, mas com a
+          // chave estável: reabrir a mesma foto com um token novo não a baixa
+          // de novo.
+          child: Image(
+            image: StableNetworkImage(widget.url),
             fit: BoxFit.contain,
             semanticLabel: 'Foto da memória em tela cheia',
             loadingBuilder: (context, child, progress) => progress == null

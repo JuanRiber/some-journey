@@ -8,7 +8,7 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -138,6 +138,24 @@ class Api {
   static final Api instance = Api._();
 
   String? _token;
+
+  /// Avisa que este app MUDOU algo no servidor — uma escrita que deu certo.
+  ///
+  /// As abas guardam o estado (não recarregam ao trocar), então quem mostra
+  /// dados precisa saber quando eles ficaram velhos: a memória criada pelo
+  /// botão central tem de aparecer na timeline e no atlas que estão por baixo.
+  /// O número em si não importa; importa que ele muda. As rotas de `/auth/`
+  /// ficam de fora — entrar ou trocar de senha não muda o acervo.
+  final ValueNotifier<int> changes = ValueNotifier<int>(0);
+
+  void _mudou(String path) {
+    if (!path.startsWith('/auth/')) changes.value++;
+  }
+
+  /// Identifica a sessão atual sem expor o token: dois valores iguais são a
+  /// mesma sessão. É o que deixa um cache de tela saber se ainda é da pessoa
+  /// que está logada (ver features/sync/session_cache.dart).
+  Object? get sessionTag => _token;
 
   /// Cliente HTTP. Injetável para que o contrato com o backend — paginação por
   /// cursor, tradução de erro, timeout — possa ser testado sem rede nem
@@ -309,6 +327,7 @@ class Api {
       throw ApiError(0, 'Sem conexão com o servidor.');
     }
     if (r.statusCode >= 400) throw _errorFor(r);
+    if (method != 'GET') _mudou(path);
     return r;
   }
 
@@ -515,6 +534,7 @@ class Api {
       throw ApiError(0, 'Sem conexão com o servidor.');
     }
     if (r.statusCode >= 400) throw _errorFor(r);
+    _mudou(path);
     if (r.bodyBytes.isEmpty) return null;
     return jsonDecode(utf8.decode(r.bodyBytes));
   }

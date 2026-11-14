@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../widgets/sj_image.dart';
 import '../api.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
@@ -223,7 +224,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   image: identity.avatarUrl == null
                       ? null
                       : DecorationImage(
-                          image: NetworkImage(identity.avatarUrl!),
+                          image: sjFoto(context, identity.avatarUrl!, lado: 116),
                           fit: BoxFit.cover,
                         ),
                 ),

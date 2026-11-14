@@ -649,3 +649,32 @@ quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de s
   uma memória registrada pela timeline filtrada, nasce na fase que a pessoa estava lendo — antes
   ela criava o momento e ele sumia da lista que ela acabou de deixar. O seletor continua
   ali para trocar ou tirar.
+
+## 2026-11-14 (3)
+
+### App: menos travado, mais vivo
+- **Trocar de aba recriava as duas abas.** O shell envolvia o `IndexedStack` num
+  `AnimatedSwitcher` com uma chave que mudava a cada toque — e chave nova é árvore nova: a
+  timeline e o atlas eram destruídos e recriados, relendo tudo da rede, voltando ao esqueleto
+  e redesenhando o mapa do zero (com dois mapas na tela durante o fade). Medido num teste: em
+  quatro trocas, a timeline era lida 5 vezes; agora, uma. A pilha é sempre a mesma, só a aba
+  que entra faz o fade, e a escondida tem as animações pausadas (`TickerMode`).
+- **As telas se atualizam sozinhas quando algo muda.** Com as abas guardando o estado, a
+  memória criada pelo botão central precisava aparecer por baixo: o cliente da API avisa a
+  cada escrita bem-sucedida (`Api.changes`), e timeline, atlas, jornadas e perfil releem em
+  silêncio — o conteúdo antigo fica até o novo chegar. Voltar de uma tela sem gravar nada não
+  custa mais uma ida à rede.
+- **Fotos que não pesam** (`widgets/sj_image.dart`). As URLs vêm assinadas, com um token novo
+  a cada resposta, e o cache de imagens usava a URL inteira como chave: cada recarga baixava e
+  decodificava de novo todas as fotos. Agora a chave é o arquivo. E cada foto é decodificada
+  no tamanho em que aparece — uma miniatura de 84 pt não decodifica mais a foto de 2048 px
+  inteira. O visualizador de tela cheia continua em resolução completa.
+- **Perfil e estante de jornadas abrem preenchidos**, com a última versão vista nesta sessão,
+  e trocam pela nova quando ela chega. O cache some ao sair ou trocar de conta.
+- **Trocar de lente não vira esqueleto**: a lista anterior esmaece até a nova chegar.
+- **A timeline mede menos.** Cada entrada usava `IntrinsicHeight` (o layout medido duas vezes
+  por entrada, a cada quadro de rolagem); a espinha agora é desenhada por trás do conteúdo. E
+  a contagem de memórias por ano era um laço dentro do laço — 10 mil leituras de data por
+  reconstrução com 100 memórias.
+- **Surgimento**: memória ou capítulo que chega de novo aparece com um fade curto; o que já
+  estava na tela não repete a animação, e "reduzir movimento" no aparelho a desliga.

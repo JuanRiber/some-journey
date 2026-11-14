@@ -24,6 +24,14 @@ import 'timeline.dart';
 /// **Atrito/surpresa:** toque com haptic, transição suave entre as abas (a troca
 /// é explicada por um fade curto, não por um corte), e o estado das duas abas é
 /// preservado (IndexedStack) para voltar exatamente ao ponto de leitura.
+///
+/// **O fade não pode custar o estado.** Era um `AnimatedSwitcher` com a chave
+/// mudando a cada troca — e chave nova é árvore nova: a timeline e o atlas
+/// eram destruídos e recriados a cada toque, relendo tudo da rede, voltando ao
+/// esqueleto e redesenhando o mapa do zero (dois mapas na tela durante o fade).
+/// Era o "travado" da troca de aba. Agora a pilha é sempre a mesma; só a aba
+/// que entra faz o fade, e a escondida tem as animações pausadas (TickerMode)
+/// para não gastar quadros por baixo.
 class TabsScreen extends StatefulWidget {
   const TabsScreen({super.key});
 
@@ -31,27 +39,44 @@ class TabsScreen extends StatefulWidget {
   State<TabsScreen> createState() => _TabsScreenState();
 }
 
-class _TabsScreenState extends State<TabsScreen> {
+class _TabsScreenState extends State<TabsScreen>
+    with SingleTickerProviderStateMixin {
   int _index = 1; // Atlas é a aba padrão pós-login: o mapa é a espinha dorsal.
+
+  late final AnimationController _entrada = AnimationController(
+    vsync: this,
+    duration: SJMotion.base,
+    value: 1,
+  );
 
   void _select(int i) {
     if (i == _index) return;
     HapticFeedback.selectionClick();
     setState(() => _index = i);
+    // Fade curto: informa que a leitura mudou sem "piscar" a tela.
+    _entrada.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _entrada.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final s = SJTheme.of(context);
+    const abas = [TimelineScreen(), AtlasScreen()];
     return Scaffold(
       backgroundColor: s.bg,
-      body: AnimatedSwitcher(
-        duration: SJMotion.base,
-        // Fade curto: informa que a leitura mudou sem "piscar" a tela.
+      body: FadeTransition(
+        opacity: CurvedAnimation(parent: _entrada, curve: SJMotion.standard),
         child: IndexedStack(
-          key: ValueKey<int>(_index),
           index: _index,
-          children: const [TimelineScreen(), AtlasScreen()],
+          children: [
+            for (var i = 0; i < abas.length; i++)
+              TickerMode(enabled: i == _index, child: abas[i]),
+          ],
         ),
       ),
       bottomNavigationBar: DecoratedBox(

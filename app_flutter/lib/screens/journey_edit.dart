@@ -10,6 +10,7 @@ import '../features/phases/phase_domain.dart';
 import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
 import '../models.dart';
+import '../widgets/sj_image.dart';
 
 /// # Editar jornada — corrigir o nome de um capítulo sem perdê-lo.
 ///
@@ -475,11 +476,9 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
     // A URL é assinada e TEMPORÁRIA: pode expirar com a tela aberta. Por isso
     // há saída para o erro — e ela não pode ser uma exceção na pintura, que o
     // Flutter reportaria no console e deixaria um retângulo vazio sem explicação.
-    return Image.network(
+    return SJNetworkImage(
       url,
       fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
       loadingBuilder: (_, child, progress) =>
           progress == null ? child : const Center(child: SJSpinner()),
       errorBuilder: (_, _, _) => Center(

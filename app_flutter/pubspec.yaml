@@ -40,16 +40,20 @@ flutter:
 
   assets:
     - assets/images/first-class-art.jpg
-    # Licença da Fraunces (SIL OFL 1.1): viaja junto da fonte, como a própria
-    # licença exige de quem a redistribui.
-    - assets/fonts/OFL.txt
+    # Licenças das fontes embutidas (todas SIL OFL 1.1): viajam junto delas,
+    # como a própria licença exige de quem as redistribui.
+    - assets/fonts/OFL-Fraunces.txt
+    - assets/fonts/OFL-Inter.txt
+    - assets/fonts/OFL-IBMPlexMono.txt
 
-  # Serifa dos títulos. Embutida porque fonte de sistema não existe em todo
-  # lugar: na web o motor não enxerga as fontes da máquina, e o "Georgia" pedido
-  # caía em sans — o app inteiro saía sem a serifa que o desenho pressupõe.
-  # São instâncias estáticas (tamanho óptico 24, o meio da escala de títulos):
-  # só os dois pesos e os dois estilos que o design system usa.
+  # As três vozes do design system, embutidas porque fonte de sistema não existe
+  # em todo lugar: na web o motor não enxerga as fontes da máquina, e "Georgia",
+  # "Inter" e "Menlo" caíam todas na mesma sans — serifa, corpo e selo saíam
+  # numa letra só. Só os pesos que o design system usa: cada arquivo a mais é
+  # carregado antes do primeiro quadro na web.
   fonts:
+    # Serifa dos títulos. Instâncias estáticas no tamanho óptico 24, o meio da
+    # escala de títulos.
     - family: Fraunces
       fonts:
         - asset: assets/fonts/Fraunces-Regular.ttf
@@ -60,3 +64,20 @@ flutter:
         - asset: assets/fonts/Fraunces-SemiBoldItalic.ttf
           weight: 600
           style: italic
+    # Sans da interface. Sem 700: os poucos pedidos de negrito caem no 600.
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+    # Mono dos overlines, selos e numerais. O 700 fica porque a aba selecionada
+    # se distingue da outra pelo peso.
+    - family: IBM Plex Mono
+      fonts:
+        - asset: assets/fonts/IBMPlexMono-Regular.ttf
+        - asset: assets/fonts/IBMPlexMono-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/IBMPlexMono-Bold.ttf
+          weight: 700

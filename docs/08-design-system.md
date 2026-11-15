@@ -34,15 +34,18 @@ importados direto numa tela: a única exceção do app é texto sobre a foto de
 marca no login.
 
 ## 2. Tipografia
-- **Serifa** (Fraunces, embutida em `app_flutter/assets/fonts/`; Georgia só
-  como reserva): display/h1/h2/títulos, conteúdo de memória, itálicos afetivos
-  (tagline, datas, atmosfera). Embutida porque fonte de sistema não existe em
-  todo lugar — na web o título caía em sans. Dois pesos (400/600) × dois
-  estilos; pedir outro peso faz o motor sintetizar, e negrito sintético em
-  serifa borra. Licença SIL OFL 1.1, que vai junto (`OFL.txt`).
-- **Sans** (Inter/Manrope): interface — corpo, botões-não-mono, labels de campo.
-- **Mono** (Menlo): overlines/selos/numerais em CAIXA ALTA com tracking 1.6 — o
-  motivo "01 / OS MOMENTOS" da landing.
+As três famílias são embutidas em `app_flutter/assets/fonts/` (SIL OFL 1.1, com
+as licenças ao lado). Fonte de sistema não existe em todo lugar: na web, sem
+elas, serifa, corpo e selo caíam na mesma sans. Só os pesos listados existem —
+pedir outro faz o motor usar o mais próximo, e cada arquivo a mais é carregado
+antes do primeiro quadro na web.
+- **Serifa** (Fraunces, 400/600 × reto/itálico; Georgia só como reserva):
+  display/h1/h2/títulos, conteúdo de memória, itálicos afetivos (tagline,
+  datas, atmosfera).
+- **Sans** (Inter, 400/500/600): interface — corpo, botões-não-mono, labels de
+  campo.
+- **Mono** (IBM Plex Mono, 400/600/700): overlines/selos/numerais em CAIXA ALTA
+  com tracking 1.6 — o motivo "01 / OS MOMENTOS" da landing.
 - Escala: display 34/40 · h1 28/34 · h2 22/28 · title 18/24 · body 16/24 ·
   bodySm 14/20 · caption 13/18 · overline 11/16. Muito contraste título↔corpo.
 

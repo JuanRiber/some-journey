@@ -131,10 +131,10 @@ const SJScheme sjDark = SJScheme(
 
 /// Famílias tipográficas. Serifa editorial para títulos/afeto; sans para
 /// interface; mono para overlines/selos (o "01 / OS MOMENTOS" da landing).
-/// A serifa é a Fraunces, embutida (`pubspec.yaml`): uma fonte de sistema não
-/// existe em todo lugar, e onde faltava — a web inteira — o título caía em
-/// sans sem aviso. A sans e a mono ainda são de sistema; os nomes abaixo são o
-/// ponto único de troca.
+/// As três são embutidas (`pubspec.yaml`): Fraunces, Inter e IBM Plex Mono.
+/// Fonte de sistema não existe em todo lugar, e onde faltava — a web inteira —
+/// serifa, corpo e selo caíam na mesma sans, sem aviso. As de sistema ficam só
+/// como reserva; os nomes abaixo são o ponto único de troca.
 abstract final class SJType {
   static const serif = 'Fraunces';
   static const List<String> serifFallback = [
@@ -142,15 +142,20 @@ abstract final class SJType {
     'Times New Roman',
     'serif',
   ];
-  static const sans = 'Inter'; // cai no system sans até a fonte ser embutida
+  static const sans = 'Inter';
   static const List<String> sansFallback = [
     'SF Pro Text',
     'Roboto',
     'Segoe UI',
     'sans-serif',
   ];
-  static const mono = 'Menlo';
-  static const List<String> monoFallback = ['Consolas', 'Courier New', 'monospace'];
+  static const mono = 'IBM Plex Mono';
+  static const List<String> monoFallback = [
+    'Menlo',
+    'Consolas',
+    'Courier New',
+    'monospace',
+  ];
 
   // Escala tipográfica (tamanho / altura de linha). Muito contraste entre
   // título (serifa grande) e corpo (sans calmo).

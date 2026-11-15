@@ -16,11 +16,15 @@ from app.domain.username import InvalidUsernameError, validate as validate_usern
 from app.models.user import User
 from app.repositories import profile_repository, user_repository
 from app.schemas.profile import (  # noqa: I001
+    CityEntry,
+    CountryEntry,
     CurrentJourney,
+    DayEntry,
     LastAdventure,
     PassportStamp,
     ProfileIdentity,
     ProfileRead,
+    PlacesRead,
     ProfileStats,
 )
 
@@ -73,6 +77,21 @@ def get_profile(db: Session, *, user: User) -> ProfileRead:
         last_adventure=LastAdventure(**adventure) if adventure else None,
         current_journey=CurrentJourney(**journey) if journey else None,
     )
+
+
+def get_places(db: Session, *, user: User) -> PlacesRead:
+    """As cidades e os países por trás dos números do Perfil."""
+    return PlacesRead(
+        cities=[CityEntry(**c) for c in profile_repository.cities(db, user_id=user.id)],
+        countries=[
+            CountryEntry(**c) for c in profile_repository.countries(db, user_id=user.id)
+        ],
+    )
+
+
+def get_days(db: Session, *, user: User) -> list[DayEntry]:
+    """Os dias de registro por trás de "dias no app"."""
+    return [DayEntry(**d) for d in profile_repository.days(db, user_id=user.id)]
 
 
 # --- Escrita da identidade pública -----------------------------------------

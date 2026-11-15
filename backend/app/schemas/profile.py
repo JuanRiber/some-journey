@@ -7,7 +7,7 @@ entra sem quebrar quem já consome os anteriores.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -90,3 +90,36 @@ class ProfileRead(BaseModel):
     passport: list[PassportStamp]
     last_adventure: LastAdventure | None = None
     current_journey: CurrentJourney | None = None
+
+
+class CityEntry(BaseModel):
+    """Uma cidade da coleção e quantas memórias moram nela."""
+
+    city: str
+    country: str | None = None
+    country_code: str | None = None
+    memories: int
+
+
+class CountryEntry(BaseModel):
+    """Um país da coleção: quantas memórias e em quantas cidades."""
+
+    country_code: str
+    country: str | None = None
+    memories: int
+    cities: int
+
+
+class PlacesRead(BaseModel):
+    """GET /me/places — o que existe por trás de "cidades" e "países"."""
+
+    cities: list[CityEntry]
+    countries: list[CountryEntry]
+
+
+class DayEntry(BaseModel):
+    """Um dia em que a pessoa registrou algo (data do registro, não do
+    acontecimento) e quantas memórias nasceram nele."""
+
+    day: date
+    memories: int

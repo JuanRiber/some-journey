@@ -9,7 +9,8 @@ Regras de ouro aplicadas aqui:
 """
 
 import uuid
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import date, datetime
 
 from geoalchemy2 import Geometry
 from sqlalchemy import cast, func, or_, select, tuple_
@@ -53,6 +54,48 @@ def in_phase(phase_id: uuid.UUID):
         .exists()
     )
     return or_(Memory.life_phase_id == phase_id, via_jornada)
+
+
+def created_day():
+    """O DIA em que a memória foi registrada — a unidade do "dias no app".
+
+    Uma expressão só, usada pela contagem do Perfil, pela lista de dias e pelo
+    filtro `created_on`: se cada um calculasse o dia do seu jeito, o quadrado
+    diria 12 dias e a lista mostraria 11."""
+    return func.date(Memory.created_at)
+
+
+@dataclass(frozen=True)
+class MemoryFilter:
+    """Os recortes da coleção — cada número do Perfil abre um deles.
+
+    `city` sozinha junta as homônimas de países diferentes; quem vem da lista
+    de cidades manda também `country_code`, que separa Valencia de Valencia.
+    Tudo opcional e combinável: o filtro vazio é a coleção inteira."""
+
+    city: str | None = None
+    country_code: str | None = None
+    has_images: bool = False
+    created_on: date | None = None
+
+    def clauses(self) -> list:
+        out = []
+        if self.city is not None:
+            out.append(Memory.city == self.city)
+        if self.country_code is not None:
+            out.append(Memory.country_code == self.country_code.upper())
+        if self.has_images:
+            out.append(
+                select(MemoryImage.id)
+                .where(
+                    MemoryImage.memory_id == Memory.id,
+                    MemoryImage.deleted_at.is_(None),
+                )
+                .exists()
+            )
+        if self.created_on is not None:
+            out.append(created_day() == self.created_on)
+        return out
 
 
 def _point(latitude: float, longitude: float):
@@ -134,6 +177,7 @@ def list_by_user(
     limit: int,
     cursor: tuple[datetime, uuid.UUID] | None = None,
     life_phase_id: uuid.UUID | None = None,
+    filtro: MemoryFilter | None = None,
 ) -> list[Memory]:
     """Página de memórias ativas do usuário, da mais recente para a mais antiga.
 
@@ -150,8 +194,9 @@ def list_by_user(
     que o Postgres avalia lexicograficamente (occurred_at < c_ts OR (occurred_at
     = c_ts AND id < c_id)) e resolve pelo índice ix_memories_user_occurred.
 
-    `life_phase_id` recorta pela fase (regra em [in_phase]). O keyset continua
-    valendo: o filtro só tira linhas, não muda a ordem de quem fica.
+    `life_phase_id` recorta pela fase (regra em [in_phase]) e `filtro` pelos
+    recortes da coleção ([MemoryFilter]). O keyset continua valendo: filtro só
+    tira linhas, não muda a ordem de quem fica.
     """
     stmt = (
         select(Memory)
@@ -165,6 +210,8 @@ def list_by_user(
         )
     if life_phase_id is not None:
         stmt = stmt.where(in_phase(life_phase_id))
+    if filtro is not None:
+        stmt = stmt.where(*filtro.clauses())
     return list(db.scalars(stmt.limit(limit + 1)))
 
 

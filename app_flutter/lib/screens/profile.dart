@@ -12,7 +12,9 @@ import '../features/profile/profile_models.dart';
 import '../features/sync/data_changes.dart';
 import '../features/sync/session_cache.dart';
 import '../widgets/sj_image.dart';
+import 'collection.dart';
 import 'profile_edit.dart';
+import 'timeline.dart';
 
 /// O último perfil visto, para a tela abrir já preenchida enquanto relê.
 final _perfilEmCache = SessionCache<Profile>();
@@ -39,6 +41,10 @@ const _meses = [
 /// backend, ele não aparece aqui. A exceção são as fases da vida, que vêm da
 /// lista delas (`GET /life-phases`): não são número, são a porta para a tela
 /// onde a pessoa nomeia os próprios capítulos.
+///
+/// **Cada número é uma porta:** tocar em "memórias" abre o álbum, "jornadas"
+/// as jornadas, e cidades, países, fotos e dias abrem a lista do que contam
+/// ([PlacesScreen], [PhotosScreen], [DaysScreen]).
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -277,13 +283,20 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   Widget _stats(SJScheme s, Profile p) {
     final st = p.stats;
-    final items = <(String, String)>[
-      ('Memórias', '${st.memories}'),
-      ('Jornadas', '${st.journeys}'),
-      ('Cidades', '${st.cities}'),
-      ('Países', '${st.countries}'),
-      ('Fotos', '${st.photos}'),
-      ('Dias no app', '${st.activeDays}'),
+    void abrir(Widget tela) => Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => tela));
+    final items = <(String, int, VoidCallback)>[
+      ('Memórias', st.memories,
+          () => abrir(const TimelineScreen(
+              cut: AlbumCut(overline: 'Sua coleção', title: 'Memórias')))),
+      ('Jornadas', st.journeys,
+          () => Navigator.of(context).pushNamed('/journeys')),
+      ('Cidades', st.cities,
+          () => abrir(const PlacesScreen(kind: PlaceKind.cities))),
+      ('Países', st.countries,
+          () => abrir(const PlacesScreen(kind: PlaceKind.countries))),
+      ('Fotos', st.photos, () => abrir(const PhotosScreen())),
+      ('Dias no app', st.activeDays, () => abrir(const DaysScreen())),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,8 +307,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           spacing: SJSpace.x3,
           runSpacing: SJSpace.x3,
           children: [
-            for (final (label, value) in items)
-              _StatTile(label: label, value: value),
+            for (final (label, value, onTap) in items)
+              _StatTile(label: label, value: '$value', onTap: onTap),
           ],
         ),
         // Honestidade operacional: o passaporte fica incompleto até o backfill.
@@ -537,33 +550,38 @@ class _ProfileScreenState extends State<ProfileScreen>
 }
 
 /// Um número da coleção. Serifa grande no valor (é o que se lê primeiro), mono
-/// discreto no rótulo.
+/// discreto no rótulo. Tocável: abre o que o número conta.
 class _StatTile extends StatelessWidget {
-  const _StatTile({required this.label, required this.value});
+  const _StatTile({required this.label, required this.value, required this.onTap});
 
   final String label;
   final String value;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final s = SJTheme.of(context);
-    return Container(
-      width: 104,
-      padding: const EdgeInsets.symmetric(
-        horizontal: SJSpace.x3, vertical: SJSpace.x4,
-      ),
-      decoration: BoxDecoration(
-        color: s.surface,
-        borderRadius: BorderRadius.circular(SJRadius.md),
-        border: Border.all(color: s.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(value, style: SJText.h2(color: s.ink)),
-          const SizedBox(height: SJSpace.x1),
-          Text(label.toUpperCase(), style: SJText.overline(color: s.inkSoft)),
-        ],
+    return SJPressable(
+      onTap: onTap,
+      semanticLabel: '$value $label',
+      child: Container(
+        width: 104,
+        padding: const EdgeInsets.symmetric(
+          horizontal: SJSpace.x3, vertical: SJSpace.x4,
+        ),
+        decoration: BoxDecoration(
+          color: s.surface,
+          borderRadius: BorderRadius.circular(SJRadius.md),
+          border: Border.all(color: s.line),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: SJText.h2(color: s.ink)),
+            const SizedBox(height: SJSpace.x1),
+            Text(label.toUpperCase(), style: SJText.overline(color: s.inkSoft)),
+          ],
+        ),
       ),
     );
   }

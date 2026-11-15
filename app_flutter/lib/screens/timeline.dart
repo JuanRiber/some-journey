@@ -5,6 +5,7 @@ import '../design/components.dart';
 import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/collection/collection_domain.dart';
 import '../features/phases/phase_domain.dart';
 import '../features/places/place_domain.dart';
 import '../features/phases/phase_store.dart';
@@ -60,11 +61,34 @@ String _excerpt(String text) =>
 /// uma delas — a faculdade, o intercâmbio. Os capítulos continuam sendo os
 /// anos; a fase só escolhe quais páginas entram. Sem fase cadastrada a lente
 /// não aparece, e a tela é exatamente o que sempre foi.
+///
+/// **Aberta de fora das abas** (um número do Perfil, uma cidade, um dia), a
+/// mesma tela vira um RECORTE do álbum: ganha voltar e o nome do recorte no
+/// lugar de "Sua timeline", e a lente das fases sai — o recorte já é a lente.
 class TimelineScreen extends StatefulWidget {
-  const TimelineScreen({super.key});
+  const TimelineScreen({super.key, this.cut});
+
+  /// O recorte aberto; null é a aba Tempo, o álbum inteiro.
+  final AlbumCut? cut;
 
   @override
   State<TimelineScreen> createState() => _TimelineScreenState();
+}
+
+/// Um recorte do álbum: o que mostrar ([filter]) e como chamá-lo.
+class AlbumCut {
+  const AlbumCut({
+    required this.overline,
+    required this.title,
+    this.filter = MemoryFilter.all,
+  });
+
+  /// O que É o recorte ("Cidade", "Dia de registro"), em overline.
+  final String overline;
+
+  /// O nome dele ("Fortaleza", "10 de março de 2026"), em display.
+  final String title;
+  final MemoryFilter filter;
 }
 
 class _TimelineScreenState extends State<TimelineScreen>
@@ -158,7 +182,8 @@ class _TimelineScreenState extends State<TimelineScreen>
     final atuais = _trocandoLente ? 0 : (_memories?.length ?? 0);
     final limite = atuais > 30 ? (atuais > 100 ? 100 : atuais) : null;
     try {
-      final page = await Api.instance.listMemories(limit: limite, phaseId: lente);
+      final page = await Api.instance.listMemories(
+          limit: limite, phaseId: lente, filter: widget.cut?.filter);
       // A lente mudou enquanto esta página vinha: ela é de outro álbum.
       if (!mounted || lente != _phaseId) return;
       setState(() {
@@ -200,7 +225,8 @@ class _TimelineScreenState extends State<TimelineScreen>
       _moreError = '';
     });
     try {
-      final page = await Api.instance.listMemories(cursor: cursor, phaseId: lente);
+      final page = await Api.instance.listMemories(
+          cursor: cursor, phaseId: lente, filter: widget.cut?.filter);
       if (!mounted) return;
       // Página de outra lente não entra neste álbum.
       if (lente != _phaseId) {
@@ -248,6 +274,13 @@ class _TimelineScreenState extends State<TimelineScreen>
   @override
   Widget build(BuildContext context) {
     final s = SJTheme.of(context);
+    final album = _album(s);
+    // Na aba, o Scaffold é o das abas; recortado, a tela é uma rota própria.
+    if (widget.cut == null) return album;
+    return Scaffold(backgroundColor: s.bg, body: album);
+  }
+
+  Widget _album(SJScheme s) {
     return SafeArea(
       child: RefreshIndicator(
         onRefresh: _load,
@@ -268,9 +301,9 @@ class _TimelineScreenState extends State<TimelineScreen>
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 SJSpace.screenX,
-                SJSpace.x8,
+                widget.cut == null ? SJSpace.x8 : SJSpace.x2,
                 SJSpace.screenX,
                 0,
               ),
@@ -327,6 +360,23 @@ class _TimelineScreenState extends State<TimelineScreen>
                 'de cada uma — e elas aparecem aqui.',
             actionLabel: 'Ver a vida toda',
             onAction: () => _setLens(null),
+          ),
+        ),
+      ];
+    }
+    final cut = widget.cut;
+    if (memories.isEmpty && cut != null && !cut.filter.isEmpty) {
+      // Um recorte vazio não é um álbum vazio: o número que trouxe a pessoa
+      // até aqui pode ter mudado (uma memória apagada noutra tela).
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: SJEmptyState(
+            title: 'Nenhuma memória aqui ainda.',
+            body: 'Quando uma memória couber neste recorte, ela aparece nesta '
+                'página.',
+            actionLabel: 'Voltar',
+            onAction: () => Navigator.of(context).maybePop(),
           ),
         ),
       ];
@@ -403,7 +453,30 @@ class _TimelineScreenState extends State<TimelineScreen>
 
   // ── Cabeçalho da tela ─────────────────────────────────────────────────────
 
-  Widget _header(SJScheme s) => Column(
+  Widget _header(SJScheme s) {
+    final cut = widget.cut;
+    if (cut != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            button: true,
+            label: 'Voltar',
+            child: IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: Icon(Icons.arrow_back, color: s.ink, size: 22),
+            ),
+          ),
+          const SizedBox(height: SJSpace.x4),
+          SJOverline(cut.overline),
+          const SizedBox(height: SJSpace.x2),
+          Text(cut.title, style: SJText.display(color: s.ink)),
+          const SizedBox(height: SJSpace.x2),
+          Text(_narrative(), style: _diaryItalic(s)),
+        ],
+      );
+    }
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SJOverline('Album', numeral: '02'),
@@ -421,6 +494,7 @@ class _TimelineScreenState extends State<TimelineScreen>
           ],
         ],
       );
+  }
 
   /// Serifa itálica das linhas afetivas (composta só a partir dos tokens).
   TextStyle _diaryItalic(SJScheme s) => TextStyle(
@@ -443,6 +517,13 @@ class _TimelineScreenState extends State<TimelineScreen>
       return fase == null
           ? 'As memórias do seu atlas em ordem viva.'
           : 'O que você guardou na fase “${fase.name}”.';
+    }
+    if (widget.cut != null) {
+      if (memories == null || _error != null) {
+        return 'As memórias deste recorte, da mais recente para a mais antiga.';
+      }
+      if (memories.isEmpty) return 'Nada guardado aqui ainda.';
+      if (memories.length == 1) return 'Uma memória guardada aqui.';
     }
     if (memories == null || memories.isEmpty || _error != null) {
       return fase == null

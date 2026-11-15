@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models.journey import Journey, JourneyMemory
 from app.models.memory import Memory, MemoryImage, MemoryMusic
+from app.repositories.memory_repository import created_day
 
 
 def _active_memories(user_id: uuid.UUID):
@@ -212,9 +213,69 @@ def active_days(db: Session, *, user_id: uuid.UUID) -> int:
     occurred_at (que é a data do acontecimento, podendo ser antiga)."""
     return int(
         db.scalar(
-            select(func.count(func.distinct(func.date(Memory.created_at)))).where(
+            select(func.count(func.distinct(created_day()))).where(
                 *_active_memories(user_id)
             )
         )
         or 0
     )
+
+
+# --- O que existe por trás de cada número ------------------------------------
+#
+# O quadrado "37 cidades" é uma porta: tocar nele lista as cidades, e cada uma
+# abre as próprias memórias. As listas saem agrupadas do banco pelo mesmo
+# motivo das contagens — o cliente não baixa memórias para descobrir onde elas
+# aconteceram.
+
+
+def cities(db: Session, *, user_id: uuid.UUID) -> list[dict[str, object]]:
+    """Cidades com memória, da mais vivida para a menos.
+
+    Agrupa por (cidade, país): Valencia na Espanha e na Venezuela são dois
+    lugares, e o filtro de memórias recebe os dois campos para abrir a certa."""
+    total = func.count(Memory.id)
+    rows = db.execute(
+        select(Memory.city, Memory.country_code, func.max(Memory.country), total)
+        .where(*_active_memories(user_id), Memory.city.is_not(None))
+        .group_by(Memory.city, Memory.country_code)
+        .order_by(total.desc(), Memory.city)
+    ).all()
+    return [
+        {"city": r[0], "country_code": r[1], "country": r[2], "memories": int(r[3])}
+        for r in rows
+    ]
+
+
+def countries(db: Session, *, user_id: uuid.UUID) -> list[dict[str, object]]:
+    """Países com memória (pelo código ISO, que é o que a contagem distingue),
+    com quantas memórias e quantas cidades cada um guarda."""
+    total = func.count(Memory.id)
+    rows = db.execute(
+        select(
+            Memory.country_code,
+            func.max(Memory.country),
+            total,
+            func.count(func.distinct(Memory.city)),
+        )
+        .where(*_active_memories(user_id), Memory.country_code.is_not(None))
+        .group_by(Memory.country_code)
+        .order_by(total.desc(), func.max(Memory.country))
+    ).all()
+    return [
+        {"country_code": r[0], "country": r[1], "memories": int(r[2]), "cities": int(r[3])}
+        for r in rows
+    ]
+
+
+def days(db: Session, *, user_id: uuid.UUID) -> list[dict[str, object]]:
+    """Os dias em que a pessoa registrou algo, do mais recente ao mais antigo —
+    a lista por trás de "dias no app" (mesma expressão de [active_days])."""
+    day = created_day()
+    rows = db.execute(
+        select(day, func.count(Memory.id))
+        .where(*_active_memories(user_id))
+        .group_by(day)
+        .order_by(day.desc())
+    ).all()
+    return [{"day": r[0], "memories": int(r[1])} for r in rows]

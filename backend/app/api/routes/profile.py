@@ -15,7 +15,7 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.domain.username import InvalidUsernameError
 from app.models.user import User
-from app.schemas.profile import ProfileRead, ProfileUpdate
+from app.schemas.profile import DayEntry, PlacesRead, ProfileRead, ProfileUpdate
 from app.services import profile_service
 
 router = APIRouter(prefix="/me", tags=["profile"])
@@ -28,6 +28,27 @@ def get_profile(
 ) -> ProfileRead:
     """Identidade, estatísticas, passaporte, última aventura e jornada atual."""
     return profile_service.get_profile(db, user=current_user)
+
+
+@router.get("/places", response_model=PlacesRead)
+def get_places(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PlacesRead:
+    """As cidades e os países da coleção, agrupados no banco — a porta dos
+    quadrados "cidades" e "países" do Perfil. Cada item abre as próprias
+    memórias por `GET /memories?city=…&country_code=…`."""
+    return profile_service.get_places(db, user=current_user)
+
+
+@router.get("/days", response_model=list[DayEntry])
+def get_days(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[DayEntry]:
+    """Os dias em que a pessoa registrou algo, do mais recente ao mais antigo.
+    Cada dia abre as próprias memórias por `GET /memories?created_on=…`."""
+    return profile_service.get_days(db, user=current_user)
 
 
 @router.patch("/profile", response_model=ProfileRead)

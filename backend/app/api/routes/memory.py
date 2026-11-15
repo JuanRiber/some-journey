@@ -7,6 +7,7 @@ inexistente OU de outro usuário resulta no MESMO 404 (não revela existência).
 """
 
 import uuid
+from datetime import date
 
 from fastapi import (
     APIRouter,
@@ -32,6 +33,7 @@ from app.core.pagination import (
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
 from app.models.user import User
+from app.repositories.memory_repository import MemoryFilter
 from app.schemas.memory import (
     MemoryCreate,
     MemoryMusicIn,
@@ -92,13 +94,24 @@ def list_memories(
     limit: int | None = Query(default=None),
     cursor: str | None = Query(default=None),
     life_phase_id: uuid.UUID | None = Query(default=None),
+    city: str | None = Query(default=None, min_length=1, max_length=200),
+    country_code: str | None = Query(
+        default=None, min_length=2, max_length=2, pattern="^[A-Za-z]{2}$"
+    ),
+    has_images: bool = Query(default=False),
+    created_on: date | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> list[MemoryRead]:
     """Lista paginada por keyset. Corpo = ARRAY puro (retrocompatível); quando há
     próxima página, o cursor vai no header X-Next-Cursor. `?limit` é normalizado
     para [1, MAX_LIMIT]; `?cursor` opaco e malformado -> 400 (nunca 500).
-    `?life_phase_id` recorta pela fase; fase que não é desta pessoa -> 404."""
+    `?life_phase_id` recorta pela fase; fase que não é desta pessoa -> 404.
+
+    Os recortes da coleção (cada número do Perfil abre um): `?city` e
+    `?country_code` pelo lugar, `?has_images=true` só as que têm foto e
+    `?created_on=AAAA-MM-DD` as registradas naquele dia. O cursor de uma página
+    filtrada só vale com o mesmo filtro."""
     decoded = None
     if cursor is not None:
         try:
@@ -115,6 +128,12 @@ def list_memories(
             limit=clamp_limit(limit),
             cursor=decoded,
             life_phase_id=life_phase_id,
+            filtro=MemoryFilter(
+                city=city,
+                country_code=country_code,
+                has_images=has_images,
+                created_on=created_on,
+            ),
         )
     except PhaseNotFoundError:
         raise fase_do_filtro_inexistente()

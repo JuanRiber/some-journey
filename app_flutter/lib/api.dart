@@ -13,6 +13,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'features/collection/collection_domain.dart';
 import 'features/phases/phase_domain.dart';
 import 'features/profile/profile_models.dart';
 import 'models.dart';
@@ -347,11 +348,13 @@ class Api {
   /// O cursor é opaco (base64url com `-`, `_` e possível `=`), então ele PRECISA
   /// passar por codificação de querystring — concatenar na mão corromperia o
   /// padding e o backend responderia 400.
-  String _paged(String path, int? limit, String? cursor, {String? phaseId}) =>
+  String _paged(String path, int? limit, String? cursor,
+          {String? phaseId, MemoryFilter? filter}) =>
       _query(path, {
         if (limit != null) 'limit': '$limit',
         'cursor': ?cursor,
         'life_phase_id': ?phaseId,
+        ...?filter?.toQuery(),
       });
 
   /// Acrescenta a querystring à rota, codificada — ou devolve a rota pura.
@@ -370,8 +373,10 @@ class Api {
     int? limit,
     String? cursor,
     String? phaseId,
+    MemoryFilter? filter,
   }) async {
-    final r = await _send('GET', _paged(path, limit, cursor, phaseId: phaseId),
+    final r = await _send(
+        'GET', _paged(path, limit, cursor, phaseId: phaseId, filter: filter),
         authed: true);
     final data = r.bodyBytes.isEmpty ? null : jsonDecode(utf8.decode(r.bodyBytes));
     if (data is! List) return const Page._empty();
@@ -435,6 +440,19 @@ class Api {
   Future<Profile> getProfile() async =>
       Profile.fromJson(await _request('GET', '/me/profile', authed: true));
 
+  /// As cidades e os países da coleção (GET /me/places), agrupados no banco:
+  /// a lista por trás dos números "cidades" e "países" do Perfil.
+  Future<Places> getPlaces() async =>
+      Places.fromJson(await _request('GET', '/me/places', authed: true));
+
+  /// Os dias em que a pessoa registrou algo (GET /me/days), do mais recente
+  /// ao mais antigo — a lista por trás de "dias no app".
+  Future<List<DayEntry>> getDays() async {
+    final data = await _request('GET', '/me/days', authed: true);
+    if (data is! List) return const [];
+    return [for (final d in data) DayEntry.fromJson(d as Map<String, dynamic>)];
+  }
+
   /// Edita a identidade pública (nome, @username, bio). PARCIAL: só o que for
   /// enviado muda. Devolve o Perfil já atualizado — sem segunda chamada.
   /// 422 = @username inválido/reservado (a mensagem já vem pronta em pt-BR);
@@ -469,9 +487,13 @@ class Api {
   /// [phaseId] é a lente: só as memórias da fase (marcadas nela ou dentro de
   /// uma jornada marcada nela — a regra mora no backend). O cursor de uma
   /// página filtrada só vale com o MESMO filtro.
-  Future<Page<Memory>> listMemories({int? limit, String? cursor, String? phaseId}) =>
+  ///
+  /// [filter] é o recorte que um número do Perfil abre: a cidade, o país, só
+  /// as que têm foto, as registradas num dia. Vale a mesma regra do cursor.
+  Future<Page<Memory>> listMemories(
+          {int? limit, String? cursor, String? phaseId, MemoryFilter? filter}) =>
       _page('/memories', Memory.fromJson,
-          limit: limit, cursor: cursor, phaseId: phaseId);
+          limit: limit, cursor: cursor, phaseId: phaseId, filter: filter);
 
   Future<Memory> getMemory(String id) async =>
       Memory.fromJson(await _request('GET', '/memories/$id', authed: true));

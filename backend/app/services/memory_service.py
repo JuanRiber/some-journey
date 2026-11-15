@@ -208,6 +208,7 @@ def list_for_user(
     limit: int,
     cursor: tuple[datetime, uuid.UUID] | None = None,
     life_phase_id: uuid.UUID | None = None,
+    filtro: memory_repository.MemoryFilter | None = None,
 ) -> tuple[list[MemoryRead], str | None]:
     """Uma PÁGINA das memórias do usuário + o cursor da próxima (ou None).
 
@@ -223,7 +224,12 @@ def list_for_user(
     if life_phase_id is not None:
         life_phase_service.get_phase(db, phase_id=life_phase_id, user_id=user_id)
     rows = memory_repository.list_by_user(
-        db, user_id=user_id, limit=limit, cursor=cursor, life_phase_id=life_phase_id
+        db,
+        user_id=user_id,
+        limit=limit,
+        cursor=cursor,
+        life_phase_id=life_phase_id,
+        filtro=filtro,
     )
     has_next = len(rows) > limit
     page = rows[:limit]

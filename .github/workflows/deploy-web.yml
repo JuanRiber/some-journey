@@ -63,7 +63,7 @@ jobs:
           # Sem API_URL o app sairia apontando para 127.0.0.1 (o padrão de
           # desenvolvimento) e abriria no ar sem conseguir falar com ninguém.
           if [ -z "$API_URL" ]; then
-            echo "::error::A variável API_URL não está definida (ex.: https://some-journey-api.onrender.com)."
+            echo "::error::A variável API_URL não está definida (ex.: https://some-journey-api-hmlg.onrender.com)."
             exit 1
           fi
           case "$API_URL" in

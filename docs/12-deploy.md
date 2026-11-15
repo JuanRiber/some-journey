@@ -93,6 +93,11 @@ do Render mostrar erro de permissão em `CREATE EXTENSION postgis`, habilite-o �
    aceita, com folga para os scripts do passo 5. Também vem dele `CLIENT_IP_HEADER=CF-Connecting-IP`:
    o proxy do Render acrescenta ao `X-Forwarded-For` que o cliente mandar, então o IP do limite de
    tentativas de login sai do cabeçalho que o Cloudflare (na frente do Render) sobrescreve.
+
+   > **O serviço no ar hoje é o `some-journey-api-hmlg`**, em
+   > `https://some-journey-api-hmlg.onrender.com` (Ohio). O `some-journey-api` de Oregon é um
+   > serviço antigo, suspenso em 15/11/2026 — o host `some-journey-api.onrender.com` responde 503
+   > e não deve aparecer em nenhuma configuração. Os exemplos abaixo usam o host atual.
 2. Ele pede as variáveis marcadas `sync: false`:
 
    | Variável | Valor |
@@ -102,14 +107,14 @@ do Render mostrar erro de permissão em `CREATE EXTENSION postgis`, habilite-o �
    | `SUPABASE_URL` | a Project URL (sem `/rest/v1`) |
    | `SUPABASE_SERVICE_KEY` | a service_role |
    | `CORS_ALLOWED_ORIGINS` | `https://some-journey-atlas.pages.dev` (o nome do passo 3; ajuste se mudar) |
-   | `TRUSTED_HOSTS` | `some-journey-api.onrender.com` (o host que o Render mostrar) |
+   | `TRUSTED_HOSTS` | `some-journey-api-hmlg.onrender.com` (o host que o Render mostrar) |
    | `GOOGLE_CLIENT_ID`, `SMTP_*` | deixe vazias por enquanto — o resto funciona sem elas |
 
 3. O primeiro deploy constrói a imagem e roda `scripts/start.sh`, que aplica as migrations (com
    retry) antes de subir o uvicorn. Para conferir:
 
    ```bash
-   curl https://some-journey-api.onrender.com/health/ready
+   curl https://some-journey-api-hmlg.onrender.com/health/ready
    ```
 
    `{"status":"ready"}` quer dizer API no ar **e** banco respondendo. Rodar de novo o
@@ -130,7 +135,7 @@ pasta pronta.
    **Account · Cloudflare Pages · Edit**. Copie o token (ele aparece uma vez só).
 3. No GitHub, **Settings → Secrets and variables → Actions**:
    - aba *Secrets*: `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`;
-   - aba *Variables*: `API_URL` = `https://some-journey-api.onrender.com`.
+   - aba *Variables*: `API_URL` = `https://some-journey-api-hmlg.onrender.com`.
      Opcionais: `GOOGLE_CLIENT_ID` (o client id **web**) e `CF_PAGES_PROJECT`, só se o nome
      padrão `some-journey-atlas` também estiver tomado.
 4. **Actions → Deploy web → Run workflow**. Na primeira execução ele cria o projeto no Pages; o
@@ -146,7 +151,7 @@ existem, o workflow termina verde com um aviso, em vez de falhar.
 ## 4. UptimeRobot — manter acordado
 
 Em <https://uptimerobot.com> (plano free): **New monitor → HTTP(s)**, URL
-`https://some-journey-api.onrender.com/health/ready`, intervalo de **5 minutos**.
+`https://some-journey-api-hmlg.onrender.com/health/ready`, intervalo de **5 minutos**.
 
 Esse único monitor resolve dois problemas: o Render não dorme (o limite é 15 min) e o Supabase
 recebe uma consulta (`SELECT 1`) a cada ping, então não conta como projeto parado. De brinde, você

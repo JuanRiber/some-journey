@@ -52,7 +52,7 @@ services:
         sync: false
       - key: CORS_ALLOWED_ORIGINS  # a URL do Cloudflare Pages: https://some-journey-atlas.pages.dev
         sync: false
-      - key: TRUSTED_HOSTS         # o host do Render, ex.: some-journey-api.onrender.com
+      - key: TRUSTED_HOSTS         # o host do Render, ex.: some-journey-api-hmlg.onrender.com
         sync: false
       # --- opcionais: vazias, o recurso fica desligado e o resto funciona ---
       - key: GOOGLE_CLIENT_ID      # ids da web, Android e iOS, separados por vírgula (sem: /auth/google responde 503)

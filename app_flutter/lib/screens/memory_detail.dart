@@ -6,10 +6,10 @@ import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../models.dart';
 import '../features/music/memory_music_section.dart';
+import '../features/photos/polaroid_pile.dart';
 import '../features/phases/phase_widgets.dart';
 import '../features/places/place_domain.dart';
 import '../widgets/photo_viewer.dart';
-import '../widgets/sj_image.dart';
 
 const _mesesLong = [
   'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho',
@@ -148,33 +148,20 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
                                   child: PhaseTag(phaseId: m.lifePhaseId),
                                 ),
                               ),
-                            // A foto é a protagonista: tocar abre em TELA CHEIA
-                            // (zoom por pinça, deslize entre as fotos da memória).
-                            for (final entry in m.images.asMap().entries)
+                            // As fotos como polaroids sobre a mesa: pequenas e
+                            // um pouco tortas, para não empurrarem o texto e a
+                            // música para longe. Tocar numa delas a faz crescer
+                            // para a tela cheia (zoom por pinça, deslize entre
+                            // as fotos da memória).
+                            if (m.images.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 16),
-                                child: Semantics(
-                                  button: true,
-                                  label: 'Abrir foto ${entry.key + 1} em tela cheia',
-                                  child: GestureDetector(
-                                    onTap: () => showSJPhotoViewer(
-                                      context,
-                                      urls: [for (final i in m.images) i.url],
-                                      initialIndex: entry.key,
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(3),
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                            border: Border.all(
-                                                color: s.frame, width: 3)),
-                                        child: AspectRatio(
-                                          aspectRatio: 4 / 3,
-                                          child: SJNetworkImage(entry.value.url,
-                                              fit: BoxFit.cover),
-                                        ),
-                                      ),
-                                    ),
+                                child: PolaroidPile(
+                                  images: m.images,
+                                  onOpen: (i) => showSJPhotoViewer(
+                                    context,
+                                    urls: [for (final img in m.images) img.url],
+                                    initialIndex: i,
                                   ),
                                 ),
                               ),

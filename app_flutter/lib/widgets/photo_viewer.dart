@@ -190,17 +190,25 @@ class _ZoomableState extends State<_Zoomable> {
           // Resolução completa — é aqui que o zoom precisa dela —, mas com a
           // chave estável: reabrir a mesma foto com um token novo não a baixa
           // de novo.
-          child: Image(
-            image: StableNetworkImage(widget.url),
-            fit: BoxFit.contain,
-            semanticLabel: 'Foto da memória em tela cheia',
-            loadingBuilder: (context, child, progress) => progress == null
-                ? child
-                : const Center(child: SJSpinner(color: Color(0xFFF7F1E7))),
-            errorBuilder: (context, _, _) => Center(
-              child: Text(
-                'Não foi possível carregar a foto.',
-                style: SJText.bodySm(color: const Color(0xFFF7F1E7)),
+          // O Hero casa com o da polaroid tocada: a foto CRESCE dela até a tela
+          // cheia, em vez de aparecer do nada.
+          child: Hero(
+            tag: heroDaFoto(widget.url),
+            child: Image(
+              image: StableNetworkImage(widget.url),
+              fit: BoxFit.contain,
+              semanticLabel: 'Foto da memória em tela cheia',
+              // Enquanto a resolução completa chega, segue a da polaroid na
+              // tela (mesmo arquivo, outra decodificação) — sem piscar.
+              gaplessPlayback: true,
+              loadingBuilder: (context, child, progress) => progress == null
+                  ? child
+                  : const Center(child: SJSpinner(color: Color(0xFFF7F1E7))),
+              errorBuilder: (context, _, _) => Center(
+                child: Text(
+                  'Não foi possível carregar a foto.',
+                  style: SJText.bodySm(color: const Color(0xFFF7F1E7)),
+                ),
               ),
             ),
           ),

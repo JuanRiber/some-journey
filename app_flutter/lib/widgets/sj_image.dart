@@ -52,6 +52,11 @@ int? larguraDeDecodificacao({
   return (lado * densidade).ceil();
 }
 
+/// A tag do Hero que liga uma foto pequena (a polaroid do detalhe) à mesma foto
+/// em tela cheia. A mesma função nos dois lados — senão a foto não "cresce",
+/// só aparece. Usa a chave estável: o token da URL não importa.
+String heroDaFoto(String url) => 'foto:${chaveEstavel(url)}';
+
 /// O provedor de imagem com chave estável. Carrega pela URL completa (com o
 /// token), mas é IGUAL a outro com o mesmo caminho — e é a igualdade que o
 /// cache de imagens usa.

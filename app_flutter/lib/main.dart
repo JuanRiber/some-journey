@@ -6,6 +6,7 @@ import 'design/sj_theme.dart';
 import 'design/theme.dart';
 import 'design/theme_controller.dart';
 import 'design/tokens.dart';
+import 'features/auth/startup_domain.dart';
 import 'screens/change_password.dart';
 import 'screens/forgot_password.dart';
 import 'screens/journey_detail.dart';
@@ -39,6 +40,28 @@ Future<void> main() async {
 
   runApp(SomeJourneyApp(tema: tema));
 }
+
+/// As rotas SEM argumento. Ficam fora do `MaterialApp` porque duas partes
+/// precisam delas: o próprio app, para navegar, e o bootstrap, para saber quais
+/// nomes dá para remontar a partir do hash depois de um recarregamento.
+final _rotas = <String, WidgetBuilder>{
+  '/login': (_) => const LoginScreen(),
+  '/forgot': (_) => const ForgotPasswordScreen(),
+  '/change-password': (_) => const ChangePasswordScreen(),
+  '/tabs': (_) => const TabsScreen(),
+  '/journeys': (_) => const JourneysScreen(),
+  '/journey-new': (_) => const JourneyNewScreen(),
+  // Perfil (avatar no topo do atlas) e, atrás da engrenagem dele,
+  // as configurações.
+  '/profile': (_) => const ProfileScreen(),
+  '/settings': (_) => const SettingsScreen(),
+  // Fases da vida: a porta fica no Perfil, porque fase é história de
+  // quem a viveu, não ajuste do app.
+  '/phases': (_) => const PhasesScreen(),
+  // Vitrine do design system (componentes/tokens) — criada por outro
+  // agente em design/gallery.dart. Rota estática, sem argumento.
+  '/design-gallery': (_) => const DesignGalleryScreen(),
+};
 
 class SomeJourneyApp extends StatelessWidget {
   const SomeJourneyApp({super.key, required this.tema});
@@ -92,37 +115,43 @@ class SomeJourneyApp extends StatelessWidget {
         scheme: tema.schemeFor(context),
         child: child ?? const SizedBox.shrink(),
       ),
-      home: const _Bootstrap(),
       // Rotas com argumento (id) são resolvidas em onGenerateRoute; as sem
-      // argumento ficam no mapa estático.
+      // argumento ficam no mapa `_rotas`.
       //
       // ATENÇÃO — POR QUE O LOGIN É '/login' E NÃO '/':
-      // com `home` definido, o MaterialApp responde ao nome de rota '/' com o
-      // PRÓPRIO `home`, antes de consultar `routes`/`onGenerateRoute`. Então
-      // `pushReplacementNamed('/')` no fim do bootstrap trocava a tela de
-      // carregamento... pela mesma tela de carregamento — spinner para sempre.
-      // Em debug um assert alertaria sobre `home` + '/' juntos; em release o
-      // assert é removido e a falha era SILENCIOSA (foi o que travou o build web).
+      // '/' é o nome do BOOTSTRAP. Quando ele era o `home`, o MaterialApp
+      // respondia a '/' com o próprio `home`, antes de consultar
+      // `routes`/`onGenerateRoute` — e `pushReplacementNamed('/')` no fim do
+      // bootstrap trocava a tela de carregamento... pela mesma tela de
+      // carregamento — spinner para sempre. Em debug um assert alertava sobre
+      // `home` + '/' juntos; em release o assert é removido e a falha era
+      // SILENCIOSA (foi o que travou o build web).
       // O login tem nome próprio; todo o app navega para '/login'.
-      routes: {
-        '/login': (_) => const LoginScreen(),
-        '/forgot': (_) => const ForgotPasswordScreen(),
-        '/change-password': (_) => const ChangePasswordScreen(),
-        '/tabs': (_) => const TabsScreen(),
-        '/journeys': (_) => const JourneysScreen(),
-        '/journey-new': (_) => const JourneyNewScreen(),
-        // Perfil (avatar no topo do atlas) e, atrás da engrenagem dele,
-        // as configurações.
-        '/profile': (_) => const ProfileScreen(),
-        '/settings': (_) => const SettingsScreen(),
-        // Fases da vida: a porta fica no Perfil, porque fase é história de
-        // quem a viveu, não ajuste do app.
-        '/phases': (_) => const PhasesScreen(),
-        // Vitrine do design system (componentes/tokens) — criada por outro
-        // agente em design/gallery.dart. Rota estática, sem argumento.
-        '/design-gallery': (_) => const DesignGalleryScreen(),
-      },
+      //
+      // Hoje não há `home`: ele não convive com `onGenerateInitialRoutes`
+      // (assert do WidgetsApp). O bootstrap entra pela pilha inicial, logo
+      // abaixo, e '/' continua sendo dele em onGenerateRoute — é o que atende
+      // quem apaga o hash da URL com o app já aberto.
+      routes: _rotas,
+      // Num recarregamento da página (web) a rota inicial é a do hash. O padrão
+      // do Navigator seria montar essa tela já no primeiro quadro, por cima do
+      // bootstrap — ANTES de o token salvo ser lido. Ela pediria seus dados sem
+      // `Authorization`, receberia 401 e mandaria para o login quem estava
+      // logado. Aqui a pilha inicial é sempre só o bootstrap, que guarda a rota
+      // pedida e decide o que abrir quando já sabe se há sessão.
+      onGenerateInitialRoutes: (pedida) => [
+        MaterialPageRoute<void>(
+          settings: const RouteSettings(name: '/'),
+          builder: (_) => _Bootstrap(pedida: pedida),
+        ),
+      ],
       onGenerateRoute: (settings) {
+        if (settings.name == Navigator.defaultRouteName) {
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => const _Bootstrap(),
+          );
+        }
         // O cadastro entra em cena como LIVRO, e por isso não pode ser uma
         // rota comum: o `MaterialPageRoute` deslizaria o login para fora e
         // apagaria a tela de baixo (`opaque: true`), deixando a capa subir
@@ -162,8 +191,16 @@ class SomeJourneyApp extends StatelessWidget {
 }
 
 /// Carrega o token salvo e decide a tela inicial: Atlas se logado, senão Login.
+///
+/// É a ÚNICA tela que existe até a sessão ser restaurada. Nada que fale com a
+/// API pode nascer antes disso — nem a rota que veio no hash ([pedida]), que só
+/// é aberta depois, por cima do atlas (a regra está em `startupStack`).
 class _Bootstrap extends StatefulWidget {
-  const _Bootstrap();
+  const _Bootstrap({this.pedida});
+
+  /// A rota com que a plataforma abriu o app (o hash, na web). Nula quando o
+  /// bootstrap entra pelo nome '/', com o app já aberto e sem pedido nenhum.
+  final String? pedida;
 
   @override
   State<_Bootstrap> createState() => _BootstrapState();
@@ -194,7 +231,16 @@ class _BootstrapState extends State<_Bootstrap> {
       // Sessão indisponível: segue para o login (sem token).
     }
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed(Api.instance.hasToken ? '/tabs' : '/login');
+    final pilha = startupStack(
+      requested: widget.pedida,
+      hasToken: Api.instance.hasToken,
+      buildable: _rotas.keys.toSet(),
+    );
+    final nav = Navigator.of(context);
+    nav.pushReplacementNamed(pilha.first);
+    for (final rota in pilha.skip(1)) {
+      nav.pushNamed(rota);
+    }
   }
 
   @override

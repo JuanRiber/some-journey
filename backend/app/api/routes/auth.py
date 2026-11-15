@@ -1,3 +1,5 @@
+import ipaddress
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
@@ -25,12 +27,20 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _client_ip(request: Request) -> str:
-    # O peer que o uvicorn entrega. Em produção ele sobe com --proxy-headers e
-    # --forwarded-allow-ips='*' (scripts/start.sh), e com '*' o uvicorn devolve
-    # a entrada MAIS À ESQUERDA do X-Forwarded-For — que é o que o cliente
-    # quiser escrever, se o proxy da plataforma acrescenta em vez de
-    # sobrescrever. Por isso nenhum limite que importa depende só daqui: o
-    # balde por E-MAIL (em _limit_auth) não lê IP nenhum.
+    """O IP de quem chama, para os limites de tentativa.
+
+    Com CLIENT_IP_HEADER configurado (em produção, CF-Connecting-IP), vale o
+    que a borda escreveu ali. Sem ele — ou com um valor que não é IP — vale o
+    peer que o uvicorn entrega, que atrás do Render é a entrada mais à esquerda
+    do X-Forwarded-For e o cliente consegue forjar. Por isso nenhum limite que
+    importa depende só daqui: o balde por E-MAIL (em _limit_auth) não lê IP.
+    """
+    if settings.CLIENT_IP_HEADER:
+        valor = request.headers.get(settings.CLIENT_IP_HEADER, "").strip()
+        try:
+            return str(ipaddress.ip_address(valor))
+        except ValueError:
+            pass
     return request.client.host if request.client else "unknown"
 
 

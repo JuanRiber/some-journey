@@ -186,6 +186,68 @@ def test_ip_rate_limit_blocks_spraying(client, monkeypatch):
     assert codes.index(429) == 5  # só trava depois de exceder o teto (5)
 
 
+# --- 6b. O IP do limite vem da borda, não do X-Forwarded-For do cliente -----
+# Em produção o proxy do Render ACRESCENTA ao X-Forwarded-For que o cliente
+# manda, e o uvicorn ('*') usa a entrada mais à esquerda: trocar esse valor a
+# cada tentativa abria um balde novo por IP. CLIENT_IP_HEADER aponta para o
+# cabeçalho que a borda sobrescreve (CF-Connecting-IP).
+def _pedido(headers: dict[str, str], peer: str = "10.1.2.3"):
+    from starlette.requests import Request
+
+    return Request(
+        {
+            "type": "http",
+            "headers": [(k.lower().encode(), v.encode()) for k, v in headers.items()],
+            "client": (peer, 1234),
+        }
+    )
+
+
+def test_ip_vem_do_cabecalho_da_borda_quando_configurado(monkeypatch):
+    from app.api.routes.auth import _client_ip
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "CLIENT_IP_HEADER", "CF-Connecting-IP")
+    assert _client_ip(_pedido({"CF-Connecting-IP": " 203.0.113.7 "})) == "203.0.113.7"
+    assert _client_ip(_pedido({"CF-Connecting-IP": "2001:db8::1"})) == "2001:db8::1"
+    # Sem o cabeçalho, ou com lixo nele, vale o peer — nunca o texto cru.
+    assert _client_ip(_pedido({})) == "10.1.2.3"
+    assert _client_ip(_pedido({"CF-Connecting-IP": "1.2.3.4, 5.6.7.8"})) == "10.1.2.3"
+
+
+def test_sem_configuracao_o_cabecalho_e_ignorado(monkeypatch):
+    from app.api.routes.auth import _client_ip
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "CLIENT_IP_HEADER", None)
+    assert _client_ip(_pedido({"CF-Connecting-IP": "203.0.113.7"})) == "10.1.2.3"
+
+
+def test_x_forwarded_for_forjado_nao_abre_balde_novo(client, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "CLIENT_IP_HEADER", "CF-Connecting-IP")
+    monkeypatch.setattr(settings, "AUTH_RATE_LIMIT_IP_ATTEMPTS", 3)
+    borda = {"CF-Connecting-IP": "198.51.100.20"}
+    codes = [
+        client.post(
+            "/auth/login",
+            json={"email": f"spray_{uuid.uuid4().hex}@t.com", "password": "whatever12345"},
+            headers={**borda, "X-Forwarded-For": f"203.0.113.{i}"},
+        ).status_code
+        for i in range(5)
+    ]
+    assert codes == [401, 401, 401, 429, 429]
+
+    # Outro IP real (outro tester) tem o seu balde: um não trava o outro.
+    r = client.post(
+        "/auth/login",
+        json={"email": f"outro_{uuid.uuid4().hex}@t.com", "password": "whatever12345"},
+        headers={"CF-Connecting-IP": "198.51.100.21"},
+    )
+    assert r.status_code == 401
+
+
 # --- 7. docs/openapi desabilitados em produção -----------------------------
 def test_docs_disabled_in_production(monkeypatch):
     from app.core.config import settings

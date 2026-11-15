@@ -45,6 +45,16 @@ class Settings(BaseSettings):
     # estourá-lo trava a conta para todo mundo, inclusive para a dona.
     AUTH_RATE_LIMIT_EMAIL_ATTEMPTS: int = Field(default=20, gt=0, le=1000)
 
+    # De onde vem o IP de quem chama, para os limites acima. Vazio: o peer que o
+    # uvicorn entrega (em produção, a entrada mais à ESQUERDA do X-Forwarded-For
+    # — que o cliente escreve como quiser, porque o proxy do Render acrescenta
+    # ao cabeçalho recebido em vez de trocá-lo). No Render o tráfego entra pelo
+    # Cloudflare, que grava o IP real em CF-Connecting-IP por cima de qualquer
+    # valor que o cliente mande: o render.yaml aponta para ele. Só aponte para
+    # um cabeçalho que o proxy da frente SEMPRE sobrescreve — senão o forjado
+    # passa direto.
+    CLIENT_IP_HEADER: str | None = None
+
     # Cadastro público. Se não definido, herda do ambiente: aberto em dev/test e
     # FECHADO em produção (as contas dos testers vêm do seed). Force com
     # REGISTRATION_OPEN=true/false para sobrepor.

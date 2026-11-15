@@ -90,7 +90,9 @@ do Render mostrar erro de permissão em `CREATE EXTENSION postgis`, habilite-o �
    repositório: o Render lê o `render.yaml` e cria o serviço `some-journey-api` no plano free,
    na região **Ohio**. O pool de conexões (`DB_POOL_SIZE=5`, `DB_MAX_OVERFLOW=5`) também vem
    do blueprint: 1 processo × 10 = 10 conexões, abaixo das ~15 que o pooler do Supabase grátis
-   aceita, com folga para os scripts do passo 5.
+   aceita, com folga para os scripts do passo 5. Também vem dele `CLIENT_IP_HEADER=CF-Connecting-IP`:
+   o proxy do Render acrescenta ao `X-Forwarded-For` que o cliente mandar, então o IP do limite de
+   tentativas de login sai do cabeçalho que o Cloudflare (na frente do Render) sobrescreve.
 2. Ele pede as variáveis marcadas `sync: false`:
 
    | Variável | Valor |

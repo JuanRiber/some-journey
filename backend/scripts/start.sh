@@ -37,10 +37,11 @@ done
 # proxy-headers, o uvicorn lê o X-Forwarded-For e request.client passa a refletir
 # o IP real do cliente. Confiamos no XFF porque no Render só o proxy da própria
 # plataforma alcança o container (borda controlada); daí o '*'.
-# LIMITE CONHECIDO: com '*' o uvicorn usa a entrada mais à ESQUERDA do XFF, que
-# o cliente pode escrever se o proxy acrescenta em vez de sobrescrever. O balde
-# por e-mail do rate limit (app/api/routes/auth.py) não depende de IP e segura
-# o brute-force numa conta; acertar o IP pede ver o XFF real em produção.
+# LIMITE: com '*' o uvicorn usa a entrada mais à ESQUERDA do XFF, e o proxy do
+# Render ACRESCENTA ao XFF que o cliente manda (confirmado em produção) — ela é
+# forjável. Por isso o rate limit lê o IP de CLIENT_IP_HEADER (CF-Connecting-IP
+# no render.yaml), que o Cloudflare sobrescreve; ver _client_ip em
+# app/api/routes/auth.py.
 #
 # UM processo por padrão (WEB_CONCURRENCY sobrepõe). No plano grátis do Render a
 # máquina tem uma fração de CPU: um segundo processo não traz CPU, só gasta RAM

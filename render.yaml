@@ -33,6 +33,11 @@ services:
         value: "5"
       - key: DB_MAX_OVERFLOW
         value: "5"
+      # O IP de quem chama, para o limite de tentativas de login. O proxy do
+      # Render acrescenta ao X-Forwarded-For que o cliente mandar (forjável); o
+      # Cloudflare, na frente dele, grava o IP real neste cabeçalho.
+      - key: CLIENT_IP_HEADER
+        value: CF-Connecting-IP
       # --- definir no painel (Environment) ---
       # Postgres do Supabase: a string do SESSION pooler (a conexão direta é só
       # IPv6 e o Render não alcança), com o prefixo trocado para

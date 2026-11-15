@@ -196,18 +196,28 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
                     children: [
                       Expanded(child: Text(j.title, style: SJText.h1(color: s.ink))),
                       const SizedBox(width: 10),
-                      StatusBadge(j.status),
+                      // Selo e lápis se alinham à PRIMEIRA linha do título, não
+                      // ao topo da caixa: soltos, o selo subia e o lápis (um
+                      // alvo de 48pt) descia, e os três pareciam desencontrados.
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5),
+                        child: StatusBadge(j.status),
+                      ),
                       // Editar mora no cabeçalho, junto do que se edita. Antes,
                       // consertar um título só era possível apagando a jornada
                       // e refazendo — o que desfaz os vínculos com as memórias.
-                      Semantics(
-                        button: true,
-                        label: 'Editar jornada',
-                        child: IconButton(
-                          onPressed: () => _openEdit(j.id),
-                          icon: Icon(Icons.edit_outlined,
-                              size: 19, color: s.inkSoft),
-                          tooltip: 'Editar',
+                      Transform.translate(
+                        // Centra o alvo de 48pt na linha de 34pt do título.
+                        offset: const Offset(0, (SJType.h1Line - 48) / 2),
+                        child: Semantics(
+                          button: true,
+                          label: 'Editar jornada',
+                          child: IconButton(
+                            onPressed: () => _openEdit(j.id),
+                            icon: Icon(Icons.edit_outlined,
+                                size: 19, color: s.inkSoft),
+                            tooltip: 'Editar',
+                          ),
                         ),
                       ),
                     ],

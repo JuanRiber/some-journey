@@ -303,13 +303,31 @@ class _ProfileScreenState extends State<ProfileScreen>
       children: [
         const SJSectionHeader(overline: 'Sua coleção', title: 'Em números'),
         const SizedBox(height: SJSpace.x4),
-        Wrap(
-          spacing: SJSpace.x3,
-          runSpacing: SJSpace.x3,
-          children: [
-            for (final (label, value, onTap) in items)
-              _StatTile(label: label, value: '$value', onTap: onTap),
-          ],
+        // Colunas IGUAIS que fecham a largura. Com bloco de largura fixa, num
+        // celular cabiam dois por linha e sobrava um terço da página vazio à
+        // direita — a grade parecia ter perdido uma coluna. Dois por linha no
+        // celular (o rótulo mais comprido cabe sem quebrar), mais conforme a
+        // tela alarga, até os seis lado a lado.
+        LayoutBuilder(
+          builder: (context, box) {
+            const gap = SJSpace.x3;
+            final colunas = (box.maxWidth / 150).floor().clamp(2, items.length);
+            final largura = (box.maxWidth - gap * (colunas - 1)) / colunas;
+            return Wrap(
+              spacing: gap,
+              runSpacing: gap,
+              children: [
+                for (final (label, value, onTap) in items)
+                  SizedBox(
+                    // Arredonda para baixo: um resto de ponto flutuante na
+                    // soma empurraria o último bloco para a linha seguinte.
+                    width: largura.floorToDouble(),
+                    child:
+                        _StatTile(label: label, value: '$value', onTap: onTap),
+                  ),
+              ],
+            );
+          },
         ),
         // Honestidade operacional: o passaporte fica incompleto até o backfill.
         if (st.pendingGeocode > 0) ...[
@@ -565,9 +583,8 @@ class _StatTile extends StatelessWidget {
       onTap: onTap,
       semanticLabel: '$value $label',
       child: Container(
-        width: 104,
         padding: const EdgeInsets.symmetric(
-          horizontal: SJSpace.x3, vertical: SJSpace.x4,
+          horizontal: SJSpace.x4, vertical: SJSpace.x4,
         ),
         decoration: BoxDecoration(
           color: s.surface,
@@ -577,9 +594,16 @@ class _StatTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(value, style: SJText.h2(color: s.ink)),
+            // O número vai na cor de ação: cada bloco é uma porta (abre o que
+            // conta), e em tinta comum ele lia como dado parado.
+            Text(value, style: SJText.h1(color: s.primary)),
             const SizedBox(height: SJSpace.x1),
-            Text(label.toUpperCase(), style: SJText.overline(color: s.inkSoft)),
+            Text(
+              label.toUpperCase(),
+              style: SJText.overline(color: s.inkSoft),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),

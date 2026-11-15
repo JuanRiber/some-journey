@@ -5,11 +5,16 @@ e-mail redefine a senha), uso único, expiração, invalidação do token anteri
 validação da nova senha.
 """
 
+import re
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
+from app.core import email
+from app.core.config import Settings
 from app.db.session import SessionLocal
 from app.models.password_reset import PasswordResetToken
 from app.services import auth_service
@@ -141,3 +146,62 @@ def test_reset_password_too_short_returns_422(client, captured_tokens):
         "/auth/reset-password", json={"token": token, "new_password": "short"}
     )
     assert r.status_code == 422
+
+
+def test_reset_link_default_points_to_the_published_app():
+    """O link do e-mail leva o token na querystring: quem é dono do host recebe
+    o token. O padrão tem de ser o endereço onde o app é publicado — o projeto
+    do Cloudflare Pages do workflow de deploy —, nunca um site de terceiro
+    (`some-journey.pages.dev`, sem o sufixo, já é de outro)."""
+    # O padrão do CAMPO, não `settings`: um .env local pode sobrepor o valor.
+    default = Settings.model_fields["PASSWORD_RESET_URL_BASE"].default
+    workflow = (
+        Path(__file__).resolve().parents[2] / ".github" / "workflows" / "deploy-web.yml"
+    ).read_text(encoding="utf-8")
+    project = re.search(r"vars\.CF_PAGES_PROJECT \|\| '([^']+)'", workflow)
+    assert project, "padrão de CF_PAGES_PROJECT não encontrado no deploy-web.yml"
+
+    url = urlsplit(default)
+    assert url.scheme == "https"
+    assert url.hostname == f"{project.group(1)}.pages.dev"
+
+
+def test_reset_link_default_opens_the_new_password_screen():
+    """O link tem de cair numa rota que o app conhece — senão abre no login e a
+    pessoa fica com um token na URL e nenhum lugar onde usá-lo. A rota mora
+    depois do `#` (é onde o app web guarda as rotas, e o que vem depois do `#`
+    não é enviado a servidor nenhum), e é a mesma que o app declara."""
+    default = Settings.model_fields["PASSWORD_RESET_URL_BASE"].default
+    url = urlsplit(default)
+    assert url.path == "/" and not url.query, "a rota do app vai depois do #"
+
+    startup = (
+        Path(__file__).resolve().parents[2]
+        / "app_flutter" / "lib" / "features" / "auth" / "startup_domain.dart"
+    ).read_text(encoding="utf-8")
+    route = re.search(r"const rotaResetSenha = '([^']+)';", startup)
+    assert route, "rotaResetSenha não encontrada no startup_domain.dart"
+    assert url.fragment == route.group(1)
+
+
+@pytest.mark.parametrize(
+    ("base", "link"),
+    [
+        # A forma do padrão: rota do app depois do `#`, token na querystring dela.
+        (
+            "https://app.exemplo.test/#/reset-password",
+            "https://app.exemplo.test/#/reset-password?token=tok123",
+        ),
+        (
+            "https://app.exemplo.test/reset-password/",
+            "https://app.exemplo.test/reset-password?token=tok123",
+        ),
+        (
+            "https://app.exemplo.test/reset?lang=pt",
+            "https://app.exemplo.test/reset?lang=pt&token=tok123",
+        ),
+    ],
+)
+def test_reset_link_carries_the_token_on_the_configured_base(monkeypatch, base, link):
+    monkeypatch.setattr(email.settings, "PASSWORD_RESET_URL_BASE", base)
+    assert email._reset_link("tok123") == link

@@ -146,7 +146,10 @@ Daqui em diante, todo push na `main` com CI verde republica o app. Enquanto os s
 existem, o workflow termina verde com um aviso, em vez de falhar.
 
 > Se o Pages der outro endereço (nome tomado), atualize `CORS_ALLOWED_ORIGINS` no Render — senão o
-> navegador bloqueia todas as chamadas e o login parece "não fazer nada".
+> navegador bloqueia todas as chamadas e o login parece "não fazer nada". Troque também o
+> `PASSWORD_RESET_URL_BASE` do `render.yaml`: é para esse endereço que vai o link do e-mail de
+> recuperação de senha, com o token dentro — ele nunca pode apontar para um site que não é o seu.
+> Só o host muda; o `/#/reset-password` do fim é a rota do app que abre a tela de nova senha.
 
 ## 4. UptimeRobot — manter acordado
 

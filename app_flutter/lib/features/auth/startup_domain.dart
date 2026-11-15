@@ -14,6 +14,29 @@ library;
 /// não faz sentido — o destino é o atlas.
 const rotasPublicas = {'/login', '/forgot', '/register'};
 
+/// A rota do link que chega no e-mail de recuperação de senha
+/// (`#/reset-password?token=…`). O backend monta o link com este mesmo nome
+/// (`PASSWORD_RESET_URL_BASE`): mudar aqui é mudar lá.
+const rotaResetSenha = '/reset-password';
+
+/// O token de redefinição que veio em [requested], ou nulo se [requested] não
+/// é o link do e-mail.
+///
+/// O link sem token (ou com ele vazio) não é um link de redefinição: não há o
+/// que redefinir, e a rota cai nas regras comuns de `startupStack`.
+String? resetTokenFrom(String? requested) {
+  if (requested == null) return null;
+  try {
+    final uri = Uri.tryParse(requested);
+    if (uri == null || uri.path != rotaResetSenha) return null;
+    final token = uri.queryParameters['token']?.trim();
+    return token == null || token.isEmpty ? null : token;
+  } catch (_) {
+    // Escape de URL torto na querystring: não é um link nosso.
+    return null;
+  }
+}
+
 /// A pilha de rotas inicial, de baixo para cima. Nunca vazia.
 ///
 /// [requested] é a rota que a plataforma pediu (o hash, na web); [hasToken]
@@ -26,11 +49,18 @@ const rotasPublicas = {'/login', '/forgot', '/register'};
 ///   sem argumento. O atlas fica por baixo para "voltar" ter para onde ir.
 /// - Detalhe e edição (`/memory`, `/journey`…) levam um id que o hash não
 ///   guarda: não há o que reconstruir, e abrem no atlas.
+/// - O link de redefinição de senha (com token) abre a tela de nova senha por
+///   cima do LOGIN, com ou sem sessão. Nunca por cima do atlas: quem esqueceu
+///   a senha costuma ter um token vencido guardado, o atlas pediria seus dados
+///   com ele, tomaria 401 e mandaria tudo para o login — levando junto a tela
+///   de nova senha, que é a única coisa que a pessoa veio fazer. O login não
+///   pede nada a ninguém.
 List<String> startupStack({
   required String? requested,
   required bool hasToken,
   required Set<String> buildable,
 }) {
+  if (resetTokenFrom(requested) != null) return const ['/login', rotaResetSenha];
   if (!hasToken) return const ['/login'];
   // Só o caminho: um `?x=1` pendurado no hash não muda de que tela se trata.
   final rota = requested == null ? null : Uri.tryParse(requested)?.path;

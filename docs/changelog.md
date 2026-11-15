@@ -701,3 +701,28 @@ quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de s
   workflow de deploy web passa a `some-journey-atlas` (a variável `CF_PAGES_PROJECT` só é
   preciso se esse também estiver tomado), e o guia e o `render.yaml` usam
   `https://some-journey-atlas.pages.dev` no `CORS_ALLOWED_ORIGINS`.
+
+## 2026-11-15
+
+### Deploy: o link de recuperação de senha aponta para o app certo
+- O padrão de `PASSWORD_RESET_URL_BASE` ainda era `https://some-journey.pages.dev/reset-password`
+  — o endereço que já é de outro site no Cloudflare Pages. O link do e-mail leva o token na
+  querystring: com o SMTP ligado, o token de redefinição iria para um site de terceiro. Estava
+  inerte só porque o e-mail ainda não sai em produção.
+- O padrão passa a `https://some-journey-atlas.pages.dev/reset-password`, o `render.yaml` define
+  a variável às claras, ao lado das outras, e o guia avisa que ela muda junto com o
+  `CORS_ALLOWED_ORIGINS` se o projeto do Pages trocar de nome. Um teste compara o host do
+  padrão com o projeto que o workflow de deploy publica.
+
+### Recuperação de senha: o link do e-mail abre a tela de nova senha
+- O app não tinha a rota do link: ele abria no login, e a pessoa tinha de copiar o token de
+  dentro da URL e colá-lo no campo "Código do e-mail". Agora `#/reset-password?token=…` abre
+  direto a etapa de escolher a senha, com um campo só. O caminho de quem pede o link e cola o
+  código na mesma tela continua igual.
+- O padrão de `PASSWORD_RESET_URL_BASE` passa a
+  `https://some-journey-atlas.pages.dev/#/reset-password`. A rota fica depois do `#` porque é
+  onde o app web guarda as rotas — e porque o navegador não envia a servidor nenhum o que vem
+  depois do `#`: o token não aparece em log de hospedagem. Depois de lido, ele também sai da
+  barra de endereço.
+- Com sessão aberta o link funciona igual, e a troca encerra a sessão local: a senha nova
+  invalida os tokens antigos no servidor.

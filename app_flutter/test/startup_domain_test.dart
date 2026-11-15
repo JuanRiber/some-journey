@@ -66,6 +66,59 @@ void main() {
     });
   });
 
+  group('link de redefinição de senha', () {
+    const link = '/reset-password?token=abc-DEF_123';
+
+    test('o token sai da querystring do link', () {
+      expect(resetTokenFrom(link), 'abc-DEF_123');
+      // Espaço colado junto, por quem copiou o link à mão, não faz parte dele.
+      expect(resetTokenFrom('/reset-password?token=%20abc%20'), 'abc');
+    });
+
+    test('sem token não é link de redefinição', () {
+      for (final pedida in [
+        null,
+        '',
+        '/',
+        '/reset-password',
+        '/reset-password?token=',
+        '/reset-password?token=%20',
+        '/reset-password?outra=1',
+      ]) {
+        expect(resetTokenFrom(pedida), isNull, reason: '$pedida');
+      }
+    });
+
+    test('querystring torta nunca derruba a abertura do app', () {
+      // Isto roda no bootstrap: uma exceção aqui é o app que não abre.
+      for (final pedida in [
+        '/reset-password?token=%zz',
+        '/reset-password?token=%FF',
+        '/reset-password?token=%E0%A4',
+        '/reset-password?%',
+      ]) {
+        expect(() => resetTokenFrom(pedida), returnsNormally, reason: pedida);
+      }
+    });
+
+    test('token pendurado em outra rota não vale', () {
+      expect(resetTokenFrom('/profile?token=abc'), isNull);
+      expect(resetTokenFrom('/forgot?token=abc'), isNull);
+    });
+
+    test('abre a nova senha por cima do login, com ou sem sessão', () {
+      expect(_pilha(link, sessao: false), ['/login', rotaResetSenha]);
+      // Com sessão também: o atlas por baixo, com um token vencido, tomaria
+      // 401 e derrubaria a tela de nova senha junto.
+      expect(_pilha(link, sessao: true), ['/login', rotaResetSenha]);
+    });
+
+    test('a rota sem token cai nas regras comuns', () {
+      expect(_pilha('/reset-password', sessao: false), ['/login']);
+      expect(_pilha('/reset-password', sessao: true), ['/tabs']);
+    });
+  });
+
   test('a pilha nunca vem vazia', () {
     for (final sessao in [true, false]) {
       for (final pedida in [null, '', '/', '/profile', '/memory']) {

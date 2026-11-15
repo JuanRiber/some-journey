@@ -25,6 +25,14 @@ services:
         value: "false"
       - key: SUPABASE_BUCKET
         value: memories
+      # Para onde aponta o link do e-mail de recuperação de senha — com o token
+      # na querystring. Tem de ser o endereço do app no Cloudflare Pages (o
+      # mesmo do CORS_ALLOWED_ORIGINS): `some-journey.pages.dev`, sem o sufixo,
+      # é de outro site, e o token iria para ele. Se o projeto do Pages mudar
+      # de nome, mude aqui junto. O `#/reset-password` é a rota do app que abre
+      # a tela de nova senha; as aspas são por causa do `#`.
+      - key: PASSWORD_RESET_URL_BASE
+        value: "https://some-journey-atlas.pages.dev/#/reset-password"
       # O Session pooler do Supabase grátis aceita ~15 conexões. Um processo
       # (scripts/start.sh) × (5 + 5) = 10, sobrando folga para os scripts
       # (seed, reset) rodados da máquina de quem administra. Subir

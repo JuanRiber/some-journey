@@ -69,10 +69,17 @@ class Settings(BaseSettings):
 
     # --- Recuperação de senha ---
     # Validade do token de reset (minutos) e destino do link entregue por e-mail.
-    # PASSWORD_RESET_URL_BASE recebe o token como querystring `?token=`; aponte
-    # para a rota do app (deep link) ou para a página web de redefinição.
+    # PASSWORD_RESET_URL_BASE recebe o token como querystring `?token=`.
+    # O host tem de ser o do app publicado (o projeto do Cloudflare Pages em
+    # .github/workflows/deploy-web.yml): quem recebe o link recebe o token.
+    # `some-journey.pages.dev`, sem o sufixo, é de OUTRO site.
+    # O `#/reset-password` é a rota do app que abre a tela de nova senha
+    # (`rotaResetSenha`, em app_flutter/lib/features/auth/startup_domain.dart).
+    # Fica depois do `#` de propósito: é onde moram as rotas do app web, e o
+    # que vem depois do `#` o navegador não manda a servidor nenhum — o token
+    # não aparece em log de hospedagem nem em cabeçalho Referer.
     PASSWORD_RESET_TOKEN_TTL_MINUTES: int = Field(default=30, ge=5, le=1440)
-    PASSWORD_RESET_URL_BASE: str = "https://some-journey.pages.dev/reset-password"
+    PASSWORD_RESET_URL_BASE: str = "https://some-journey-atlas.pages.dev/#/reset-password"
 
     # --- E-mail (SMTP) ---
     # OPCIONAL: sem SMTP_HOST + SMTP_FROM o envio fica desabilitado. Nesse caso,

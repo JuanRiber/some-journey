@@ -5,6 +5,7 @@ import '../design/components.dart';
 import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/phases/phase_store.dart';
 import '../widgets/common.dart';
 
 /// # Recuperar senha — o caminho de volta para dentro da própria história.
@@ -23,12 +24,20 @@ import '../widgets/common.dart';
 /// logo após o envio (quem está com o e-mail aberto ao lado cola o código e
 /// segue, sem precisar voltar).
 ///
+/// **Quem chega pelo link do e-mail** ([resetToken]) cai direto na etapa 2, com
+/// um campo só: a nova senha. O código já veio no link — pedir para colá-lo
+/// seria pedir de volta o que a pessoa acabou de entregar.
+///
 /// **Segurança (ANTI-ENUMERAÇÃO):** o backend responde SEMPRE 202 com a mesma
 /// mensagem, exista a conta ou não. Portanto esta tela NUNCA afirma que o e-mail
 /// existe — a confirmação é condicional ("se existir uma conta..."). Errar isso
 /// transformaria a tela num oráculo de contas cadastradas.
 class ForgotPasswordScreen extends StatefulWidget {
-  const ForgotPasswordScreen({super.key});
+  const ForgotPasswordScreen({super.key, this.resetToken});
+
+  /// O token que veio no link do e-mail (`#/reset-password?token=…`). Nulo no
+  /// caminho comum, que começa pedindo o link.
+  final String? resetToken;
 
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
@@ -45,6 +54,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   _Step _step = _Step.request;
   bool _busy = false;
   String _error = '';
+
+  /// Chegou pelo link do e-mail: o código já está em mãos e não é pedido.
+  /// Deixa de valer quando a pessoa pede outro link — aí o fluxo é o comum.
+  bool _fromLink = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final token = widget.resetToken?.trim() ?? '';
+    if (token.isNotEmpty) {
+      _token.text = token;
+      _step = _Step.reset;
+      _fromLink = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -95,6 +119,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
     try {
       await Api.instance.resetPassword(token, password);
+      // Trocar a senha invalida no servidor as sessões abertas. Quem veio pelo
+      // link estando logado ficaria com um token morto guardado: o app abriria
+      // no atlas e cada tela responderia 401. Sem sessão, isto não faz nada.
+      // É o mesmo que "sair" faz nas configurações, fases em memória inclusive.
+      await Api.instance.logout();
+      PhaseStore.instance.clear();
       if (!mounted) return;
       // Senha trocada: volta ao login com uma confirmação discreta.
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
@@ -142,7 +172,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     Text(
                       _step == _Step.request
                           ? 'Enviamos um link para você voltar ao seu atlas.'
-                          : 'Cole o código do e-mail e defina a senha que vai usar agora.',
+                          : _fromLink
+                              ? 'Defina a senha que vai usar agora.'
+                              : 'Cole o código do e-mail e defina a senha que vai usar agora.',
                       style: SJText.bodySm(color: s.inkSoft).copyWith(
                         fontFamily: SJType.serif,
                         fontFamilyFallback: SJType.serifFallback,
@@ -179,6 +211,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               if (_step == _Step.reset) {
                                 setState(() {
                                   _step = _Step.request;
+                                  _fromLink = false;
                                   _error = '';
                                   _token.clear();
                                   _password.clear();
@@ -225,8 +258,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               const SizedBox(width: SJSpace.x3),
               Expanded(
                 child: Text(
-                  'Se existir uma conta com esse e-mail, o link já está a caminho. '
-                  'Ele vale por pouco tempo e só pode ser usado uma vez.',
+                  _fromLink
+                      ? 'Este link vale por pouco tempo e só pode ser usado uma vez.'
+                      : 'Se existir uma conta com esse e-mail, o link já está a caminho. '
+                          'Ele vale por pouco tempo e só pode ser usado uma vez.',
                   style: SJText.caption(color: s.inkSoft),
                 ),
               ),
@@ -234,13 +269,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: SJSpace.x5),
-        SJTextField(
-          label: 'Código do e-mail',
-          controller: _token,
-          hint: 'cole aqui',
-          textInputAction: TextInputAction.next,
-        ),
-        const SizedBox(height: SJSpace.x4),
+        if (!_fromLink) ...[
+          SJTextField(
+            label: 'Código do e-mail',
+            controller: _token,
+            hint: 'cole aqui',
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: SJSpace.x4),
+        ],
         SJTextField(
           label: 'Nova senha',
           controller: _password,

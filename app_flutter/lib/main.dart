@@ -168,6 +168,21 @@ class SomeJourneyApp extends StatelessWidget {
             pageBuilder: (_, _, _) => const RegisterScreen(),
           );
         }
+        // O link do e-mail de recuperação de senha. Na abertura do app o token
+        // chega como argumento (o bootstrap o tira da rota pedida); com o app
+        // já aberto, o navegador entrega o hash inteiro como nome da rota, e o
+        // token sai dele. A rota é registrada SEM a querystring: é o nome dela
+        // que vai para a barra de endereço, e o token não deve ficar lá.
+        if (settings.name != null &&
+            Uri.tryParse(settings.name!)?.path == rotaResetSenha) {
+          final token = settings.arguments is String
+              ? settings.arguments as String
+              : resetTokenFrom(settings.name);
+          return MaterialPageRoute<void>(
+            settings: const RouteSettings(name: rotaResetSenha),
+            builder: (_) => ForgotPasswordScreen(resetToken: token),
+          );
+        }
         final id = settings.arguments as String?;
         Widget? page;
         switch (settings.name) {
@@ -239,7 +254,12 @@ class _BootstrapState extends State<_Bootstrap> {
     final nav = Navigator.of(context);
     nav.pushReplacementNamed(pilha.first);
     for (final rota in pilha.skip(1)) {
-      nav.pushNamed(rota);
+      // A tela de nova senha é a única da pilha inicial que leva argumento: o
+      // token do link, que não pode viajar no nome da rota (ver onGenerateRoute).
+      nav.pushNamed(
+        rota,
+        arguments: rota == rotaResetSenha ? resetTokenFrom(widget.pedida) : null,
+      );
     }
   }
 

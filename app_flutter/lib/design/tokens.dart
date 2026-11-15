@@ -12,8 +12,10 @@
 /// - **Escuro = "atlas noturno"**: navy profundo, creme como tinta, vinho/ciano
 ///   vivos, ouro nas molduras. A identidade da landing.
 ///
-/// As cores foram escolhidas orgânicas (nada saturado) e checadas para contraste
-/// de texto (alvo WCAG AA 4.5:1 no corpo; overlines ≥3:1 por serem grandes/bold).
+/// As cores são orgânicas — terra, vinho, lago, musgo — mas com croma de
+/// verdade: acento que não se distingue do marrom não é acento. Checadas para
+/// contraste de texto (alvo WCAG AA 4.5:1 no corpo; overlines ≥3:1 por serem
+/// grandes/bold).
 /// "Checadas" era à mão, e à mão escapou: quem cobra esse piso agora é
 /// `test/contrast_test.dart`, que recalcula a razão de cada par tinta↔superfície
 /// nos dois modos. Mudou um valor aqui, é lá que o estrago aparece.
@@ -72,31 +74,37 @@ class SJScheme {
 }
 
 /// Modo CLARO — "papel quente" (padrão do app).
+///
+/// PORQUÊ os acentos subiram de croma: a primeira paleta era toda de tons
+/// escurecidos e pouco saturados sobre creme acinzentado — legível, mas vista
+/// inteira a tela lia como uma cor só. O papel continua papel e a tinta
+/// continua tinta; o que mudou é que cada acento agora tem cor de verdade
+/// (vinho que é vinho, não marrom) e o cartão levanta do fundo. Os pisos de
+/// contraste são os mesmos e continuam cobrados em `test/contrast_test.dart`.
 const SJScheme sjLight = SJScheme(
   brightness: Brightness.light,
-  bgDeep: Color(0xFFECE3D2),
-  bg: Color(0xFFF5F0E6), // creme papel
-  surface: Color(0xFFFBF8F1), // off-white (card levanta do papel)
-  surfaceAlt: Color(0xFFEFE7D7), // areia clara (inputs)
-  ink: Color(0xFF2B2724), // marrom quase-preto quente
-  inkSoft: Color(0xFF6E6353),
-  // A tinta mais quieta do conjunto era também a única abaixo do piso: em
-  // #9C917E dava 2,73:1 sobre `bg` e 2,53:1 sobre `surfaceAlt` — e é justamente
-  // sobre `surfaceAlt` que ela escreve o placeholder dos campos. Escurecida o
-  // MÍNIMO para passar de 3:1 em todas as superfícies claras (3,37 / 3,12 /
-  // 3,61 / 3,01), mantendo o matiz (38°) e a distância para `inkSoft`: continua
-  // sendo a terciária, não virou uma segunda secundária.
-  inkFaint: Color(0xFF8C816E),
-  line: Color(0x1A2B2724), // tinta a 10%
-  frame: Color(0xFFC4AE86), // couro claro decorativo
-  primary: Color(0xFF6E2C3A), // vinho profundo (ação)
-  onPrimary: Color(0xFFF7F1E7),
-  secondary: Color(0xFF2E6C7E), // azul petróleo / lago
-  accent: Color(0xFF7A5A2E), // couro escurecido (legível como overline)
-  moss: Color(0xFF3E5A47), // verde musgo profundo
-  highlight: Color(0xFFB4762E), // amarelo queimado / terracota
-  danger: Color(0xFFA6392C),
-  shadow: Color(0xFF2B2724),
+  bgDeep: Color(0xFFEFE3CC),
+  bg: Color(0xFFF8F2E4), // creme papel, mais quente e menos cinza
+  surface: Color(0xFFFFFCF6), // quase branco: o card levanta do papel
+  surfaceAlt: Color(0xFFF2E8D4), // areia clara (inputs)
+  ink: Color(0xFF2A2420), // marrom quase-preto quente
+  inkSoft: Color(0xFF6B5E4C),
+  // A tinta mais quieta do conjunto já foi a única abaixo do piso (2,73:1
+  // sobre `bg`) — e é sobre `surfaceAlt` que ela escreve o placeholder dos
+  // campos. Fica no MÍNIMO que passa de 3:1 em todas as superfícies claras
+  // (3,04 / 3,45 / 3,77 / 3,17), mantendo o matiz e a distância para
+  // `inkSoft`: continua sendo a terciária, não virou uma segunda secundária.
+  inkFaint: Color(0xFF8E806A),
+  line: Color(0x1A2A2420), // tinta a 10%
+  frame: Color(0xFFD2AE68), // couro claro decorativo, puxado para o dourado
+  primary: Color(0xFFA3213F), // vinho vivo (ação)
+  onPrimary: Color(0xFFFFF8EC),
+  secondary: Color(0xFF11718F), // azul-lago
+  accent: Color(0xFF8F5B0E), // couro âmbar (legível como overline)
+  moss: Color(0xFF2A744E), // verde musgo
+  highlight: Color(0xFFC4671A), // terracota
+  danger: Color(0xFFC2331C),
+  shadow: Color(0xFF2A2420),
 );
 
 /// Modo ESCURO — "atlas noturno" (espelha a landing / mobile colors.ts).
@@ -123,11 +131,17 @@ const SJScheme sjDark = SJScheme(
 
 /// Famílias tipográficas. Serifa editorial para títulos/afeto; sans para
 /// interface; mono para overlines/selos (o "01 / OS MOMENTOS" da landing).
-/// Fontes próprias (Fraunces/Inter) entram como polimento — os nomes abaixo
-/// são o ponto único de troca.
+/// A serifa é a Fraunces, embutida (`pubspec.yaml`): uma fonte de sistema não
+/// existe em todo lugar, e onde faltava — a web inteira — o título caía em
+/// sans sem aviso. A sans e a mono ainda são de sistema; os nomes abaixo são o
+/// ponto único de troca.
 abstract final class SJType {
-  static const serif = 'Georgia';
-  static const List<String> serifFallback = ['Times New Roman', 'serif'];
+  static const serif = 'Fraunces';
+  static const List<String> serifFallback = [
+    'Georgia',
+    'Times New Roman',
+    'serif',
+  ];
   static const sans = 'Inter'; // cai no system sans até a fonte ser embutida
   static const List<String> sansFallback = [
     'SF Pro Text',

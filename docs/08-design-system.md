@@ -10,16 +10,19 @@
 | | Claro — "papel quente" (PADRÃO) | Escuro — "atlas noturno" |
 | --- | --- | --- |
 | Sensação | diário de papel envelhecido, luz de dia | mapa noturno, luz de vela |
-| Fundo (`bg`) | `#F5F0E6` creme | `#0D1524` navy |
-| Tinta (`ink`) | `#2B2724` marrom quente | `#F3ECDC` creme |
-| Ação (`primary`) | `#6E2C3A` vinho | `#B7314F` vinho vivo |
-| Link (`secondary`) | `#2E6C7E` azul-lago | `#4FB3C7` ciano |
-| Selo/overline (`accent`) | `#7A5A2E` couro | `#E3B04B` ouro |
-| Natureza (`moss`) | `#3E5A47` | `#6BA583` |
-| Era/quente (`highlight`) | `#B4762E` mostarda | `#D9A94E` |
+| Fundo (`bg`) | `#F8F2E4` creme | `#0D1524` navy |
+| Tinta (`ink`) | `#2A2420` marrom quente | `#F3ECDC` creme |
+| Ação (`primary`) | `#A3213F` vinho | `#B7314F` vinho vivo |
+| Link (`secondary`) | `#11718F` azul-lago | `#4FB3C7` ciano |
+| Selo/overline (`accent`) | `#8F5B0E` couro âmbar | `#E3B04B` ouro |
+| Natureza (`moss`) | `#2A744E` | `#6BA583` |
+| Era/quente (`highlight`) | `#C4671A` terracota | `#D9A94E` |
 
 O modo claro é o padrão; o escuro é uma alternância (respeita o sistema + toggle
-manual persistido em Configurações › Aparência). Nada saturado — tudo orgânico.
+manual persistido em Configurações › Aparência). Tudo orgânico — terra, vinho,
+lago, musgo — mas com croma de verdade: sobre creme, acento escurecido demais
+lê como marrom e a tela inteira vira uma cor só. Quem segura a legibilidade é
+o piso de contraste (`test/contrast_test.dart`), não a falta de saturação.
 
 **Como o esquema chega na tela.** `themeMode` sozinho troca só o Material por
 baixo. As telas leem `SJTheme.of(context)`, que cai num fallback CLARO quando
@@ -31,8 +34,12 @@ importados direto numa tela: a única exceção do app é texto sobre a foto de
 marca no login.
 
 ## 2. Tipografia
-- **Serifa** (Georgia → Fraunces quando embutir): display/h1/h2/títulos, conteúdo
-  de memória, itálicos afetivos (tagline, datas, atmosfera).
+- **Serifa** (Fraunces, embutida em `app_flutter/assets/fonts/`; Georgia só
+  como reserva): display/h1/h2/títulos, conteúdo de memória, itálicos afetivos
+  (tagline, datas, atmosfera). Embutida porque fonte de sistema não existe em
+  todo lugar — na web o título caía em sans. Dois pesos (400/600) × dois
+  estilos; pedir outro peso faz o motor sintetizar, e negrito sintético em
+  serifa borra. Licença SIL OFL 1.1, que vai junto (`OFL.txt`).
 - **Sans** (Inter/Manrope): interface — corpo, botões-não-mono, labels de campo.
 - **Mono** (Menlo): overlines/selos/numerais em CAIXA ALTA com tracking 1.6 — o
   motivo "01 / OS MOMENTOS" da landing.
@@ -63,7 +70,8 @@ Todos derivam dos tokens; nenhum usa Material/genérico "cru".
   label overline mono `accent`. Sem borda dura.
 - **Card = página de diário**: `surface`, raio lg, `e1`, muito respiro. Variante
   foto-protagonista: imagem sangra no topo, texto só complementa embaixo.
-- **Chip**: fundo tonal do acento (16%), label sans/mono. **Badge**: fundo do
+- **Chip**: fundo tonal do acento (16%), label sans/mono; selecionado, o tom
+  cheio com a tinta de maior contraste por cima. **Badge**: fundo do
   acento + texto contrastante, mono caixa alta.
 - **Bottom sheet**: `surface`, topo raio xl, grabber, `e2`. **FAB**: `primary`, `e2`.
 - **Overline**: mono caixa alta `accent` — "01 / TÍTULO".

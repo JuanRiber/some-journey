@@ -214,8 +214,16 @@ void main() {
   // por quê, com a conta à vista.
   test('o inkFaint antigo reprovava, o atual passa', () {
     const antigo = Color(0xFF9C917E);
-    expect(_contraste(antigo, sjLight.bg), closeTo(2.73, 0.01));
-    expect(_contraste(antigo, sjLight.surfaceAlt), closeTo(2.53, 0.01));
+    // As superfícies vão escritas por extenso, e não lidas do token: o número
+    // é um registro do dia em que a falha foi medida, sobre o papel daquele
+    // dia. O papel já mudou de tom desde então; o registro não muda junto.
+    const bgDaEpoca = Color(0xFFF5F0E6);
+    const surfaceAltDaEpoca = Color(0xFFEFE7D7);
+    expect(_contraste(antigo, bgDaEpoca), closeTo(2.73, 0.01));
+    expect(_contraste(antigo, surfaceAltDaEpoca), closeTo(2.53, 0.01));
+    // E sobre o papel de hoje ele continuaria reprovado.
+    expect(_contraste(antigo, sjLight.bg), lessThan(3.0));
+    expect(_contraste(antigo, sjLight.surfaceAlt), lessThan(3.0));
     expect(_contraste(sjLight.inkFaint, sjLight.bg), greaterThanOrEqualTo(3.0));
     expect(
       _contraste(sjLight.inkFaint, sjLight.surfaceAlt),

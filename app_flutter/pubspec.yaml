@@ -40,3 +40,23 @@ flutter:
 
   assets:
     - assets/images/first-class-art.jpg
+    # Licença da Fraunces (SIL OFL 1.1): viaja junto da fonte, como a própria
+    # licença exige de quem a redistribui.
+    - assets/fonts/OFL.txt
+
+  # Serifa dos títulos. Embutida porque fonte de sistema não existe em todo
+  # lugar: na web o motor não enxerga as fontes da máquina, e o "Georgia" pedido
+  # caía em sans — o app inteiro saía sem a serifa que o desenho pressupõe.
+  # São instâncias estáticas (tamanho óptico 24, o meio da escala de títulos):
+  # só os dois pesos e os dois estilos que o design system usa.
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces-Regular.ttf
+        - asset: assets/fonts/Fraunces-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Fraunces-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Fraunces-SemiBoldItalic.ttf
+          weight: 600
+          style: italic

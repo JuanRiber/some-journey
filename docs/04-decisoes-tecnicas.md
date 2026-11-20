@@ -56,9 +56,10 @@ a API devolve `image_url` **assinada** e temporária (assinatura em lote na list
 **Motivo.** Privacidade e anti-enumeração.
 **Consequência.** Nenhuma rota confia em `user_id` vindo do cliente — sempre do token.
 
-## Mapa: Leaflet/OSM agora, Mapbox planejado
-**Decisão.** Hoje o mapa (web) usa **Leaflet + OpenStreetMap** (sem API key); o seletor de local
-não pede lat/long manual.
-**Motivo.** Tirar o mapa do papel sem depender de chave/conta. No nativo, fallback por busca/lista.
-**Consequência.** **Mapbox** (ou provedor nativo) fica planejado para o atlas nativo/futuro;
+## Mapa: `flutter_map`/OSM agora, Mapbox planejado
+**Decisão.** O mapa usa **`flutter_map`** com tiles OpenStreetMap/CartoDB (sem API key), o mesmo
+no celular e na web; o seletor de local não pede lat/long manual: busca pelo nome ou toque no mapa.
+(Até outubro de 2026 o mapa web era Leaflet, no app Expo, e o nativo caía em busca/lista.)
+**Motivo.** Tirar o mapa do papel sem depender de chave/conta, com um código só.
+**Consequência.** **Mapbox** (ou provedor nativo) fica planejado;
 o backend (`GET /map`) já entrega pins + rastros independente do provedor visual.

@@ -5,8 +5,10 @@ nem duplicam linhas quando algo é inserido/removido entre requisições — des
 que a ordenação tenha um desempate único (o id). Cada listagem ordena por
 (timestamp, id) e o cursor carrega exatamente esse par.
 
-CONTRATO HTTP (idêntico em todas as rotas de lista, para os clientes e o Design
-System dependerem de UMA forma só):
+CONTRATO HTTP (um só para toda rota que pagina, para o app e o Design System
+dependerem de UMA forma só). Hoje paginam `GET /memories` e `GET /journeys`;
+`GET /journeys/{id}/memories`, `GET /journeys/{id}/tracks` e `GET /life-phases`
+devolvem a lista inteira:
 - A resposta continua sendo um ARRAY JSON puro (retrocompatível com os clientes
   atuais, que iteram a lista direto).
 - Query params: `?limit` (default DEFAULT_LIMIT, teto MAX_LIMIT) e `?cursor`

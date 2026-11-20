@@ -18,7 +18,7 @@ aparece só DENTRO do Perfil.
 
 ## Seções (na ordem)
 
-1. **Cabeçalho** — avatar grande, nome, `@username` (futuro), frase pessoal
+1. **Cabeçalho** — avatar grande, nome, `@username`, frase pessoal
    ("Colecionando lugares desde 2026."), data de entrada, nível (futuro).
 2. **Cartão de identidade do viajante** — o resumo humano, logo abaixo do
    cabeçalho. Não é uma grade de números, é uma frase de vida:
@@ -47,43 +47,46 @@ informações técnicas · qualquer aparência de painel administrativo.
 
 ## Análise de dados: o que já existe e o que falta
 
-**Regra de performance:** o Perfil deve consumir **UM** endpoint agregado
+**Regra de performance:** o Perfil consome **UM** endpoint agregado
 (`GET /me/profile`), com as contagens feitas em SQL. Baixar todas as memórias só
-para contá-las no cliente violaria a paginação que acabamos de introduzir.
+para contá-las no cliente violaria a paginação.
 
-| Dado | Situação | Como obter |
+| Dado | Situação | De onde vem |
 | --- | --- | --- |
-| Nome, e-mail, entrou em | ✅ existe | `GET /auth/me` (`UserProfile`) |
-| Nº de memórias / jornadas | 🟡 derivável | `COUNT(*)` no backend (hoje só via lista paginada) |
-| Jornadas concluídas | 🟡 derivável | `COUNT(*) WHERE status='finished'` |
-| Fotos | 🟡 derivável | `COUNT(*)` em `memory_images` |
-| Km registrados | 🟡 derivável | PostGIS nos tracks + haversine dos pontos (a lógica já existe em `features/atlas/atlas_domain.dart`) |
-| Jornada atual + progresso | 🟡 derivável | jornada `active` + contagem de pontos |
-| Atividade recente | 🟡 derivável | `created_at` de memórias/jornadas, ordenado |
-| Músicas salvas | ✅ existe | tabela `memory_music` + `stats.tracks` em `GET /me/profile` |
-| **Cidades / países / continentes** | ⛔ **BLOQUEADOR** | **hoje o app NÃO guarda o lugar** — só `latitude`/`longitude`. O rótulo do LocationPicker é display-only e é descartado. |
-| Dias consecutivos de uso | ⛔ **falta** | exige registro de atividade (ou derivar de `occurred_at`, o que mede a viagem, não o uso) |
-| Conquistas / nível | ⛔ **falta** | precisa de definição + persistência |
-| Avatar | ⛔ **falta** | nenhum campo de foto no `users`; precisa upload (o Storage privado já está pronto) |
+| Nome, e-mail, entrou em | ✅ existe | `identity` em `GET /me/profile` |
+| `@username`, frase pessoal | ✅ existe | `identity.username` / `identity.bio`; edição por `PATCH /me/profile` |
+| Avatar | ✅ existe | `POST`/`DELETE /me/avatar`, no Storage privado; volta como URL assinada |
+| Nº de memórias / jornadas | ✅ existe | `stats.memories`, `stats.journeys` |
+| Jornadas concluídas | ✅ existe | `stats.journeys_finished` |
+| Fotos | ✅ existe | `stats.photos` |
+| Músicas salvas | ✅ existe | `stats.tracks` (tabela `memory_music`) |
+| Km registrados | ✅ existe | `stats.tracked_meters`, somado no PostGIS a partir dos trechos ativos |
+| Cidades / países / continentes | ✅ existe | `stats.cities`, `stats.countries`, `stats.continents` e `passport`; as listas em `GET /me/places` |
+| Última aventura | ✅ existe | `last_adventure` |
+| Jornada atual + progresso | ✅ existe | `current_journey` (a `active` + contagem de pontos) |
+| Dias no app | ✅ existe | `stats.active_days` e a lista em `GET /me/days` — dias distintos com registro, pela data de criação |
+| Atividade recente | ⛔ **falta** | derivável de `created_at` de memórias/jornadas; não há campo no endpoint nem seção na tela |
+| Dias **consecutivos** de uso | ⛔ **falta** | `active_days` conta dias distintos, não sequência |
+| Conquistas / nível | ⛔ **falta** | precisa de definição + persistência; a tela mostra a seção vazia, marcada "Em breve" |
+| Coleções | ⛔ **falta** | ainda sem definição |
 
-### O bloqueador que importa
+### O bloqueador que já foi resolvido
 
-**Passaporte, "cidades", "países" e "última aventura" não podem ser calculados
-hoje.** Guardamos apenas coordenadas; o nome do lugar escolhido no picker nunca é
-persistido. Duas saídas:
+No início guardávamos apenas coordenadas, e passaporte, "cidades",
+"países" e "última aventura" não podiam ser calculados. A saída adotada foi
+**persistir no momento da escrita**: `memories` ganhou os campos de lugar,
+preenchidos por reverse geocode quando a memória é criada ou muda de lugar, com
+script de backfill para o acervo antigo (ver
+[`10-localizacao.md`](10-localizacao.md)). O Perfil lê tudo em SQL, sem voltar
+ao provedor. `stats.pending_geocode` diz quantas memórias ainda esperam o lugar.
 
-1. **Persistir no momento da escrita (recomendado):** adicionar
-   `place_label`, `city`, `country`, `country_code` em `memories`, preenchidos por
-   reverse geocode (Nominatim, já usado no app) quando a memória é criada/editada.
-   Barato de ler depois, e casa com a regra "importação EXIF é nativa".
-2. **Reverse geocode sob demanda:** caro, dependente de rede e sujeito a limite
-   de uso a cada abertura do Perfil. Não recomendado.
+## Ordem de implementação
 
-## Ordem de implementação sugerida
-
-1. Migração + campos de lugar (`city`/`country`) e reverse geocode na escrita.
-2. `GET /me/profile` agregado (SQL) + testes.
-3. Tela de Perfil (cabeçalho, cartão do viajante, estatísticas, mapa pessoal,
-   jornada atual, atividade) com skeletons e estados de erro/vazio.
-4. Avatar (upload no Storage privado) e `@username`.
-5. Conquistas (definição + persistência) e Coleções.
+1. ✅ Migração + campos de lugar (`city`/`country`) e reverse geocode na escrita.
+2. ✅ `GET /me/profile` agregado (SQL) + testes.
+3. 🟡 Tela de Perfil: cabeçalho, cartão do viajante, estatísticas, passaporte e
+   jornada atual estão prontos, com skeleton e estados de erro/vazio. Faltam o
+   mapa pessoal embutido (hoje é o botão "Ver meu atlas") e a atividade recente.
+4. ✅ Avatar (upload no Storage privado) e `@username`. A edição abre pelo
+   Perfil e por Configurações › Conta.
+5. ⬜ Conquistas (definição + persistência) e Coleções.

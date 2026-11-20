@@ -207,8 +207,9 @@ def _nominatim(user_agent: str) -> "NominatimGeocodingProvider":
     rajada para o Nominatim, que bloqueia o IP de saída — e aí a
     geocodificação para para todo mundo, em silêncio.
 
-    É por processo: com os 2 workers do start.sh o teto real é ~2 por
-    segundo, e o backfill, rodado à parte, tem o próprio relógio."""
+    É por processo: o start.sh sobe UM por padrão, então o limite vale exato;
+    cada processo a mais (WEB_CONCURRENCY) soma o seu. O backfill, rodado à
+    parte, tem o próprio relógio."""
     return NominatimGeocodingProvider(
         user_agent=user_agent,
         timezone_resolver=resolve_timezone,

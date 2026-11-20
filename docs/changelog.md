@@ -726,3 +726,34 @@ quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de s
   barra de endereço.
 - Com sessão aberta o link funciona igual, e a troca encerra a sessão local: a senha nova
   invalida os tokens antigos no servidor.
+
+## 2026-11-20
+
+### App: Configurações › Conta abre a edição de perfil
+- "Alterar nome" e "Alterar foto" estavam marcados "em breve" enquanto a tela que faz as duas
+  coisas já existia, aberta só pelo botão do Perfil. Viraram **uma linha** — "Nome, foto e
+  @username" — que abre essa mesma tela: duas linhas seriam duas portas para o mesmo lugar.
+- Configurações não tem o perfil na mão, então busca o atual antes de abrir. Se ele não vier, a
+  pessoa continua onde está, com um aviso, e a linha volta a responder.
+- O Perfil por baixo se atualiza pelo aviso de escrita do cliente da API (`Api.changes`), não
+  pelo retorno da rota.
+
+### Documentação: o que tinha ficado para trás do código
+- README: Dart `>= 3.10.9` (dizia 3.12.2, contra o `pubspec.yaml` e o CI), migrations
+  `0001..0016` (dizia `..0010`), `life_phases` na lista de rotas, contagem de testes (418 no
+  backend, 519 no app) e a divergência do texto da memória sem "os dois clientes".
+- [`09-perfil.md`](09-perfil.md): a tabela de dados dizia que avatar, cidades, países e
+  continentes **faltavam** — o segundo como bloqueador. Estão entregues desde a migration de
+  lugar e o `GET /me/profile`. A tabela agora diz de onde cada dado vem e o que de fato falta:
+  atividade recente, dias consecutivos, conquistas e coleções.
+- [`04-decisoes-tecnicas.md`](04-decisoes-tecnicas.md) e
+  [`05-fluxos-usuario.md`](05-fluxos-usuario.md): o mapa era descrito como Leaflet na web e
+  busca/lista no nativo, que era o app Expo. É `flutter_map`, o mesmo nos dois.
+- [`11-convencoes.md`](11-convencoes.md): uma menção a "os dois clientes" que sobrou.
+
+### Código: dois comentários que diziam o que já não é
+- `app/services/geocoding.py` falava nos "2 workers do start.sh"; o padrão é um processo desde
+  14/11.
+- `app/core/pagination.py` dizia que o contrato de cursor é idêntico em todas as rotas de
+  lista. Agora diz quais paginam e quais devolvem a lista inteira — a pendência registrada em
+  11/10.

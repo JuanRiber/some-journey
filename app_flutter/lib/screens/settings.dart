@@ -6,6 +6,7 @@ import '../design/sj_theme.dart';
 import '../design/theme_controller.dart';
 import '../design/tokens.dart';
 import '../features/phases/phase_store.dart';
+import 'profile_edit.dart';
 
 /// # Configurações — estruturadas para crescer.
 ///
@@ -28,6 +29,39 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _confirmingLogout = false;
+  bool _abrindoPerfil = false;
+
+  /// Abre a edição de perfil a partir daqui.
+  ///
+  /// A tela de edição nasce com o perfil na mão, e Configurações não tem um:
+  /// busca o atual antes de abrir. Quem atualiza o Perfil por baixo é o aviso
+  /// de escrita do cliente da API (`Api.changes`), não o retorno desta rota.
+  Future<void> _editarPerfil() async {
+    if (_abrindoPerfil) return;
+    setState(() => _abrindoPerfil = true);
+    try {
+      final perfil = await Api.instance.getProfile();
+      if (!mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (_) => ProfileEditScreen(profile: perfil)),
+      );
+    } on ApiError catch (e) {
+      if (!mounted) return;
+      if (e.isUnauthorized) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+        return;
+      }
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Não foi possível abrir seu perfil agora.')),
+      );
+    } finally {
+      if (mounted) setState(() => _abrindoPerfil = false);
+    }
+  }
 
   Future<void> _logout() async {
     await Api.instance.logout();
@@ -72,8 +106,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 label: 'Alterar senha',
                 onTap: () => Navigator.of(context).pushNamed('/change-password'),
               ),
-              const _Row(label: 'Alterar nome', soon: true),
-              const _Row(label: 'Alterar foto', soon: true),
+              // Nome, foto e @ moram na mesma tela, a que o Perfil já abre:
+              // uma linha só, em vez de duas portas para o mesmo lugar.
+              _Row(
+                label: 'Nome, foto e @username',
+                onTap: _abrindoPerfil ? null : _editarPerfil,
+              ),
               const _Row(label: 'Excluir conta', soon: true),
             ]),
 

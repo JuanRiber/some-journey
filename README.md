@@ -17,7 +17,7 @@ A vida deixa rastros. O Some Journey registra esses rastros e une lugar, tempo, 
 | --- | --- |
 | Backend | Python 3.12, FastAPI, SQLAlchemy, Pydantic, JWT |
 | Banco | PostgreSQL 16 + PostGIS 3.4 |
-| App | Flutter (Dart >= 3.12.2), `flutter_map` — movel e web |
+| App | Flutter (Dart >= 3.10.9), `flutter_map` — movel e web |
 | Mapa | `flutter_map` com tiles OSM/CartoDB; Mapbox planejado |
 | Imagens | Supabase Storage (bucket privado, URL assinada) |
 | Infra | Docker Compose para PostgreSQL/PostGIS; Render para a API; Cloudflare Pages para o app web |
@@ -41,7 +41,7 @@ some-journey/
 |-- backend/
 |   |-- app/
 |   |   |-- main.py
-|   |   |-- api/routes/        # auth, memories, journeys, tracks, map, profile
+|   |   |-- api/routes/        # auth, memories, journeys, tracks, map, profile, life_phases
 |   |   |-- core/              # config, security, rate limit, storage, geohash, email
 |   |   |-- db/                # engine, session, Base
 |   |   |-- dependencies/      # autenticacao atual
@@ -49,9 +49,9 @@ some-journey/
 |   |   |-- repositories/      # acesso a dados
 |   |   |-- schemas/           # contratos Pydantic
 |   |   `-- services/          # regras de negocio (inclui geocoding)
-|   |-- alembic/               # migrations versionadas (0001..0010)
+|   |-- alembic/               # migrations versionadas (0001..0016)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (391 testes)
+|   |-- tests/                 # pytest (418 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -80,7 +80,7 @@ some-journey/
 
 - Python 3.11+ (producao roda 3.12; o codigo usa sintaxe 3.10+)
 - Docker + Docker Compose (para o PostgreSQL/PostGIS)
-- Flutter SDK com Dart >= 3.12.2 (para o app principal)
+- Flutter SDK com Dart >= 3.10.9 (o CI usa Flutter 3.38.10)
 - Git
 
 ---
@@ -415,10 +415,10 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Fuso horario (`timezone`) resolvido offline pelas coordenadas, sem chamada de rede extra
 - [x] Perfil agregado (`GET /me/profile`) com passaporte, `@username`, avatar e bio
 - [x] Paginacao keyset em `/memories` e `/journeys`
-- [x] Migracoes versionadas (Alembic, 0001..0010)
+- [x] Migracoes versionadas (Alembic, 0001..0016)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 391 no backend (pytest) e 462 no app (flutter test)
+- [x] Testes automatizados — 418 no backend (pytest) e 519 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -463,7 +463,7 @@ seis meses.
 
 | Divergencia | Situacao |
 | --- | --- |
-| Texto da memoria e opcional | O produto pede que o texto seja o nucleo da memoria. O titulo ja deixou de ser obrigatorio; exigir o texto quebraria os dois clientes e o acervo ja gravado, entao segue em aberto. Ver `01-regras-negocio.md`. |
+| Texto da memoria e opcional | O produto pede que o texto seja o nucleo da memoria. O titulo ja deixou de ser obrigatorio; exigir o texto quebraria o app e o acervo ja gravado, entao segue em aberto. Ver `01-regras-negocio.md`. |
 | Uma memoria por jornada | Limite do MVP, garantido por indice unico parcial em `journey_memories.memory_id`. A modelagem ja suporta varias jornadas — basta trocar a constraint. |
 | Mapa em Mapbox | Planejado. Hoje o Flutter usa `flutter_map` com tiles OSM/CartoDB e o backend entrega pins e rastros independente do provedor visual. |
 

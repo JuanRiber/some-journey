@@ -1,11 +1,11 @@
 # Fluxos de Usuário
 
-Fluxos principais do MVP. No web o mapa é interativo (Leaflet); no nativo, o local vem por
-busca/GPS e a visualização é por lista (ver [`04-decisoes-tecnicas.md`](04-decisoes-tecnicas.md)).
+Fluxos principais do MVP. O mapa é interativo no celular e na web (`flutter_map`); o local vem
+por toque no mapa, busca ou GPS (ver [`04-decisoes-tecnicas.md`](04-decisoes-tecnicas.md)).
 
 ## Fluxo 1 — Criar ponto solto
 1. Usuário abre o app e vai criar uma memória.
-2. Escolhe o local: toca no mapa (web), busca pelo nome ou usa a localização atual (GPS).
+2. Escolhe o local: toca no mapa, busca pelo nome ou usa a localização atual (GPS).
 3. Sistema captura `latitude`/`longitude`.
 4. Usuário escreve o texto (núcleo) e, opcionalmente, título.
 5. Usuário define a data do acontecimento.

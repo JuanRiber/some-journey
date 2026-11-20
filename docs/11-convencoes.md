@@ -164,7 +164,7 @@ continua sendo um array porque os clientes já iteravam a lista direto.
 
 **Se errar.** Tirar o `expose_headers` do CORS não gera erro: o navegador
 simplesmente não entrega o header, e a lista para na primeira página de 30 sem
-que ninguém perceba. Devolver um envelope em vez do array quebra os dois clientes
+que ninguém perceba. Devolver um envelope em vez do array quebra o app inteiro
 de uma vez.
 
 **Estado real, para não prometer demais.** Só as duas coleções de topo paginam.

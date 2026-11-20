@@ -49,9 +49,9 @@ some-journey/
 |   |   |-- repositories/      # acesso a dados
 |   |   |-- schemas/           # contratos Pydantic
 |   |   `-- services/          # regras de negocio (inclui geocoding)
-|   |-- alembic/               # migrations versionadas (0001..0016)
+|   |-- alembic/               # migrations versionadas (0001..0018)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (418 testes)
+|   |-- tests/                 # pytest (450 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -281,9 +281,11 @@ exigem `Authorization: Bearer <token>`.
 ### Auth
 
 - `POST /auth/register` — cadastro (fechado por padrao em producao)
-- `POST /auth/login`
+- `POST /auth/login` — devolve o access token (JWT, 60 min) e o refresh token
+- `POST /auth/refresh` — troca o refresh token por um par novo; cada refresh token vale uma troca
+- `POST /auth/logout` — encerra a sessao daquele aparelho (revoga o refresh token)
 - `GET /auth/me`
-- `POST /auth/change-password` — troca a senha e invalida os tokens antigos
+- `POST /auth/change-password` — troca a senha e encerra todas as sessoes abertas
 - `POST /auth/forgot-password` — dispara o token de reset (por e-mail, se houver SMTP)
 - `POST /auth/reset-password` — redefine a senha com o token
 
@@ -403,22 +405,23 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Health check e readiness com checagem de banco
 - [x] Configuracao por variaveis de ambiente
 - [x] Autenticacao com cadastro, login, JWT e `/auth/me`
-- [x] Rate limit simples para auth (por conta, por IP e por e-mail)
+- [x] Sessao que se renova sozinha — refresh token com rotacao, no cofre do sistema no celular
+- [x] Rate limit para auth (por conta, por IP e por e-mail), contado no banco
 - [x] CRUD de memorias com ownership por usuario
 - [x] Jornadas com ciclo de vida (draft/active/paused/finished), pontos, reordenacao e desvinculo
 - [x] Edicao de jornada (`PATCH`), capa, `mood` e `is_private`
 - [x] Endpoint de mapa (`/map`) com pins soltos, jornadas com rastro e filtros por bbox/jornada
-- [x] Percurso real por GPS (tracks + pontos) e mapa da jornada em GeoJSON; captura em primeiro plano no app
+- [x] Percurso real por GPS (tracks + pontos) e mapa da jornada em GeoJSON; captura em primeiro plano no app, com os pontos ainda nao enviados guardados no aparelho
 - [x] Upload/storage de imagens — ate 5 fotos por memoria no Supabase Storage, com URL assinada
 - [x] Recuperacao real de senha (token com validade, envio por SMTP opcional) e troca de senha
 - [x] Lugar da memoria persistido por geocoding reverso + script de backfill
 - [x] Fuso horario (`timezone`) resolvido offline pelas coordenadas, sem chamada de rede extra
 - [x] Perfil agregado (`GET /me/profile`) com passaporte, `@username`, avatar e bio
 - [x] Paginacao keyset em `/memories` e `/journeys`
-- [x] Migracoes versionadas (Alembic, 0001..0016)
+- [x] Migracoes versionadas (Alembic, 0001..0018)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 418 no backend (pytest) e 519 no app (flutter test)
+- [x] Testes automatizados — 450 no backend (pytest) e 574 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -474,6 +477,9 @@ seis meses.
 - Senhas sempre como hash; `password_hash` nunca retorna pela API.
 - Trocar a senha invalida os tokens emitidos antes (`password_changed_at`), inclusive quando a troca cai no mesmo segundo da senha anterior.
 - Tokens de reset de senha ficam no banco como hash, com validade e uso unico.
+- A sessao dura mais que o access token por um refresh token de uso unico: cada renovacao devolve o sucessor, e so o hash dele fica no banco. Um refresh token ja trocado que reaparece (fora de uma folga de segundos) revoga a sessao inteira.
+- Trocar ou redefinir a senha revoga todos os refresh tokens da pessoa, no mesmo commit do hash novo; sair revoga o daquele aparelho.
+- No celular os tokens ficam no Keychain (iOS) / Keystore (Android), nao em arquivo de texto. Na web ficam no `localStorage`: o navegador nao tem cofre.
 - Secrets (`JWT_SECRET_KEY`, credenciais de banco, service key do Supabase) ficam em variaveis de ambiente.
 - UUID nativo do PostgreSQL evita IDs sequenciais previsiveis.
 - Cada usuario acessa somente os proprios dados.
@@ -483,7 +489,7 @@ seis meses.
 - Login e recuperacao de senha tem um teto por e-mail (`AUTH_RATE_LIMIT_EMAIL_ATTEMPTS`), que nao depende de IP: um `X-Forwarded-For` forjado nao o contorna.
 - STARTTLS do SMTP confere o certificado e o nome do servidor.
 - Toda resposta leva `nosniff`, `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`; em producao, tambem HSTS e uma CSP que nao carrega nada. O servidor nao se identifica.
-- O conteiner roda sem root, e a API sobe com um processo so: os limites que vivem em memoria (tentativas de login, intervalo do Nominatim) valem exatos.
+- O conteiner roda sem root. O limite de tentativas de login mora no banco (`auth_rate_limits`): sobrevive a reinicio e vale igual com qualquer numero de processos. A API ainda sobe com um processo so por causa do intervalo do Nominatim, que e por processo.
 - Um e-mail ja ligado a uma conta Google nao e religado a outra (`409`): e-mail de dominio que troca de dono nao herda as memorias de ninguem.
 - Senhas, tokens e dados sensiveis nao devem ir para logs.
 - Entrada que o banco nao guarda (caractere NUL no texto) ou que nao cabe em JSON (`NaN`, `Infinity`) responde 422, nunca 500.

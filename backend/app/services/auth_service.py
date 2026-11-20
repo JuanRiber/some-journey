@@ -9,6 +9,7 @@ mensagem genérica de credencial inválida nasce aqui (anti-enumeração).
 
 import hashlib
 import secrets
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func
@@ -19,7 +20,11 @@ from app.core import google_oauth
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
-from app.repositories import password_reset_repository, user_repository
+from app.repositories import (
+    password_reset_repository,
+    refresh_token_repository,
+    user_repository,
+)
 from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest
 
 # Hash Argon2 "dummy" calculado UMA vez no import. No login, quando o e-mail não
@@ -47,6 +52,53 @@ class PasswordNotSetError(Exception):
 
 class InactiveUserError(Exception):
     """Conta inativa — a rota traduz para 403 Forbidden."""
+
+
+class InvalidRefreshTokenError(Exception):
+    """Refresh token inexistente, vencido, revogado ou reusado — 401."""
+
+
+# Um refresh token já trocado ainda é aceito por este tempo, e só para gerar
+# OUTRO sucessor na mesma sessão. Cobre os dois casos honestos de reuso: duas
+# abas do navegador renovando ao mesmo tempo com o mesmo token guardado, e a
+# resposta da renovação que se perdeu no caminho (o servidor trocou, o app não
+# soube e tenta de novo). Fora desta folga, token trocado que reaparece é cópia.
+_REFRESH_REUSE_GRACE = timedelta(seconds=20)
+
+
+def _hash_token(raw_token: str) -> str:
+    """SHA-256 hex do token cru — é isto que fica no banco (nunca o cru)."""
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _issue_session(
+    db: Session, user: User, *, family_id: uuid.UUID | None = None
+) -> LoginResponse:
+    """Emite o par da sessão: access token (JWT) + refresh token (opaco).
+
+    Sem `family_id` é um login — nasce uma sessão nova. Com ele é uma
+    renovação: o refresh token novo entra na MESMA família do que foi trocado.
+    Quem chama já conferiu a credencial (senha, Google ou refresh token) e que
+    a conta está ativa. Comita: o par só existe se o refresh token foi gravado.
+    """
+    raw_refresh = secrets.token_urlsafe(48)
+    refresh_token_repository.purge_stale_for_user(db, user_id=user.id)
+    refresh_token_repository.create(
+        db,
+        user_id=user.id,
+        family_id=family_id or uuid.uuid4(),
+        token_hash=_hash_token(raw_refresh),
+        expires_at=datetime.now(UTC)
+        + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+    db.commit()
+    # pcat = password_changed_at vigente: o token só vale enquanto a senha não
+    # for trocada/redefinida (ver get_current_user).
+    return LoginResponse(
+        access_token=create_access_token(user.id, user.password_changed_at),
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        refresh_token=raw_refresh,
+    )
 
 
 def register(db: Session, data: RegisterRequest) -> User:
@@ -94,13 +146,7 @@ def login(db: Session, data: LoginRequest) -> LoginResponse:
         raise InvalidCredentialsError()
     if not user.is_active:
         raise InactiveUserError()
-    # pcat = password_changed_at vigente: o token só vale enquanto a senha não
-    # for trocada/redefinida (ver get_current_user).
-    access_token = create_access_token(user.id, user.password_changed_at)
-    return LoginResponse(
-        access_token=access_token,
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
+    return _issue_session(db, user)
 
 
 def login_with_google(db: Session, id_token: str) -> LoginResponse:
@@ -155,11 +201,67 @@ def login_with_google(db: Session, id_token: str) -> LoginResponse:
 
     if not user.is_active:
         raise InactiveUserError()
-    access_token = create_access_token(user.id, user.password_changed_at)
-    return LoginResponse(
-        access_token=access_token,
-        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    return _issue_session(db, user)
+
+
+def refresh_session(db: Session, *, raw_token: str) -> LoginResponse:
+    """Troca um refresh token por um par novo (rotação).
+
+    O token vale UMA troca. Os caminhos, na ordem em que são decididos:
+
+    - **não existe, foi revogado ou venceu** — a sessão acabou;
+    - **é o vigente** — é consumido e nasce o sucessor, na mesma família;
+    - **já foi trocado, há instantes** — a folga (`_REFRESH_REUSE_GRACE`): outro
+      sucessor na mesma família, sem derrubar ninguém;
+    - **já foi trocado, e não foi agora** — é cópia. A família inteira é
+      revogada: quem copiou perde o acesso, e a dona volta ao login — que é o
+      aviso que ela pode receber.
+
+    Tudo o que falha levanta a MESMA exceção: a rota responde um 401 só, sem
+    dizer qual dos motivos foi.
+    """
+    token = refresh_token_repository.get_by_hash(
+        db, token_hash=_hash_token(raw_token)
     )
+    agora = datetime.now(UTC)
+    if token is None or token.revoked_at is not None or token.expires_at <= agora:
+        raise InvalidRefreshTokenError()
+
+    user = user_repository.get_by_id(db, token.user_id)
+    if user is None or not user.is_active:
+        raise InvalidRefreshTokenError()
+
+    consumiu = token.used_at is None and refresh_token_repository.mark_used(
+        db, token_id=token.id
+    )
+    if not consumiu:
+        # Já estava trocado — ou outra requisição o trocou entre a leitura e o
+        # UPDATE. Relê para decidir com o instante que o banco gravou.
+        db.refresh(token)
+        usado_em = token.used_at
+        if (
+            token.revoked_at is not None
+            or usado_em is None
+            or agora - usado_em > _REFRESH_REUSE_GRACE
+        ):
+            refresh_token_repository.revoke_family(db, family_id=token.family_id)
+            db.commit()
+            raise InvalidRefreshTokenError()
+
+    return _issue_session(db, user, family_id=token.family_id)
+
+
+def logout(db: Session, *, raw_token: str) -> None:
+    """Encerra a sessão do refresh token dado. Idempotente e silencioso: token
+    desconhecido, vencido ou já revogado não é erro — quem está saindo quer
+    sair, e a resposta não deve servir para testar se um token existe."""
+    token = refresh_token_repository.get_by_hash(
+        db, token_hash=_hash_token(raw_token)
+    )
+    if token is None:
+        return
+    refresh_token_repository.revoke_family(db, family_id=token.family_id)
+    db.commit()
 
 
 def change_password(
@@ -174,11 +276,16 @@ def change_password(
 
     Conta que só entra pelo Google não tem senha atual para conferir: levanta
     PasswordNotSetError em vez de passar None ao verificador, que quebraria
-    com TypeError (500)."""
+    com TypeError (500).
+
+    As sessões abertas caem junto: os refresh tokens da pessoa são revogados na
+    MESMA transação do hash novo (o set_password_hash é quem comita). Sem isso
+    o access token antigo morria e o refresh antigo emitia outro."""
     if user.password_hash is None:
         raise PasswordNotSetError()
     if not verify_password(current_password, user.password_hash):
         raise InvalidCredentialsError()
+    refresh_token_repository.revoke_all_for_user(db, user_id=user.id)
     user_repository.set_password_hash(
         db, user=user, password_hash=hash_password(new_password)
     )
@@ -189,11 +296,6 @@ def change_password(
 
 class InvalidResetTokenError(Exception):
     """Token de reset inexistente, expirado ou já usado — a rota traduz em 400."""
-
-
-def _hash_token(raw_token: str) -> str:
-    """SHA-256 hex do token cru — é isto que fica no banco (nunca o cru)."""
-    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
 def request_password_reset(db: Session, *, email: str) -> str | None:
@@ -240,4 +342,7 @@ def reset_password(db: Session, *, raw_token: str, new_password: str) -> None:
     user.password_changed_at = func.now()
     # Consome ESTE token e derruba qualquer outro pendente do usuário.
     password_reset_repository.invalidate_user_tokens(db, user_id=user.id)
+    # E encerra as sessões abertas: quem redefine a senha porque perdeu o
+    # controle da conta não pode deixar um refresh token vivo com outra pessoa.
+    refresh_token_repository.revoke_all_for_user(db, user_id=user.id)
     db.commit()

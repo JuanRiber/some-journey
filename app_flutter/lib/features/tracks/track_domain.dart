@@ -40,6 +40,18 @@ class TrackSample {
   final double? speed;
   final double? heading;
 
+  /// O inverso de [toJson]. É como um ponto guardado no aparelho volta a ser
+  /// ponto depois que o app foi fechado (ver `track_outbox.dart`).
+  factory TrackSample.fromJson(Map<String, dynamic> j) => TrackSample(
+        latitude: (j['latitude'] as num).toDouble(),
+        longitude: (j['longitude'] as num).toDouble(),
+        accuracy: (j['accuracy'] as num?)?.toDouble(),
+        altitude: (j['altitude'] as num?)?.toDouble(),
+        speed: (j['speed'] as num?)?.toDouble(),
+        heading: (j['heading'] as num?)?.toDouble(),
+        recordedAt: DateTime.parse(j['recorded_at'] as String).toUtc(),
+      );
+
   Map<String, dynamic> toJson() => {
         'latitude': latitude,
         'longitude': longitude,
@@ -133,9 +145,9 @@ class TrackRecorderCore {
 
   final SamplingPolicy policy;
 
-  /// A cada quantos pontos aceitos vale a pena subir um lote. Segurar tudo em
-  /// memória perderia o percurso se o app morresse; subir a cada ponto gastaria
-  /// bateria e rede à toa.
+  /// A cada quantos pontos aceitos vale a pena subir um lote. Subir a cada
+  /// ponto gastaria bateria e rede à toa; e o que espera a vez não fica só em
+  /// memória — o gravador o escreve no aparelho (ver `track_outbox.dart`).
   final int flushEvery;
 
   final List<TrackSample> _buffer = [];

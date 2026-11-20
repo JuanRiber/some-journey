@@ -757,3 +757,100 @@ quem abre conexões novas pode chegar a ~40 por janela), faltam cabeçalhos de s
 - `app/core/pagination.py` dizia que o contrato de cursor é idêntico em todas as rotas de
   lista. Agora diz quais paginam e quais devolvem a lista inteira — a pendência registrada em
   11/10.
+
+## 2026-11-20 (2)
+
+Quatro fragilidades do levantamento de 20/11, fechadas juntas porque três delas se
+encostam: sessão que dura pede um segredo de vida longa, e segredo de vida longa pede um
+lugar melhor para ficar.
+
+### A sessão se renova sozinha
+- O access token vale 60 minutos e não havia como renová-lo: passada a hora, a primeira tela
+  que pedisse dados tomava 401 e mandava a pessoa para o login, no meio do que estivesse
+  fazendo. Agora o login devolve também um **refresh token** (30 dias), e o app o troca por
+  um par novo em `POST /auth/refresh` quando o access vence — e repete a MESMA requisição.
+  Quem chamou nem fica sabendo.
+- **Rotação.** Cada refresh token vale uma troca; a resposta traz o sucessor, com validade
+  nova. No banco fica só o SHA-256 dele (`refresh_tokens`, migration 0018), como já era com
+  o token de recuperação de senha.
+- **Reuso é cópia.** Um token já trocado que reaparece revoga a sessão inteira daquele
+  aparelho: quem copiou perde o acesso, e a dona volta ao login — que é o aviso que ela pode
+  receber. A exceção é uma folga de 20 s para os dois casos honestos: duas abas renovando
+  juntas com o mesmo token guardado, e a resposta da renovação que se perdeu no caminho.
+- **Sair agora sai no servidor** (`POST /auth/logout`): antes o app só esquecia o token, e
+  ele seguia valendo. O aparelho esquece primeiro e avisa depois, sem esperar — sair não
+  pode depender de rede.
+- **Trocar ou redefinir a senha encerra as sessões abertas**, no mesmo commit do hash novo.
+  Sem isso o access token antigo morria e o refresh antigo emitia outro.
+- No app, o que se cuidou para a renovação não virar problema novo:
+  - várias requisições vencem juntas (uma tela abre e dispara três) e a renovação acontece
+    **uma vez** — três trocas com o mesmo token seriam duas recusas;
+  - sem rede, servidor fora ou 429 na renovação **não deslogam**: a sessão pode estar inteira,
+    e mandar para o login quem só passou por um túnel seria o defeito antigo de volta;
+  - o 401 de "senha atual incorreta" **não** dispara renovação. Só o 401 de sessão traz
+    `WWW-Authenticate`, que passou a ser exposto no CORS para o app web conseguir lê-lo;
+  - duas abas: antes de trocar, a aba relê o que está guardado. Se a outra já renovou, adota
+    o par novo em vez de reusar o velho;
+  - renovar não é trocar de sessão: os caches de tela (Perfil, estante) não se esvaziam a
+    cada hora.
+- Compatível nos dois sentidos, porque API e app são publicados separados: o app novo contra
+  a API antiga só não renova; o app antigo contra a API nova ignora o campo a mais.
+
+### Os tokens saem do arquivo de texto, no celular
+- A sessão ficava no `shared_preferences`, que no celular é um arquivo de texto na pasta do
+  app. Para um token de uma hora era um risco pequeno; para um refresh token de 30 dias não
+  é. No celular os dois vão para o cofre do sistema — **Keychain** no iOS, **Keystore** no
+  Android (`flutter_secure_storage`).
+- **Na web continuam no `localStorage`**, e não é descuido: o navegador não tem cofre. O que
+  o plugin oferece ali é cifrar o valor com uma chave guardada no mesmo `localStorage`, que
+  não protege de nada do que já alcança um.
+- Quem já estava logado é **mudado** para o cofre na primeira abertura — copiado e, só
+  depois de gravado, apagado do arquivo. Atualizar o app não desloga ninguém.
+- Se o cofre recusar a gravação, a sessão vale em memória até o app fechar. Ela **não** cai
+  de volta para o arquivo de texto.
+- Cada ida ao cofre tem teto de 4 s: um keychain que não responde não segura o login.
+- Android: `allowBackup="false"`. O backup automático levaria o valor cifrado para outro
+  aparelho sem a chave que o abre.
+- Não conferido em aparelho: as três plataformas nativas só rodaram nos testes, com o cofre
+  simulado.
+
+### Os pontos de GPS sobrevivem ao app
+- Entre um lote e outro — e durante todo o tempo em que a rede falhava — os pontos do
+  percurso existiam só em memória. Se o app morresse ali, o fim do percurso sumia e o traço
+  simplesmente terminava antes, sem erro nenhum.
+- Cada ponto aceito é escrito no aparelho assim que entra, com o trecho a que pertence, e
+  sai quando o servidor confirma. O lote que está no ar também fica guardado: é justamente o
+  que se perderia.
+- Na volta, a jornada **diz** quantos pontos ficaram e oferece enviá-los; e a saída que já
+  existia para o trecho que ficou aberto ("Encerrar a gravação anterior") leva os pontos
+  junto, antes de fechar.
+- Sem rede, o trecho não é fechado nem os pontos apagados — fechar sem eles jogaria fora o
+  fim do percurso. Pontos que o servidor **recusa** (o trecho fechou por outro caminho) são
+  deixados para trás: senão a jornada ficaria presa num envio que nunca vai ser aceito.
+- Duas mudanças de comportamento no mesmo sentido: sair da tela gravando agora sobe o que
+  faltava antes de fechar o trecho (antes fechava sem eles), e encerrar sem rede mantém os
+  pontos para a próxima tentativa (antes eram descartados).
+- Sair da conta apaga do aparelho o que não subiu: é de quem saiu, não do próximo a entrar.
+- Limite conhecido: se o app morrer entre o servidor confirmar um lote e o aparelho
+  registrar isso, o lote sobe de novo na recuperação e os pontos ficam duplicados no trecho.
+  A janela é de milissegundos; o servidor não deduplica.
+
+### O limite de tentativas mora no banco
+- Era um dicionário na memória do processo. Um reinício da API — deploy, queda, o contêiner
+  do plano grátis acordando — zerava os baldes e devolvia a quem estava adivinhando uma
+  senha uma janela nova; e com mais de um processo cada um contava o seu.
+- Cada balde é uma linha em `auth_rate_limits` (migration 0017) e a contagem é **um**
+  comando: `INSERT ... ON CONFLICT DO UPDATE`, que abre a janela, reinicia a vencida ou
+  soma, e devolve o total. O Postgres trava a linha, então duas tentativas simultâneas nunca
+  leem o mesmo número; e o relógio é o do banco, o mesmo para todo processo.
+- A chave é o SHA-256 das partes: a tabela não guarda e-mail nem IP.
+- A contagem roda numa transação própria — a tentativa tem de ficar contada mesmo quando o
+  request termina em 401, que é o caso que o limite existe para contar.
+- A API continua subindo com um processo só, agora por um motivo a menos: o intervalo do
+  Nominatim ainda é por processo.
+
+### Testes
+- Backend: 450 (eram 418). App: 574 (eram 519).
+- Os testes do app ganharam um cofre de mentira para todos (`test/flutter_test_config.dart`).
+  Num teste não há plataforma do outro lado do plugin, e a chamada não falha — ela nunca
+  responde, e o login "não termina" longe da causa.

@@ -3,7 +3,12 @@
          de gravação está aberta. Não há rastreamento em segundo plano. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- allowBackup="false": a sessão fica no Keystore (flutter_secure_storage).
+         O backup automático do Android copiaria o valor cifrado para outro
+         aparelho SEM a chave que o abre, e o app nasceria lá com um cofre que
+         não consegue ler. Sem backup, um aparelho novo começa pelo login. -->
     <application
+        android:allowBackup="false"
         android:label="some_journey"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

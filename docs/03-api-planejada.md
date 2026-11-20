@@ -13,9 +13,18 @@ header `Authorization: Bearer <token>`. ✅ = implementado · 🔜 = planejado.
 ## Autenticação
 - ✅ `POST /auth/register` — `{name, email, password}` → 201 `{id, name, email, created_at}`.
   Em produção o cadastro é **fechado** por padrão (contas via `scripts/seed_users`).
-- ✅ `POST /auth/login` — `{email, password}` → `{access_token, token_type, expires_in}`
+- ✅ `POST /auth/login` — `{email, password}` →
+  `{access_token, token_type, expires_in, refresh_token}`
+- ✅ `POST /auth/refresh` — `{refresh_token}` → o mesmo corpo do login, com um par novo. Não
+  pede `Authorization`. O refresh token vale uma troca; qualquer falha é **401**.
+- ✅ `POST /auth/logout` — `{refresh_token}` → 204 sempre; encerra a sessão daquele aparelho.
 - ✅ `GET /auth/me` — usuário autenticado
-- ✅ `POST /auth/change-password` — troca a senha; os tokens emitidos antes deixam de valer
+- ✅ `POST /auth/change-password` — troca a senha; os tokens emitidos antes deixam de valer e
+  as sessões abertas são encerradas
+
+O **401 de sessão** (token ausente, vencido ou revogado) vem com `WWW-Authenticate: Bearer`,
+exposto no CORS. É por ele que o app distingue "renove e tente de novo" dos outros 401
+(senha atual errada, login recusado), que não trazem o header.
 - ✅ `POST /auth/forgot-password` — gera o token de reset (enviado por e-mail se houver SMTP;
   fora de produção e sem SMTP, o link é logado). Responde igual para e-mail existente ou não.
 - ✅ `POST /auth/reset-password` — redefine a senha com o token (validade + uso único)

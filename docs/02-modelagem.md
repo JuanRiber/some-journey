@@ -15,7 +15,10 @@ User
  │      │      └── Memory
  │      └── JourneyTracks     (percurso real por GPS)
  │             └── JourneyTrackPoints
- └── PasswordResetTokens (recuperação de senha)
+ ├── PasswordResetTokens (recuperação de senha)
+ └── RefreshTokens       (sessões: uma família por aparelho)
+
+AuthRateLimits           (baldes do limite de tentativas; sem dono — a chave é um hash)
 ```
 
 ## users
@@ -217,3 +220,30 @@ a tire da fase sem nenhuma escrita a mais.
 | expires_at | timestamptz | validade (`PASSWORD_RESET_TOKEN_TTL_MINUTES`) |
 | used_at | timestamptz \| null | uso único |
 | created_at | timestamptz | |
+
+## refresh_tokens  (a sessão que dura mais que o JWT)
+| Campo | Tipo | Notas |
+|---|---|---|
+| id | UUID | PK |
+| user_id | UUID | FK → users (CASCADE) |
+| family_id | UUID | a sessão de um aparelho: todo sucessor herda a mesma |
+| token_hash | varchar(64) | só o **hash** vai para o banco; único |
+| expires_at | timestamptz | validade (`REFRESH_TOKEN_EXPIRE_DAYS`); o sucessor ganha uma nova |
+| used_at | timestamptz \| null | marca a troca — cada token vale **uma** |
+| revoked_at | timestamptz \| null | logout, troca/redefinição de senha ou reuso detectado |
+| created_at | timestamptz | |
+
+O token vigente de uma sessão é o único da família com `used_at` e `revoked_at` nulos.
+Revogar é sempre por família (logout, reuso) ou por usuário (senha). Vencidos, e trocados
+ou revogados há mais de um dia, são apagados a cada emissão para a mesma pessoa.
+
+## auth_rate_limits  (o limite de tentativas)
+| Campo | Tipo | Notas |
+|---|---|---|
+| key | varchar(160) | PK — `<escopo>:<sha256>` das partes (IP, e-mail); **não** guarda nenhum dos dois |
+| window_started_at | timestamptz | início da janela corrente, pelo relógio do banco |
+| attempts | int | tentativas na janela, incluindo as recusadas |
+
+Uma linha por balde, contada com um único `INSERT ... ON CONFLICT DO UPDATE`
+(`app/core/rate_limit.py`). Sem FK de propósito: o balde existe antes de se saber se a conta
+existe. Janelas vencidas há mais de um dia saem numa faxina oportunista.

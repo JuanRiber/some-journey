@@ -72,6 +72,24 @@ class TrackPanel extends StatelessWidget {
                   ),
                 ],
               ],
+              // O app foi fechado no meio de uma gravação e os últimos pontos
+              // ficaram no aparelho. Sem dizer isso, eles esperariam para
+              // sempre que alguém tentasse gravar de novo e topasse com o erro.
+              if (recorder.savedPointCount > 0 && !recorder.hasOrphanTrack) ...[
+                const SizedBox(height: SJSpace.x3),
+                Text(_guardados(), style: SJText.bodySm(color: s.ink)),
+                const SizedBox(height: SJSpace.x3),
+                SJButton(
+                  label: 'Enviar e encerrar',
+                  variant: SJButtonVariant.secondary,
+                  onPressed: recorder.isBusy
+                      ? null
+                      : () async {
+                          await recorder.closeOrphanTrack();
+                          onFinished();
+                        },
+                ),
+              ],
               if (gravando && _aviso() != null) ...[
                 const SizedBox(height: SJSpace.x2),
                 Text(_aviso()!, style: SJText.caption(color: s.accent)),
@@ -106,6 +124,15 @@ class TrackPanel extends StatelessWidget {
     final pendentes = recorder.pendingCount;
     final base = n == 1 ? '$d · 1 ponto' : '$d · $n pontos';
     return pendentes > 0 ? '$base · $pendentes a enviar' : base;
+  }
+
+  /// O recado da gravação interrompida, com o número que a pessoa pode
+  /// conferir depois no traço.
+  String _guardados() {
+    final n = recorder.savedPointCount;
+    final pontos = n == 1 ? '1 ponto' : '$n pontos';
+    return 'Uma gravação foi interrompida e $pontos do percurso '
+        '${n == 1 ? 'ficou' : 'ficaram'} neste aparelho, sem enviar.';
   }
 
   /// Explica o silêncio. Sem isto, sinal ruim parece app travado.

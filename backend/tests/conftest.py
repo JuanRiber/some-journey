@@ -170,12 +170,13 @@ def _clean_tables(_schema):
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limit():
-    """Zera os baldes do rate limiter (in-memory, por processo) a cada teste —
-    o TestClient compartilha o mesmo IP, então o limite por-IP acumularia entre
-    testes sem isso."""
+    """Os baldes do limitador moram na tabela `auth_rate_limits`, que o
+    `_clean_tables` já esvazia a cada teste — o TestClient compartilha o mesmo
+    IP, então o limite por-IP acumularia entre testes sem isso. Aqui só volta
+    ao zero o relógio da faxina, o único estado que ficou em memória."""
     from app.core import rate_limit
 
-    rate_limit._buckets.clear()
+    rate_limit._last_purge = None
     yield
 
 

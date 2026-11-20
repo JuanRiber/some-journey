@@ -11,11 +11,12 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart' show ValueNotifier, visibleForTesting;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'features/auth/token_store.dart';
 import 'features/collection/collection_domain.dart';
 import 'features/phases/phase_domain.dart';
 import 'features/profile/profile_models.dart';
+import 'features/tracks/track_outbox.dart';
 import 'models.dart';
 
 const apiUrl = String.fromEnvironment('API_URL', defaultValue: 'http://127.0.0.1:8000');
@@ -52,8 +53,6 @@ const apiTimeout = Duration(seconds: 75);
 /// estavam progredindo bem. O cliente Expo já tratava os dois casos como
 /// grandezas diferentes (`API_TIMEOUT_MS * 3`); manter a proporção.
 const apiUploadTimeout = Duration(minutes: 3);
-
-const _tokenKey = 'sj_access_token';
 
 /// Natureza da falha, para a tela saber que notícia dar.
 ///
@@ -140,6 +139,15 @@ class Api {
 
   String? _token;
 
+  /// O que troca o access token vencido por um novo (POST /auth/refresh). Vale
+  /// UMA troca: cada renovação devolve o sucessor. Nulo em sessão antiga,
+  /// aberta antes de existir renovação — essa vale até o access token vencer.
+  String? _refreshToken;
+
+  /// Muda quando a SESSÃO muda (entrar, sair, restaurar) e fica igual quando
+  /// ela só é renovada. Ver [sessionTag].
+  Object? _sessao;
+
   /// Avisa que este app MUDOU algo no servidor — uma escrita que deu certo.
   ///
   /// As abas guardam o estado (não recarregam ao trocar), então quem mostra
@@ -156,7 +164,23 @@ class Api {
   /// Identifica a sessão atual sem expor o token: dois valores iguais são a
   /// mesma sessão. É o que deixa um cache de tela saber se ainda é da pessoa
   /// que está logada (ver features/sync/session_cache.dart).
-  Object? get sessionTag => _token;
+  ///
+  /// NÃO é o token: ele troca a cada hora, na renovação, e a sessão continua
+  /// sendo a mesma — um cache que se esvaziasse a cada renovação reabriria as
+  /// telas em esqueleto sem ninguém ter saído.
+  Object? get sessionTag => _token == null ? null : _sessao;
+
+  /// Onde a sessão fica guardada: o cofre do sistema no celular, o
+  /// `localStorage` na web (ver features/auth/token_store.dart).
+  TokenStore _store = TokenStore.platform();
+
+  /// Troca o cofre da sessão (testes). Devolve o anterior, para restaurar.
+  @visibleForTesting
+  TokenStore swapTokenStore(TokenStore store) {
+    final old = _store;
+    _store = store;
+    return old;
+  }
 
   /// Cliente HTTP. Injetável para que o contrato com o backend — paginação por
   /// cursor, tradução de erro, timeout — possa ser testado sem rede nem
@@ -171,41 +195,48 @@ class Api {
     return old;
   }
 
-  /// Esquece a sessão em memória (testes), sem tocar no armazenamento.
+  /// Define a sessão em memória (testes), sem tocar no armazenamento.
   @visibleForTesting
-  void debugSetToken(String? token) => _token = token;
+  void debugSetToken(String? token, {String? refreshToken}) {
+    _token = token;
+    _refreshToken = token == null ? null : refreshToken;
+    _sessao = token;
+  }
 
   /// Lê a sessão salva. Falha de armazenamento NÃO derruba o app: sem token, o
   /// bootstrap manda para o login (ver _Bootstrap em main.dart).
   Future<void> loadToken() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _token = prefs.getString(_tokenKey);
-    } catch (_) {
-      _token = null;
-    }
+    final guardada = await _store.read();
+    _token = guardada?.accessToken;
+    _refreshToken = guardada?.refreshToken;
+    _sessao = guardada == null ? null : Object();
   }
 
   bool get hasToken => _token != null;
 
-  /// Guarda (ou apaga) a sessão. O token vale EM MEMÓRIA na hora — a persistência
-  /// é best-effort: se o armazenamento estiver indisponível (aba privada, política
-  /// de site na web), o login continua funcionando nesta sessão; ele só não
-  /// sobrevive a um recarregamento. Antes, uma exceção aqui fazia um login
-  /// bem-sucedido parecer que falhou.
-  Future<void> _saveToken(String? token) async {
-    _token = token;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (token == null) {
-        await prefs.remove(_tokenKey);
-      } else {
-        await prefs.setString(_tokenKey, token);
-      }
-    } catch (_) {
-      // Sessão só em memória — aceitável e melhor que quebrar o fluxo.
-    }
+  /// Guarda (ou apaga) a sessão. Ela vale EM MEMÓRIA na hora — a persistência
+  /// é best-effort: se o armazenamento estiver indisponível (aba privada,
+  /// política de site na web, cofre recusando), o login continua funcionando
+  /// nesta sessão; ele só não sobrevive a um recarregamento. Antes, uma exceção
+  /// aqui fazia um login bem-sucedido parecer que falhou.
+  ///
+  /// [nova] é falso só na renovação: os tokens mudam, a sessão é a mesma.
+  Future<void> _saveSession(String? access,
+      {String? refresh, bool nova = true}) async {
+    _token = access;
+    _refreshToken = access == null ? null : refresh;
+    if (nova) _sessao = access == null ? null : Object();
+    await _store.write(access == null
+        ? null
+        : StoredSession(accessToken: access, refreshToken: refresh));
   }
+
+  /// Guarda o par que o servidor acabou de emitir (login, Google, renovação).
+  Future<void> _adotar(dynamic data, {bool nova = true}) => _saveSession(
+        data['access_token'] as String,
+        refresh: data['refresh_token'] as String?,
+        nova: nova,
+      );
 
   Map<String, String> _headers({bool json = true, bool authed = false}) => {
         if (json) 'Content-Type': 'application/json',
@@ -296,21 +327,17 @@ class Api {
     return 'Erro inesperado (${r.statusCode}).';
   }
 
-  /// Envia a requisição e devolve a RESPOSTA inteira.
-  ///
-  /// Existe separado de [_request] porque as listagens precisam do header
-  /// `X-Next-Cursor`, que se perde quando só o corpo é devolvido.
-  Future<http.Response> _send(
+  /// Uma ida ao servidor, sem julgar o status. Só o transporte vira exceção.
+  Future<http.Response> _despachar(
     String method,
     String path, {
     Object? body,
     bool authed = false,
   }) async {
     final uri = Uri.parse('$apiUrl$path');
-    late http.Response r;
     try {
       final headers = _headers(json: body != null, authed: authed);
-      r = switch (method) {
+      return switch (method) {
         'GET' => await _client.get(uri, headers: headers).timeout(apiTimeout),
         'POST' => await _client
             .post(uri, headers: headers, body: body == null ? null : jsonEncode(body))
@@ -324,12 +351,95 @@ class Api {
     } on TimeoutException {
       throw ApiError(0, 'O servidor demorou a responder. Tente de novo.',
           kind: ApiFailure.timeout);
+    } on ArgumentError {
+      rethrow;
     } catch (_) {
       throw ApiError(0, 'Sem conexão com o servidor.');
+    }
+  }
+
+  /// Envia a requisição e devolve a RESPOSTA inteira.
+  ///
+  /// Existe separado de [_request] porque as listagens precisam do header
+  /// `X-Next-Cursor`, que se perde quando só o corpo é devolvido.
+  ///
+  /// Sessão vencida não chega a quem chamou: o 401 de sessão vira uma
+  /// renovação e a MESMA requisição sai de novo, com o token novo (ver
+  /// [_renovar]). Só quando a renovação diz que a sessão acabou é que o 401
+  /// sobe — e aí cada tela faz o que sempre fez com ele: manda para o login.
+  Future<http.Response> _send(
+    String method,
+    String path, {
+    Object? body,
+    bool authed = false,
+  }) async {
+    final usado = _token;
+    var r = await _despachar(method, path, body: body, authed: authed);
+    if (authed && _sessaoVencida(r, path) && await _renovar(usado)) {
+      r = await _despachar(method, path, body: body, authed: authed);
     }
     if (r.statusCode >= 400) throw _errorFor(r);
     if (method != 'GET') _mudou(path);
     return r;
+  }
+
+  /// Este 401 é de SESSÃO (token vencido ou revogado), e não de outra coisa?
+  ///
+  /// A API responde 401 também para "a senha atual está incorreta", na troca
+  /// de senha. Renovar a sessão ali seria gastar um refresh token para repetir
+  /// a mesma senha errada — e contar duas tentativas no limite do servidor. O
+  /// 401 de sessão é o único que vem com `WWW-Authenticate`; onde o header não
+  /// é visível (um servidor que ainda não o expõe ao navegador), o caminho
+  /// decide: fora de `/auth/`, todo 401 é de sessão.
+  bool _sessaoVencida(http.Response r, String path) =>
+      r.statusCode == 401 &&
+      (r.headers.containsKey('www-authenticate') || !path.startsWith('/auth/'));
+
+  Future<bool>? _renovando;
+
+  /// Renova a sessão. Devolve se há um token novo para tentar de novo.
+  ///
+  /// [recusado] é o access token que acabou de tomar 401. Várias requisições
+  /// vencem juntas — uma tela abre e dispara três — e todas chegam aqui: a
+  /// primeira renova, as outras esperam a MESMA renovação. O refresh token
+  /// vale uma troca só; três trocas em paralelo com o mesmo token seriam duas
+  /// recusas.
+  ///
+  /// Lança `ApiError` quando não deu para saber (sem rede, servidor fora, 429):
+  /// a sessão pode estar inteira, e tratar isso como "sessão acabou" mandaria
+  /// para o login alguém que só passou por um túnel.
+  Future<bool> _renovar(String? recusado) => _renovando ??=
+      _renovarUmaVez(recusado).whenComplete(() => _renovando = null);
+
+  Future<bool> _renovarUmaVez(String? recusado) async {
+    // Já foi renovada enquanto esta requisição estava no ar.
+    if (_token != null && _token != recusado) return true;
+
+    // Outra aba do navegador pode ter renovado: o par novo está guardado, e o
+    // que esta aba tem em memória já foi trocado. Usar o refresh token velho
+    // pareceria reuso ao servidor, que derrubaria a sessão das duas.
+    final guardada = await _store.read();
+    if (_token != null && guardada != null && guardada.accessToken != recusado) {
+      _token = guardada.accessToken;
+      _refreshToken = guardada.refreshToken;
+      return true;
+    }
+
+    final refresh = _refreshToken;
+    if (refresh == null) return false;
+
+    final r = await _despachar('POST', '/auth/refresh',
+        body: {'refresh_token': refresh});
+    if (r.statusCode == 200) {
+      await _adotar(jsonDecode(utf8.decode(r.bodyBytes)), nova: false);
+      return true;
+    }
+    if (r.statusCode == 429 || r.statusCode >= 500) throw _errorFor(r);
+    // 401 (vencido, revogado, reusado) e qualquer outro 4xx: a sessão acabou.
+    // Esquecê-la aqui é o que impede o app de reabrir no atlas, na próxima
+    // vez, só para cada tela tomar 401 de novo.
+    await _saveSession(null);
+    return false;
   }
 
   Future<dynamic> _request(
@@ -394,7 +504,7 @@ class Api {
 
   Future<void> login(String email, String password) async {
     final data = await _request('POST', '/auth/login', body: {'email': email, 'password': password});
-    await _saveToken(data['access_token'] as String);
+    await _adotar(data);
   }
 
   /// Entra com o Google: manda o `id_token` e recebe a NOSSA sessão.
@@ -407,10 +517,32 @@ class Api {
   /// recusado. Os dois chegam como `ApiError` com a mensagem pronta.
   Future<void> loginWithGoogle(String idToken) async {
     final data = await _request('POST', '/auth/google', body: {'id_token': idToken});
-    await _saveToken(data['access_token'] as String);
+    await _adotar(data);
   }
 
-  Future<void> logout() => _saveToken(null);
+  /// Sai: esquece a sessão AQUI na hora e avisa o servidor em seguida.
+  ///
+  /// A ordem é a regra. Sair não pode depender de rede — quem toca em "Sair"
+  /// num metrô tem de sair — então o aparelho esquece primeiro e o aviso
+  /// (POST /auth/logout, que revoga o refresh token) vai sem ninguém esperar
+  /// por ele. Se não chegar, o refresh token morre sozinho na validade.
+  ///
+  /// Os pontos de GPS que estivessem esperando envio neste aparelho saem
+  /// junto: são de quem está saindo, e não do próximo a entrar.
+  Future<void> logout() async {
+    final refresh = _refreshToken;
+    await _saveSession(null);
+    await PrefsTrackOutbox.clearAll();
+    if (refresh != null) unawaited(_encerrarNoServidor(refresh));
+  }
+
+  Future<void> _encerrarNoServidor(String refresh) async {
+    try {
+      await _despachar('POST', '/auth/logout', body: {'refresh_token': refresh});
+    } catch (_) {
+      // Melhor esforço: a sessão local já acabou.
+    }
+  }
 
   Future<void> changePassword(String current, String next) => _request(
         'POST',
@@ -528,6 +660,21 @@ class Api {
   /// como [addMemoryImage] faz, e como [_request] já fazia para `deleteMemory`.
   Future<dynamic> _upload(
       String path, List<int> bytes, String filename, String mimeType) async {
+    final usado = _token;
+    var r = await _enviarArquivo(path, bytes, filename, mimeType);
+    // Mesma regra de [_send]: sessão vencida vira renovação e o MESMO envio
+    // sai de novo. A requisição multipart é de uso único, por isso é remontada.
+    if (_sessaoVencida(r, path) && await _renovar(usado)) {
+      r = await _enviarArquivo(path, bytes, filename, mimeType);
+    }
+    if (r.statusCode >= 400) throw _errorFor(r);
+    _mudou(path);
+    if (r.bodyBytes.isEmpty) return null;
+    return jsonDecode(utf8.decode(r.bodyBytes));
+  }
+
+  Future<http.Response> _enviarArquivo(
+      String path, List<int> bytes, String filename, String mimeType) async {
     final req = http.MultipartRequest('POST', Uri.parse('$apiUrl$path'));
     req.headers.addAll(_headers(json: false, authed: true));
     final parts = mimeType.split('/');
@@ -537,7 +684,6 @@ class Api {
       filename: filename,
       contentType: parts.length == 2 ? MediaType(parts[0], parts[1]) : null,
     ));
-    late http.Response r;
     try {
       // Pelo cliente injetável, e NÃO por `req.send()`: aquele fabrica um
       // cliente próprio lá dentro, que `swapClient` não alcança — é o que
@@ -546,7 +692,7 @@ class Api {
       // O teto é o do upload, não o de leitura: aqui o relógio também cobre os
       // bytes subindo, e [apiTimeout] cancelaria envio que ia bem.
       final enviada = await _client.send(req).timeout(apiUploadTimeout);
-      r = await http.Response.fromStream(enviada);
+      return await http.Response.fromStream(enviada);
     } on TimeoutException {
       // Texto próprio: "o upload demorou" é outra notícia que "o servidor
       // demorou a responder" — quem está esperando sabe que mandou uma foto.
@@ -555,10 +701,6 @@ class Api {
     } catch (_) {
       throw ApiError(0, 'Sem conexão com o servidor.');
     }
-    if (r.statusCode >= 400) throw _errorFor(r);
-    _mudou(path);
-    if (r.bodyBytes.isEmpty) return null;
-    return jsonDecode(utf8.decode(r.bodyBytes));
   }
 
   // ---- Música da memória ----

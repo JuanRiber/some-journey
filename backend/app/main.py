@@ -63,7 +63,10 @@ def create_app() -> FastAPI:
         allow_headers=["Authorization", "Content-Type"],
         # O contrato de paginação por cursor devolve o próximo cursor neste
         # header; sem expô-lo, o navegador o esconde do cliente (fetch/XHR).
-        expose_headers=[NEXT_CURSOR_HEADER],
+        # O WWW-Authenticate marca o 401 de SESSÃO (token vencido ou revogado)
+        # e o distingue dos outros 401 — senha atual errada, login recusado. É
+        # por ele que o app sabe quando vale renovar a sessão e tentar de novo.
+        expose_headers=[NEXT_CURSOR_HEADER, "WWW-Authenticate"],
     )
 
     # Adicionado POR ÚLTIMO => o mais EXTERNO: decora toda resposta, inclusive o

@@ -31,10 +31,14 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = Field(min_length=32)
     JWT_ALGORITHM: Literal["HS256"] = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60, gt=0, le=1440)
+    # Por quanto tempo a sessão sobrevive PARADA. O refresh token é trocado a
+    # cada renovação e o sucessor ganha validade nova, então quem usa o app
+    # não volta ao login; quem some por mais que isto, volta.
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, ge=1, le=365)
 
-    # Limitador POR PROCESSO dos endpoints públicos de autenticação. Por isso a
-    # API sobe com um processo só (scripts/start.sh): com mais, cada um conta o
-    # seu e o teto real se multiplica.
+    # Limitador dos endpoints públicos de autenticação. A contagem mora no
+    # banco (tabela auth_rate_limits, ver app/core/rate_limit.py): sobrevive a
+    # reinício e vale igual com qualquer número de processos.
     AUTH_RATE_LIMIT_ATTEMPTS: int = Field(default=8, gt=0, le=100)
     AUTH_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=300, ge=30, le=3600)
     # Teto por IP (independe do email) na mesma janela — trava password spraying

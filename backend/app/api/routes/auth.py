@@ -16,6 +16,7 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     LoginResponse,
+    RefreshRequest,
     RegisterRequest,
     RegisterResponse,
     ResetPasswordRequest,
@@ -224,6 +225,50 @@ def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="O link de redefinição é inválido ou expirou. Peça um novo.",
         )
+
+
+@router.post("/refresh", response_model=LoginResponse)
+def refresh(
+    data: RefreshRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> LoginResponse:
+    """Renova a sessão: troca o refresh token por um par novo.
+
+    Não pede o access token — ele já venceu, e é por isso que o app está aqui.
+    O refresh token vale UMA troca; a resposta traz o sucessor, e o app passa a
+    guardar o par novo. Qualquer falha (token desconhecido, vencido, revogado,
+    reusado, conta desativada) é o MESMO 401: a sessão acabou, e o caminho é o
+    login.
+
+    O limite é por IP, o mesmo balde folgado do reset: uma sessão honesta
+    renova uma vez por hora, e adivinhar um token de 384 bits não é ataque que
+    se tente — o limite está aqui para o custo de tentar não ser zero.
+    """
+    _limit_auth_ip(request, "refresh")
+    try:
+        return auth_service.refresh_session(db, raw_token=data.refresh_token)
+    except auth_service.InvalidRefreshTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sua sessão expirou. Entre de novo.",
+        )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(
+    data: RefreshRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> None:
+    """Encerra a sessão deste aparelho: revoga o refresh token e os sucessores.
+
+    Responde 204 sempre, exista o token ou não. O access token em circulação
+    segue valendo até vencer (no máximo ACCESS_TOKEN_EXPIRE_MINUTES) — é o
+    preço de ele não ser guardado em lugar nenhum; o app o descarta na hora.
+    """
+    _limit_auth_ip(request, "logout")
+    auth_service.logout(db, raw_token=data.refresh_token)
 
 
 @router.get("/me", response_model=UserResponse)

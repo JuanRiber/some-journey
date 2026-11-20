@@ -9,11 +9,23 @@
 - Dados de um usuário nunca são expostos a outro. IDs de terceiros e IDs inexistentes
   retornam o **mesmo 404** (anti-enumeração). **(impl.)**
 - Rotas privadas são protegidas por autenticação (Bearer/JWT, 60 min). **(impl.)**
+- **A sessão não acaba em 60 minutos.** Junto do JWT vem um refresh token (30 dias), que o
+  app troca por um par novo quando o JWT vence — sem a pessoa perceber. Cada refresh token
+  vale **uma** troca, e o sucessor ganha validade nova: quem usa o app não volta ao login;
+  quem some por mais de 30 dias, volta. **(impl.)**
+- Um refresh token já trocado que reaparece é tratado como cópia: a sessão inteira daquele
+  aparelho é encerrada. A exceção é uma folga de 20 s, que cobre duas abas renovando juntas
+  e a resposta que se perdeu no caminho. **(impl.)**
+- **Sair** encerra a sessão daquele aparelho no servidor, e não só no app; as dos outros
+  aparelhos continuam. **(impl.)**
+- No celular, a sessão fica no cofre do sistema (Keychain/Keystore). Quem já estava logado é
+  mudado para o cofre na primeira abertura, sem voltar ao login. **(impl.)**
 - O cadastro público fica **fechado em produção**; as contas dos testers vêm do script de
   seed. **(impl.)**
 - Senha: de 10 a 128 caracteres, guardada só como hash (Argon2). **(impl.)**
 - **Trocar ou redefinir a senha derruba todas as sessões abertas antes** — inclusive quando a
-  troca cai no mesmo segundo da senha anterior. **(impl.)**
+  troca cai no mesmo segundo da senha anterior — e revoga os refresh tokens delas: nenhuma
+  volta por renovação. **(impl.)**
 - Recuperação de senha por token de uso único, válido por 30 min; a resposta é a mesma
   exista a conta ou não. **(impl.)**
 - Entrar com o Google **vincula** a conta que já tem o mesmo e-mail, em vez de criar outra.
@@ -21,7 +33,8 @@
 - Conta que só entra pelo Google não tem senha para trocar; o caminho é "Esqueci minha
   senha". **(impl.)**
 - Tentativas de login e de recuperação têm teto por conta, por IP e **por e-mail** (este
-  último vale de qualquer IP). **(impl.)**
+  último vale de qualquer IP). A contagem mora no banco: reiniciar a API não devolve as
+  tentativas a ninguém, e o teto é o mesmo com um processo ou com vários. **(impl.)**
 
 ## Perfil
 - `@username` opcional, único sem diferenciar maiúsculas, de 3 a 30 caracteres, começando
@@ -80,6 +93,11 @@
 - A data do ponto **não** é conferida contra o relógio do servidor: um celular adiantado não
   pode custar o rastro inteiro de um trecho. **(impl.)**
 - Apagar a jornada apaga os trechos dela; o perfil para de contar essa distância. **(impl.)**
+- **Ponto aceito não se perde com o app.** Cada ponto é escrito no aparelho assim que entra
+  no percurso e só sai quando o servidor confirma. Se o app for fechado no meio da gravação,
+  a jornada avisa quantos pontos ficaram e os envia ao encerrar a gravação interrompida.
+  Sem rede, o trecho **não** é fechado: fechar sem eles jogaria fora o fim do percurso. **(impl.)**
+- Sair da conta apaga do aparelho os pontos que ainda não subiram. **(impl.)**
 
 ## Fases da vida
 - Uma fase é um **capítulo** que a pessoa reconhece (a faculdade, um recomeço). Não há lista

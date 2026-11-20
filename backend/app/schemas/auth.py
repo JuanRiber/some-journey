@@ -103,13 +103,34 @@ class GoogleLoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    """Resposta 200: {access_token, token_type, expires_in}. Schema de saída
-    puro (não lê do ORM): o token é emitido pelo service."""
+    """Resposta 200: {access_token, token_type, expires_in, refresh_token}.
+    Schema de saída puro (não lê do ORM): os tokens são emitidos pelo service.
+
+    É a MESMA forma no login, no login do Google e na renovação: o cliente
+    guarda o par que chegar por último, venha de onde vier."""
 
     access_token: str
     token_type: str = "bearer"  # default do contrato
-    # expires_in em SEGUNDOS.
+    # expires_in em SEGUNDOS (do access token).
     expires_in: int
+    # Segredo opaco de vida longa, de USO ÚNICO: troca-se por um par novo em
+    # POST /auth/refresh. Só existe cru aqui, nesta resposta — no banco fica o
+    # hash. Entrou depois: cliente antigo que o ignora continua funcionando,
+    # só volta ao login quando o access token vence.
+    refresh_token: str
+
+
+# --- POST /auth/refresh e POST /auth/logout --------------------------------
+
+
+class RefreshRequest(BaseModel):
+    """O refresh token, e só ele. Serve aos dois endpoints: renovar a sessão e
+    encerrá-la. Nenhum dos dois pede o access token — ele pode já ter vencido,
+    que é exatamente quando a renovação acontece."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    refresh_token: str = Field(min_length=16, max_length=256)
 
 
 # --- POST /auth/change-password --------------------------------------------

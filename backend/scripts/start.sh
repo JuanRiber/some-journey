@@ -45,10 +45,10 @@ done
 #
 # UM processo por padrão (WEB_CONCURRENCY sobrepõe). No plano grátis do Render a
 # máquina tem uma fração de CPU: um segundo processo não traz CPU, só gasta RAM
-# — e partia ao meio tudo o que mora em memória de processo. Com 2, o teto de
-# tentativas de login era ~40 por janela em vez de 20 (cada processo contava o
-# seu), e o intervalo de 1 s do Nominatim virava ~2 por segundo. As rotas
-# síncronas rodam num pool de threads; um processo atende vários pedidos.
+# — e parte ao meio o que mora em memória de processo: o intervalo de 1 s do
+# Nominatim vira ~2 por segundo. (O teto de tentativas de login já não é desse
+# grupo: é contado no banco e vale igual com qualquer número de processos.) As
+# rotas síncronas rodam num pool de threads; um processo atende vários pedidos.
 #
 # --no-server-header: a resposta não anuncia qual servidor está do outro lado.
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" \

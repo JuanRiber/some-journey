@@ -2,7 +2,7 @@
 
 get_current_user é a "porta" das rotas protegidas: extrai o Bearer token,
 valida via core.security, carrega o usuário do banco e bloqueia conta inativa.
-Qualquer falha vira 401 genérico ("Could not validate credentials.") — não
+Qualquer falha vira 401 genérico ("Sua sessão expirou ou não é válida. Entre de novo.") — não
 revelamos se o token expirou, é inválido, ou se a conta não existe/está
 inativa (anti-enumeração).
 """
@@ -24,7 +24,7 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 _credentials_exception = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Could not validate credentials.",
+    detail="Sua sessão expirou ou não é válida. Entre de novo.",
     headers={"WWW-Authenticate": "Bearer"},
 )
 

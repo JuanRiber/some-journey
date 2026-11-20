@@ -73,5 +73,5 @@ def get_map(
         raise fase_do_filtro_inexistente()
     except JourneyNotFoundError:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found."
+            status_code=status.HTTP_404_NOT_FOUND, detail="Jornada não encontrada."
         )

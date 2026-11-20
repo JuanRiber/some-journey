@@ -94,28 +94,28 @@ def set_avatar(
         if total > max_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail="Image too large.",
+                detail="A imagem é grande demais.",
             )
         chunks.append(chunk)
     data = b"".join(chunks)
     if not data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O arquivo está vazio.")
     try:
         return profile_service.set_avatar(db, user=current_user, data=data)
     except profile_service.InvalidAvatarError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported image type. Use JPEG, PNG or WebP.",
+            detail="Formato de imagem não aceito. Use JPEG, PNG ou WebP.",
         )
     except storage.StorageNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Image storage is not configured.",
+            detail="O armazenamento de imagens não está configurado.",
         )
     except storage.StorageError:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not store the image. Try again.",
+            detail="Não foi possível guardar a imagem. Tente de novo.",
         )
 
 

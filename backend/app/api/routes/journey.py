@@ -54,7 +54,7 @@ router = APIRouter(prefix="/journeys", tags=["journeys"])
 
 _not_found = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND,
-    detail="Journey not found.",
+    detail="Jornada não encontrada.",
 )
 
 
@@ -106,7 +106,7 @@ def list_journeys(
     except CursorError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid pagination cursor.",
+            detail="Cursor de paginação inválido.",
         )
     if next_cursor is not None:
         response.headers[NEXT_CURSOR_HEADER] = next_cursor
@@ -146,7 +146,7 @@ def update_journey(
     except InvalidJourneyDatesError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="ended_at cannot be earlier than started_at.",
+            detail="O fim da jornada não pode ser antes do começo.",
         )
 
 
@@ -161,9 +161,9 @@ def start_journey(
     except JourneyNotFoundError:
         raise _not_found
     except ActiveJourneyExistsError:
-        raise _conflict("Another journey is already active.")
+        raise _conflict("Já existe outra jornada em andamento.")
     except InvalidJourneyTransitionError:
-        raise _conflict("Only a draft journey can be started.")
+        raise _conflict("Só uma jornada em rascunho pode ser iniciada.")
 
 
 @router.post("/{journey_id}/pause", response_model=JourneyRead)
@@ -177,7 +177,7 @@ def pause_journey(
     except JourneyNotFoundError:
         raise _not_found
     except InvalidJourneyTransitionError:
-        raise _conflict("Only an active journey can be paused.")
+        raise _conflict("Só uma jornada em andamento pode ser pausada.")
 
 
 @router.post("/{journey_id}/resume", response_model=JourneyRead)
@@ -191,9 +191,9 @@ def resume_journey(
     except JourneyNotFoundError:
         raise _not_found
     except ActiveJourneyExistsError:
-        raise _conflict("Another journey is already active.")
+        raise _conflict("Já existe outra jornada em andamento.")
     except InvalidJourneyTransitionError:
-        raise _conflict("Only a paused journey can be resumed.")
+        raise _conflict("Só uma jornada pausada pode ser retomada.")
 
 
 @router.post("/{journey_id}/finish", response_model=JourneyRead)
@@ -213,11 +213,11 @@ def finish_journey(
     except JourneyNotFoundError:
         raise _not_found
     except InvalidJourneyTransitionError:
-        raise _conflict("Only an active or paused journey can be finished.")
+        raise _conflict("Só uma jornada em andamento ou pausada pode ser encerrada.")
     except InvalidJourneyDatesError:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="ended_at cannot be earlier than started_at.",
+            detail="O fim da jornada não pode ser antes do começo.",
         )
 
 
@@ -237,7 +237,7 @@ def add_memory_to_journey(
     except MemoryAlreadyInJourneyError:
         raise _conflict("Memory already belongs to a journey. Unlink it first.")
     except JourneyClosedError:
-        raise _conflict("Cannot add points to a finished journey.")
+        raise _conflict("Não dá para adicionar pontos a uma jornada encerrada.")
 
 
 @router.get("/{journey_id}/memories", response_model=list[MemoryRead])
@@ -273,7 +273,7 @@ def create_memory_in_journey(
     except JourneyNotFoundError:
         raise _not_found
     except JourneyClosedError:
-        raise _conflict("Cannot add points to a finished journey.")
+        raise _conflict("Não dá para adicionar pontos a uma jornada encerrada.")
     except JourneyConflictError:
         raise _conflict("Could not add the point due to a conflict. Try again.")
     background.add_task(
@@ -319,7 +319,7 @@ def reorder_journey_points(
     except InvalidJourneyReorderError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="memory_ids must match the current journey points exactly.",
+            detail="A nova ordem precisa ter exatamente as memórias da jornada.",
         )
 
 
@@ -343,12 +343,12 @@ def set_journey_cover(
         if total > max_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail="Image too large.",
+                detail="A imagem é grande demais.",
             )
         chunks.append(chunk)
     data = b"".join(chunks)
     if not data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O arquivo está vazio.")
     try:
         return journey_service.set_cover(
             db,
@@ -362,17 +362,17 @@ def set_journey_cover(
     except InvalidCoverImageError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported image type. Use JPEG, PNG or WebP.",
+            detail="Formato de imagem não aceito. Use JPEG, PNG ou WebP.",
         )
     except storage.StorageNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Image storage is not configured.",
+            detail="O armazenamento de imagens não está configurado.",
         )
     except storage.StorageError:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not store the image. Try again.",
+            detail="Não foi possível guardar a imagem. Tente de novo.",
         )
 
 

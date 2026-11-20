@@ -147,7 +147,7 @@ def test_sem_configuracao_a_rota_diz_que_nao_esta_ligada(client, monkeypatch):
     monkeypatch.setattr(google_oauth.settings, "GOOGLE_CLIENT_ID", None)
     r = _entrar(client)
     assert r.status_code == 503
-    assert "not configured" in r.json()["detail"]
+    assert "não está configurada" in r.json()["detail"]
 
 
 def test_corpo_com_campo_extra_e_recusado(client):

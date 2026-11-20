@@ -104,7 +104,7 @@ class BodySizeLimitMiddleware:
             await self._reject(send)
 
     async def _reject(self, send: Send) -> None:
-        body = b'{"detail":"Request body too large."}'
+        body = '{"detail":"O pedido é grande demais."}'.encode()
         await send(
             {
                 "type": "http.response.start",

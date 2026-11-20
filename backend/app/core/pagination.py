@@ -53,4 +53,4 @@ def decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
         iso, id_str = raw.rsplit("|", 1)
         return datetime.fromisoformat(iso), uuid.UUID(id_str)
     except (ValueError, TypeError) as exc:
-        raise CursorError("Invalid pagination cursor.") from exc
+        raise CursorError("Cursor de paginação inválido.") from exc

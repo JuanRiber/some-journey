@@ -29,8 +29,8 @@ from app.services.track_service import (
 
 router = APIRouter(prefix="/journeys", tags=["tracks"])
 
-_not_found = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journey not found.")
-_track_not_found = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Track not found.")
+_not_found = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Jornada não encontrada.")
+_track_not_found = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Percurso não encontrado.")
 
 
 def _conflict(detail: str) -> HTTPException:
@@ -56,7 +56,7 @@ def start_track(
     except JourneyNotFoundError:
         raise _not_found
     except JourneyClosedError:
-        raise _conflict("Cannot start a track on a finished journey.")
+        raise _conflict("Não dá para gravar um percurso numa jornada encerrada.")
     except TrackAlreadyActiveError:
         raise _conflict("This journey already has an open track. Finish it first.")
 
@@ -84,7 +84,7 @@ def add_track_points(
     except TrackClosedError:
         raise _conflict("Track is already finished; start a new one.")
     except JourneyClosedError:
-        raise _conflict("Cannot add points to a finished journey.")
+        raise _conflict("Não dá para adicionar pontos a uma jornada encerrada.")
 
 
 @router.post("/{journey_id}/tracks/{track_id}/finish", response_model=TrackRead)

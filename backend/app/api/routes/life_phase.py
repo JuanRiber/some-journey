@@ -22,7 +22,7 @@ router = APIRouter(prefix="/life-phases", tags=["life-phases"])
 
 def _nao_encontrada() -> HTTPException:
     return HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail="Life phase not found."
+        status_code=status.HTTP_404_NOT_FOUND, detail="Fase da vida não encontrada."
     )
 
 

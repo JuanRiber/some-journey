@@ -93,7 +93,7 @@ def _limit_auth(
     )
     raise HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-        detail="Too many attempts. Try again later.",
+        detail="Tentativas demais. Espere um pouco e tente de novo.",
         headers={"Retry-After": str(max(1, retry_after))},
     )
 
@@ -114,7 +114,7 @@ def _limit_change_password(request: Request, user_id: object) -> None:
         return
     raise HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-        detail="Too many attempts. Try again later.",
+        detail="Tentativas demais. Espere um pouco e tente de novo.",
         headers={"Retry-After": str(max(1, retry))},
     )
 
@@ -132,7 +132,7 @@ def _limit_auth_ip(request: Request, scope: str) -> None:
         return
     raise HTTPException(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-        detail="Too many attempts. Try again later.",
+        detail="Tentativas demais. Espere um pouco e tente de novo.",
         headers={"Retry-After": str(max(1, retry))},
     )
 
@@ -151,7 +151,7 @@ def register(
     if not settings.registration_open:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Registration is closed.",
+            detail="O cadastro está fechado.",
         )
     _limit_auth(request, "register", data.email)
     try:
@@ -159,7 +159,7 @@ def register(
     except auth_service.EmailAlreadyRegisteredError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered.",
+            detail="Este e-mail já tem uma conta.",
         )
 
 
@@ -175,12 +175,12 @@ def login(
     except auth_service.InvalidCredentialsError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password.",
+            detail="E-mail ou senha incorretos.",
         )
     except auth_service.InactiveUserError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive.",
+            detail="Esta conta está desativada.",
         )
 
 
@@ -222,7 +222,7 @@ def reset_password(
     except auth_service.InvalidResetTokenError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired reset token.",
+            detail="O link de redefinição é inválido ou expirou. Peça um novo.",
         )
 
 
@@ -259,17 +259,17 @@ def login_with_google(
     except google_oauth.GoogleNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Google sign-in is not configured.",
+            detail="A entrada com Google não está configurada.",
         )
     except google_oauth.InvalidGoogleToken:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Google token.",
+            detail="Não foi possível confirmar sua conta Google. Tente de novo.",
         )
     except auth_service.InactiveUserError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account is inactive.",
+            detail="Esta conta está desativada.",
         )
     except auth_service.GoogleAccountConflictError:
         # Quem pede provou controlar o e-mail (o token veio verificado), então
@@ -302,7 +302,7 @@ def change_password(
     except auth_service.InvalidCredentialsError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Current password is incorrect.",
+            detail="A senha atual está incorreta.",
         )
     except auth_service.PasswordNotSetError:
         raise HTTPException(

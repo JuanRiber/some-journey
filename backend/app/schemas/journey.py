@@ -37,7 +37,7 @@ class JourneyCreate(BaseModel):
             and self.ended_at is not None
             and self.ended_at < self.started_at
         ):
-            raise ValueError("ended_at nao pode ser anterior a started_at")
+            raise ValueError("o fim da jornada não pode ser antes do começo")
         return self
 
 
@@ -144,5 +144,5 @@ class JourneyReorder(BaseModel):
     @model_validator(mode="after")
     def _memory_ids_unique(self) -> "JourneyReorder":
         if len(set(self.memory_ids)) != len(self.memory_ids):
-            raise ValueError("memory_ids nao pode conter duplicatas")
+            raise ValueError("a mesma memória aparece mais de uma vez na ordem")
         return self

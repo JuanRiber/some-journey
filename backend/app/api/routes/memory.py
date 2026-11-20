@@ -60,7 +60,7 @@ router = APIRouter(prefix="/memories", tags=["memories"])
 
 _not_found = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND,
-    detail="Memory not found.",
+    detail="Memória não encontrada.",
 )
 
 
@@ -119,7 +119,7 @@ def list_memories(
         except CursorError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid pagination cursor.",
+                detail="Cursor de paginação inválido.",
             )
     try:
         items, next_cursor = memory_service.list_for_user(
@@ -215,12 +215,12 @@ def add_memory_image(
         if total > max_bytes:
             raise HTTPException(
                 status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                detail="Image too large.",
+                detail="A imagem é grande demais.",
             )
         chunks.append(chunk)
     data = b"".join(chunks)
     if not data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O arquivo está vazio.")
     try:
         return memory_service.add_image(
             db,
@@ -233,22 +233,22 @@ def add_memory_image(
     except InvalidImageError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported image type. Use JPEG, PNG or WebP.",
+            detail="Formato de imagem não aceito. Use JPEG, PNG ou WebP.",
         )
     except TooManyImagesError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This memory already has the maximum number of photos.",
+            detail="Esta memória já tem o máximo de fotos.",
         )
     except storage.StorageNotConfigured:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Image storage is not configured.",
+            detail="O armazenamento de imagens não está configurado.",
         )
     except storage.StorageError:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not store the image. Try again.",
+            detail="Não foi possível guardar a imagem. Tente de novo.",
         )
 
 
@@ -297,12 +297,12 @@ def add_memory_music(
     except DuplicateMusicError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This track is already on the memory.",
+            detail="Esta música já está na memória.",
         )
     except TooManyTracksError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="This memory already has the maximum number of tracks.",
+            detail="Esta memória já tem o máximo de músicas.",
         )
 
 

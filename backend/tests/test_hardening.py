@@ -550,7 +550,7 @@ def test_corpo_em_pedacos_acima_do_teto_da_413_e_nao_400(client, auth_headers):
         headers={**auth_headers(), "Content-Type": "application/json"},
     )
     assert r.status_code == 413
-    assert r.json()["detail"] == "Request body too large."
+    assert r.json()["detail"] == "O pedido é grande demais."
 
 
 # --- 12. Cabeçalhos de segurança --------------------------------------------

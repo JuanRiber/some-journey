@@ -102,7 +102,7 @@ def create_app() -> FastAPI:
         except Exception:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Database not ready.",
+                detail="O banco de dados ainda não está pronto.",
             )
         finally:
             db.close()

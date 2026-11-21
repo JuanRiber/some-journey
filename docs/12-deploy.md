@@ -124,6 +124,26 @@ do Render mostrar erro de permissão em `CREATE EXTENSION postgis`, habilite-o �
 O blueprint usa `autoDeployTrigger: checksPass`: os próximos deploys só acontecem quando o CI do
 commit passa.
 
+> **"Checks" são TODOS os do commit, não só o nosso CI.** Um check vermelho de qualquer outro
+> aplicativo ligado ao repositório segura o deploy do mesmo jeito — e o Render não avisa: ele
+> simplesmente não publica, e a API antiga continua respondendo 200. Foi o que aconteceu entre
+> 15 e 20/11/2026: um projeto do Cloudflare Pages ligado ao repositório pelo Git (ver o passo 3)
+> reprovava cada commit, e dois commits de backend com o CI verde ficaram sem publicar. As
+> únicas publicações desse período foram de commits que mexiam no `render.yaml`, disparadas
+> segundos depois do push — antes de o CI terminar.
+>
+> Para ver os checks de um commit e o último que o Render publicou:
+>
+> ```bash
+> gh api "repos/{owner}/{repo}/commits/<sha>/check-runs" \
+>   -q '.check_runs[] | .name + " [" + .app.slug + "]: " + (.conclusion // .status)'
+> gh api "repos/{owner}/{repo}/deployments?per_page=3" \
+>   -q '.[] | .created_at + " " + .environment + " " + (.sha | .[0:7])'
+> ```
+>
+> Para publicar sem esperar o check ser consertado: no serviço, **Manual Deploy → Deploy latest
+> commit**. É seguro repetir — o `start.sh` só aplica as migrations que faltam.
+
 ## 3. Cloudflare Pages — o app web
 
 O Pages não tem Flutter na imagem de build, então quem compila é o GitHub Actions, que só envia a
@@ -144,6 +164,19 @@ pasta pronta.
 
 Daqui em diante, todo push na `main` com CI verde republica o app. Enquanto os secrets não
 existem, o workflow termina verde com um aviso, em vez de falhar.
+
+> **Não ligue o repositório ao Pages pelo Git** ("Connect to Git", na criação do projeto). Quem
+> publica é o workflow, com a pasta já compilada. Um projeto ligado pelo Git tenta compilar por
+> conta própria a cada push, falha — o Pages não tem Flutter — e deixa em todo commit um check
+> vermelho chamado "Cloudflare Pages". O app continua sendo publicado pelo workflow, então nada
+> parece errado deste lado; quem para é a **API**, porque o Render espera todos os checks (ver o
+> fim do passo 2).
+>
+> Se já existir um projeto assim (o de 11/2026 se chama `some-journey`, sem o `-atlas`): em
+> **Workers & Pages → o projeto → Settings → Builds & deployments**, desative os deploys
+> automáticos de produção e de preview, ou desconecte o repositório. Pelo lado do GitHub dá no
+> mesmo: **Settings → Applications → Cloudflare Workers and Pages → Configure**, tirando o
+> repositório da lista.
 
 > Se o Pages der outro endereço (nome tomado), atualize `CORS_ALLOWED_ORIGINS` no Render — senão o
 > navegador bloqueia todas as chamadas e o login parece "não fazer nada". Troque também o
@@ -190,6 +223,7 @@ graça; no iOS, o TestFlight exige a conta Apple Developer (US$ 99/ano).
 |---|---|
 | Login "não faz nada"; no console do navegador, erro de CORS | `CORS_ALLOWED_ORIGINS` diferente da URL real do Pages (com `https://`, sem barra no fim). |
 | Resposta `400 Invalid host header` | `TRUSTED_HOSTS` sem o host do Render. Se o log mostrar o health check do próprio Render sendo recusado, acrescente o host que aparece no log. |
+| Push com CI verde, o app web atualiza e a API **não** muda | Outro check do commit está vermelho e o `checksPass` do Render espera por ele — em 11/2026, o "Cloudflare Pages" de um projeto ligado pelo Git. Confira os checks do commit (fim do passo 2), publique com *Manual Deploy* e desligue o check (passo 3). |
 | Deploy falha em `alembic upgrade head` | `DATABASE_URL` errada (prefixo sem `+psycopg`, senha, ou *Direct connection* em vez do pooler), ou o projeto Supabase pausado — restaure no painel. O `scripts.check_database` (passo 1.5) diz qual dos dois. |
 | Erro `max clients reached` nos logs | Conexões demais no pooler: confira `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` no Render e se algum script local ficou aberto. |
 | Tudo funciona, mas cada tela demora | API e banco em regiões diferentes. Confira a região dos dois (Ohio / East US, `us-east-2`). |

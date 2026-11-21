@@ -854,3 +854,26 @@ lugar melhor para ficar.
 - Os testes do app ganharam um cofre de mentira para todos (`test/flutter_test_config.dart`).
   Num teste não há plataforma do outro lado do plugin, e a chamada não falha — ela nunca
   responde, e o login "não termina" longe da causa.
+
+## 2026-11-20 (3)
+
+### Deploy: a API ficou cinco dias sem publicar, e nada avisou
+- O push das mudanças de sessão passou no CI, o app web foi publicado, e a API continuou
+  respondendo com o código de 15/11 — `/auth/refresh` em 404, e as mensagens em português do
+  commit anterior também fora do ar. O Render não tinha feito deploy nenhum.
+- O `render.yaml` pede `autoDeployTrigger: checksPass`, e "checks" são todos os do commit. Um
+  projeto do Cloudflare Pages chamado `some-journey`, ligado ao repositório pelo Git, tenta
+  compilar a cada push, falha (o Pages não tem Flutter) e deixa um check vermelho em todo
+  commit desde pelo menos 15/11. O app nunca dependeu dele: quem publica é o workflow, no
+  projeto `some-journey-atlas`.
+- O que mascarou o problema: os três deploys anteriores eram de commits que mexiam no
+  `render.yaml`, e saíram segundos depois do push, antes de o CI terminar. Pareciam o gatilho
+  funcionando. A leitura de que foram publicados pela sincronização do blueprint, e não pelo
+  `checksPass`, é dedução a partir dos horários — o painel do Render não foi consultado para
+  confirmá-la.
+- Resolvido na hora com **Manual Deploy** do commit `af25198`: as migrations 0017 e 0018
+  rodaram e a API nova respondeu. O check do Cloudflare ainda precisa ser desligado; até lá,
+  cada push de backend pede deploy manual.
+- [`12-deploy.md`](12-deploy.md) ganhou o aviso nos dois lugares em que alguém tropeçaria — o
+  fim do passo do Render e o passo do Pages —, os dois comandos que mostram os checks de um
+  commit e o último deploy registrado, e a linha correspondente em "Problemas comuns".

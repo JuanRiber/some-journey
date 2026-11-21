@@ -20,6 +20,10 @@ class ProfileIdentity {
   final String? avatarUrl;
   final String? bio;
 
+  /// A conta tem senha? Falso em quem só entra pelo Google. É o que decide se
+  /// a exclusão de conta pede a senha — não dá para pedir a quem nunca teve.
+  final bool hasPassword;
+
   ProfileIdentity({
     required this.id,
     required this.name,
@@ -29,6 +33,7 @@ class ProfileIdentity {
     this.username,
     this.avatarUrl,
     this.bio,
+    this.hasPassword = true,
   });
 
   factory ProfileIdentity.fromJson(Map<String, dynamic> j) => ProfileIdentity(
@@ -42,6 +47,9 @@ class ProfileIdentity {
         username: j['username'] as String?,
         avatarUrl: j['avatar_url'] as String?,
         bio: j['bio'] as String?,
+        // Servidor que ainda não manda o campo: vale o caso comum, e se a
+        // conta não tiver senha é o próprio servidor que recusa o pedido.
+        hasPassword: (j['has_password'] as bool?) ?? true,
       );
 
   /// Iniciais para o avatar enquanto não há foto ("Juan Pedro" -> "JP").

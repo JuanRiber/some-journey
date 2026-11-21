@@ -8,6 +8,7 @@ import 'design/theme_controller.dart';
 import 'design/tokens.dart';
 import 'features/auth/startup_domain.dart';
 import 'screens/change_password.dart';
+import 'screens/delete_account.dart';
 import 'screens/forgot_password.dart';
 import 'screens/journey_detail.dart';
 import 'screens/journey_edit.dart';
@@ -48,6 +49,7 @@ final _rotas = <String, WidgetBuilder>{
   '/login': (_) => const LoginScreen(),
   '/forgot': (_) => const ForgotPasswordScreen(),
   '/change-password': (_) => const ChangePasswordScreen(),
+  '/delete-account': (_) => const DeleteAccountScreen(),
   '/tabs': (_) => const TabsScreen(),
   '/journeys': (_) => const JourneysScreen(),
   '/journey-new': (_) => const JourneyNewScreen(),

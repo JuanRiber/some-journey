@@ -49,6 +49,22 @@ class Settings(BaseSettings):
     # estourá-lo trava a conta para todo mundo, inclusive para a dona.
     AUTH_RATE_LIMIT_EMAIL_ATTEMPTS: int = Field(default=20, gt=0, le=1000)
 
+    # --- Expurgo do que foi apagado ---
+    # Memória, jornada, trecho e fase são apagados "de leve" (deleted_at): a
+    # linha some das consultas e fica no banco, para um toque errado ter volta.
+    # Passado este prazo o expurgo apaga de vez — linhas e arquivos. Excluir a
+    # CONTA não espera prazo nenhum: é na hora.
+    PURGE_DELETED_AFTER_DAYS: int = Field(default=30, ge=1, le=3650)
+    # De quanto em quanto tempo a API roda o expurgo sozinha (0 desliga). O
+    # plano grátis do Render não tem cron, e o expurgo é idempotente: com mais
+    # de um processo, cada um roda o seu e o resultado é o mesmo.
+    # Se não definido, herda do ambiente: a cada 6 h em PRODUÇÃO e desligado
+    # fora dela. Uma API de desenvolvimento deixada de pé não apaga nada
+    # sozinha — nem do banco local, nem do bucket, que o `.env` de dev alcança
+    # com credenciais de verdade. Para rodar à mão:
+    # `python -m scripts.purge_deleted`.
+    PURGE_INTERVAL_HOURS: float | None = Field(default=None, ge=0, le=168)
+
     # De onde vem o IP de quem chama, para os limites acima. Vazio: o peer que o
     # uvicorn entrega (em produção, a entrada mais à ESQUERDA do X-Forwarded-For
     # — que o cliente escreve como quiser, porque o proxy do Render acrescenta
@@ -151,6 +167,15 @@ class Settings(BaseSettings):
     @property
     def trusted_hosts(self) -> list[str]:
         return self._csv(self.TRUSTED_HOSTS)
+
+    @property
+    def purge_interval_hours(self) -> float:
+        """De quanto em quanto tempo o expurgo roda sozinho; 0 = não roda.
+        Explícito via PURGE_INTERVAL_HOURS; senão, 6 h em produção e desligado
+        nos demais ambientes."""
+        if self.PURGE_INTERVAL_HOURS is not None:
+            return self.PURGE_INTERVAL_HOURS
+        return 6.0 if self.is_production else 0.0
 
     @property
     def storage_enabled(self) -> bool:

@@ -26,6 +26,11 @@ class ProfileIdentity(BaseModel):
     username: str | None = None
     avatar_url: str | None = None
     bio: str | None = None
+    # A conta tem senha? Falso em quem só entra pelo Google. O app precisa
+    # saber ANTES de pedir: a exclusão de conta e a troca de senha conferem a
+    # senha atual, e não dá para pedir a quem nunca teve uma. Só o fato — o
+    # hash nunca sai daqui.
+    has_password: bool = True
 
 
 class ProfileUpdate(BaseModel):

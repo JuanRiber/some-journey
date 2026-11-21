@@ -19,7 +19,13 @@ User
  └── RefreshTokens       (sessões: uma família por aparelho)
 
 AuthRateLimits           (baldes do limite de tentativas; sem dono — a chave é um hash)
+PendingFileDeletions     (arquivos a apagar do Storage; sem dono — só o caminho)
 ```
+
+Toda tabela "de alguém" chega a `users` por chave estrangeira com `ON DELETE CASCADE`,
+direto ou por uma tabela que chega. É o que faz a exclusão de conta ser **uma** linha
+apagada: o banco leva o resto. Tabela nova com dado de pessoa precisa manter isso — o teste
+`test_a_lista_de_tabelas_esta_completa` para a suíte se uma tabela nascer sem ser classificada.
 
 ## users
 | Campo | Tipo | Notas |
@@ -247,3 +253,19 @@ ou revogados há mais de um dia, são apagados a cada emissão para a mesma pess
 Uma linha por balde, contada com um único `INSERT ... ON CONFLICT DO UPDATE`
 (`app/core/rate_limit.py`). Sem FK de propósito: o balde existe antes de se saber se a conta
 existe. Janelas vencidas há mais de um dia saem numa faxina oportunista.
+
+## pending_file_deletions  (a fila dos arquivos a apagar)
+| Campo | Tipo | Notas |
+|---|---|---|
+| id | UUID | PK |
+| path | text | caminho do objeto no bucket |
+| attempts | int | quantas vezes o Storage recusou ou não respondeu |
+| last_attempt_at | timestamptz \| null | |
+| created_at | timestamptz | |
+
+Banco e Storage não cabem numa transação só. O caminho de cada arquivo entra aqui na
+**mesma** transação que apaga a linha (exclusão de conta, expurgo); o arquivo é removido em
+seguida, e a linha da fila sai quando o Storage confirma. Se ele falhar, o caminho fica e a
+próxima passada tenta de novo — do menos tentado para o mais tentado, para um arquivo que
+nunca sai não segurar os outros. Sem `user_id` de propósito: depois de excluída a conta, o
+que resta é apagar arquivos, não saber de quem eram.

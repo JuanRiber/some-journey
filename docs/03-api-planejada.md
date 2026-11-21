@@ -28,6 +28,10 @@ exposto no CORS. É por ele que o app distingue "renove e tente de novo" dos out
 - ✅ `POST /auth/forgot-password` — gera o token de reset (enviado por e-mail se houver SMTP;
   fora de produção e sem SMTP, o link é logado). Responde igual para e-mail existente ou não.
 - ✅ `POST /auth/reset-password` — redefine a senha com o token (validade + uso único)
+- ✅ `POST /auth/delete-account` — `{email, password?}` → 204. Exclui a conta de quem está
+  logado e tudo o que é dela, na hora. `email` é o da conta, digitado; `password` é a senha
+  atual, obrigatória quando a conta tem uma (`identity.has_password` em `GET /me/profile`).
+  **400** e-mail que não é o da conta · **401** senha errada, sem `WWW-Authenticate` · **429**.
 
 ## Memórias  (privadas)
 - ✅ `POST /memories` — cria ponto/memória solta; `life_phase_id` opcional

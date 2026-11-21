@@ -49,9 +49,9 @@ some-journey/
 |   |   |-- repositories/      # acesso a dados
 |   |   |-- schemas/           # contratos Pydantic
 |   |   `-- services/          # regras de negocio (inclui geocoding)
-|   |-- alembic/               # migrations versionadas (0001..0018)
-|   |-- scripts/               # seed_users, reset_password, backfill_geocoding, start.sh
-|   |-- tests/                 # pytest (450 testes)
+|   |-- alembic/               # migrations versionadas (0001..0019)
+|   |-- scripts/               # seed_users, reset_password, backfill_geocoding, purge_deleted, start.sh
+|   |-- tests/                 # pytest (495 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -288,6 +288,7 @@ exigem `Authorization: Bearer <token>`.
 - `POST /auth/change-password` — troca a senha e encerra todas as sessoes abertas
 - `POST /auth/forgot-password` — dispara o token de reset (por e-mail, se houver SMTP)
 - `POST /auth/reset-password` — redefine a senha com o token
+- `POST /auth/delete-account` — exclui a conta e tudo o que e dela, na hora e sem volta; pede o e-mail digitado e a senha atual
 
 ### Memories
 
@@ -407,6 +408,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Autenticacao com cadastro, login, JWT e `/auth/me`
 - [x] Sessao que se renova sozinha — refresh token com rotacao, no cofre do sistema no celular
 - [x] Rate limit para auth (por conta, por IP e por e-mail), contado no banco
+- [x] Excluir conta (banco e arquivos) e expurgo do que foi apagado ha mais de 30 dias
 - [x] CRUD de memorias com ownership por usuario
 - [x] Jornadas com ciclo de vida (draft/active/paused/finished), pontos, reordenacao e desvinculo
 - [x] Edicao de jornada (`PATCH`), capa, `mood` e `is_private`
@@ -418,10 +420,10 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Fuso horario (`timezone`) resolvido offline pelas coordenadas, sem chamada de rede extra
 - [x] Perfil agregado (`GET /me/profile`) com passaporte, `@username`, avatar e bio
 - [x] Paginacao keyset em `/memories` e `/journeys`
-- [x] Migracoes versionadas (Alembic, 0001..0018)
+- [x] Migracoes versionadas (Alembic, 0001..0019)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 450 no backend (pytest) e 585 no app (flutter test)
+- [x] Testes automatizados — 495 no backend (pytest) e 597 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -493,6 +495,9 @@ seis meses.
 - O conteiner roda sem root. O limite de tentativas de login mora no banco (`auth_rate_limits`): sobrevive a reinicio e vale igual com qualquer numero de processos. A API ainda sobe com um processo so por causa do intervalo do Nominatim, que e por processo.
 - Um e-mail ja ligado a uma conta Google nao e religado a outra (`409`): e-mail de dominio que troca de dono nao herda as memorias de ninguem.
 - Senhas, tokens e dados sensiveis nao devem ir para logs.
+- A pessoa pode excluir a propria conta: memorias, fotos, jornadas, percursos, fases e tokens saem do banco na hora. Um token de sessao sozinho nao basta — a rota confere o e-mail digitado e a senha atual.
+- O que e apagado "de leve" (`deleted_at`) nao fica para sempre: passados `PURGE_DELETED_AFTER_DAYS` (30) o expurgo apaga linhas e arquivos de vez. Em producao a API roda o expurgo sozinha a cada 6 h; `python -m scripts.purge_deleted --dry-run` mostra o que sairia.
+- Nenhum arquivo fica no Storage sem linha que leve a ele: o caminho entra na fila `pending_file_deletions` na mesma transacao que apaga a linha, e a remocao e tentada de novo ate o Storage confirmar.
 - Entrada que o banco nao guarda (caractere NUL no texto) ou que nao cabe em JSON (`NaN`, `Infinity`) responde 422, nunca 500.
 - Datas de entrada ficam entre os anos 1000 e 2999: fora disso, a leitura de volta quebrava a conta inteira.
 

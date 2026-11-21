@@ -25,6 +25,7 @@ from app.repositories import (
     refresh_token_repository,
     user_repository,
 )
+from app.services import purge_service
 from app.schemas.auth import LoginRequest, LoginResponse, RegisterRequest
 
 # Hash Argon2 "dummy" calculado UMA vez no import. No login, quando o e-mail não
@@ -289,6 +290,37 @@ def change_password(
     user_repository.set_password_hash(
         db, user=user, password_hash=hash_password(new_password)
     )
+
+
+# --- Excluir conta ---------------------------------------------------------
+
+
+class AccountConfirmationError(Exception):
+    """O e-mail digitado não é o da conta — a rota traduz em 400."""
+
+
+def delete_account(
+    db: Session, *, user: User, email: str, password: str | None
+) -> None:
+    """Exclui a conta de quem pede, depois de conferir que é a própria pessoa.
+
+    Duas travas, nesta ordem:
+
+    1. **O e-mail digitado é o da conta.** Não é segredo — é a confirmação de
+       que a pessoa sabe o que está apagando, e de qual conta.
+    2. **A senha atual**, quando a conta tem uma. É o que impede um token de
+       sessão copiado de apagar tudo. Conta que só entra pelo Google não tem
+       senha: para ela vale a primeira trava e a sessão.
+
+    Passou, não tem volta: quem apaga é o purge_service.delete_account.
+    """
+    if email != user.email:
+        raise AccountConfirmationError()
+    if user.password_hash is not None and not (
+        password and verify_password(password, user.password_hash)
+    ):
+        raise InvalidCredentialsError()
+    purge_service.delete_account(db, user=user)
 
 
 # --- Recuperação de senha --------------------------------------------------

@@ -1,3 +1,4 @@
+from app.models.file_deletion import PendingFileDeletion
 from app.models.journey import Journey, JourneyMemory
 from app.models.life_phase import LifePhase
 from app.models.memory import Memory, MemoryImage
@@ -19,4 +20,5 @@ __all__ = [
     "LifePhase",
     "AuthRateLimit",
     "RefreshToken",
+    "PendingFileDeletion",
 ]

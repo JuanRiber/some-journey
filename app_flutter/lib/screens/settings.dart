@@ -112,7 +112,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 label: 'Nome, foto e @username',
                 onTap: _abrindoPerfil ? null : _editarPerfil,
               ),
-              const _Row(label: 'Excluir conta', soon: true),
+              _Row(
+                label: 'Excluir conta',
+                onTap: () => Navigator.of(context).pushNamed('/delete-account'),
+              ),
             ]),
 
             const _Section(title: 'Aparência', children: [_Aparencia()]),

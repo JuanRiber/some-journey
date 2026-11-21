@@ -551,6 +551,27 @@ class Api {
         authed: true,
       );
 
+  /// Exclui a conta de quem está logado, e tudo o que é dela. SEM VOLTA.
+  ///
+  /// O servidor confere duas coisas que não são a sessão: o [email] digitado
+  /// e, se a conta tem senha, a [password] atual — um token copiado não apaga
+  /// a vida de ninguém. 400 = o e-mail não é o da conta; 401 = senha errada
+  /// (sem `WWW-Authenticate`, então não dispara renovação de sessão).
+  ///
+  /// Deu certo, a sessão daqui não existe mais em lugar nenhum: é esquecida
+  /// no aparelho, com os pontos de GPS que estivessem esperando envio. Não há
+  /// logout a avisar — os tokens foram apagados junto com a conta.
+  Future<void> deleteAccount({required String email, String? password}) async {
+    await _request(
+      'POST',
+      '/auth/delete-account',
+      body: {'email': email, 'password': ?password},
+      authed: true,
+    );
+    await _saveSession(null);
+    await PrefsTrackOutbox.clearAll();
+  }
+
   /// Pede o link de recuperação de senha. O backend responde SEMPRE 202 com a
   /// mesma mensagem genérica — exista a conta ou não (anti-enumeração). Portanto
   /// a UI nunca deve afirmar que "o e-mail existe": só que, se existir, o link foi

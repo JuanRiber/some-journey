@@ -32,6 +32,11 @@
   Um e-mail já ligado a outra conta Google **não troca de dono** (409). **(impl.)**
 - Conta que só entra pelo Google não tem senha para trocar; o caminho é "Esqueci minha
   senha". **(impl.)**
+- **A pessoa pode excluir a própria conta**, e com ela tudo o que guardou: memórias, fotos,
+  músicas, jornadas, percursos, fases, perfil. É na hora e não tem volta — não fica cópia. A
+  confirmação é dupla e nenhuma das duas é a sessão: o e-mail digitado e, se a conta tem
+  senha, a senha atual. Um token de sessão copiado não apaga a conta de ninguém. **(impl.)**
+- O e-mail de uma conta excluída fica livre: um cadastro novo com ele nasce vazio. **(impl.)**
 - Tentativas de login e de recuperação têm teto por conta, por IP e **por e-mail** (este
   último vale de qualquer IP). A contagem mora no banco: reiniciar a API não devolve as
   tentativas a ninguém, e o teto é o mesmo com um processo ou com vários. **(impl.)**
@@ -67,6 +72,12 @@
 - Pode ser vinculada a uma jornada **depois** de criada. **(impl.)**
 - Excluir uma jornada **não apaga** as memórias. **(impl.)**
 - Exclusão é **soft delete** (`deleted_at`). **(impl.)**
+- **Apagado não é para sempre guardado.** O que foi apagado há mais de 30 dias
+  (`PURGE_DELETED_AFTER_DAYS`) é apagado de vez — a linha e os arquivos. Vale para memória,
+  jornada, trecho de GPS, fase, e para a foto ou a música tirada de uma memória que
+  continua. O prazo existe para o toque errado ter volta; não há tela de desfazer ainda, mas
+  dentro dele o dado está inteiro no banco. **(impl.)**
+- Expurgar uma jornada não apaga as memórias dela, como excluí-la nunca apagou. **(impl.)**
 - Texto com caractere que o banco não guarda (NUL) é recusado com 422. **(impl.)**
 
 ## Jornadas

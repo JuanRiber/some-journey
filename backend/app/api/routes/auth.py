@@ -13,6 +13,7 @@ from app.models.user import User
 from app.schemas.auth import (
     GoogleLoginRequest,
     ChangePasswordRequest,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     LoginRequest,
     LoginResponse,
@@ -99,14 +100,19 @@ def _limit_auth(
     )
 
 
-def _limit_change_password(request: Request, user_id: object) -> None:
+def _limit_change_password(
+    request: Request, user_id: object, scope: str = "change-password"
+) -> None:
     """Throttle da troca de senha por (usuário autenticado + IP). Diferente do
     login, aqui a identidade vem do TOKEN (não do corpo), então a chave é o
     user_id + IP: trava o brute-force da senha ATUAL de quem já porta um token
     válido, sem deixar um usuário legítimo estourar o limite de outro. Reusa o
-    mesmo balde/tetos do por-conta do _limit_auth."""
+    mesmo balde/tetos do por-conta do _limit_auth.
+
+    `scope` separa os baldes: a exclusão de conta também confere a senha atual
+    com um token na mão, e tentativas numa não gastam o teto da outra."""
     ok, retry = check_rate_limit(
-        "change-password",
+        scope,
         [str(user_id), _client_ip(request)],
         max_attempts=settings.AUTH_RATE_LIMIT_ATTEMPTS,
         window_seconds=settings.AUTH_RATE_LIMIT_WINDOW_SECONDS,
@@ -356,4 +362,39 @@ def change_password(
                 "Esta conta entra pelo Google e ainda não tem senha. Para criar "
                 "uma, use \"Esqueci minha senha\" na tela de entrada."
             ),
+        )
+
+
+@router.post("/delete-account", status_code=status.HTTP_204_NO_CONTENT)
+def delete_account(
+    data: DeleteAccountRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Exclui a conta de quem está logado, e tudo o que é dela. Sem volta.
+
+    Memórias, fotos, músicas, jornadas, percursos e fases saem do banco na
+    hora; os arquivos saem do Storage em seguida (o que falhar fica numa fila
+    e é tentado de novo). As sessões morrem junto: o access token em mãos
+    passa a responder 401, porque a conta não existe mais.
+
+    Pede o e-mail digitado e, se a conta tem senha, a senha atual. **400**
+    quando o e-mail não é o da conta, **401** quando a senha não confere —
+    sem `WWW-Authenticate`: a sessão está boa, a senha é que não.
+    """
+    _limit_change_password(request, current_user.id, scope="delete-account")
+    try:
+        auth_service.delete_account(
+            db, user=current_user, email=data.email, password=data.password
+        )
+    except auth_service.AccountConfirmationError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="O e-mail digitado não é o desta conta.",
+        )
+    except auth_service.InvalidCredentialsError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="A senha está incorreta.",
         )

@@ -51,6 +51,20 @@ a API devolve `image_url` **assinada** e temporária (assinatura em lote na list
 **Motivo.** Memórias têm valor emocional; reduz perda acidental e permite recuperação futura.
 **Consequência.** Toda consulta filtra `deleted_at IS NULL`.
 
+## Apagado tem prazo; conta excluída não espera
+**Decisão.** O soft delete vale por 30 dias (`PURGE_DELETED_AFTER_DAYS`); depois o expurgo
+apaga de vez, linhas e arquivos. Excluir a **conta** não passa por soft delete: é hard delete
+na hora, levado pelo `ON DELETE CASCADE` a partir de `users`.
+**Motivo.** O soft delete protege do toque errado, e sozinho significava que nada jamais
+saía: a memória apagada há um ano seguia no banco, com as fotos no Storage, e ninguém
+conseguia ir embora levando os próprios dados da nossa mão. Já quem exclui a conta disse o
+que quer com duas confirmações; segurar os dados dela "por via das dúvidas" seria guardar o
+que nos pediram para apagar.
+**Consequência.** O expurgo roda dentro da própria API, de 6 em 6 h em produção (o plano
+grátis do Render não tem cron), e é idempotente. Fora de produção não roda sozinho. Os
+arquivos passam por uma fila (`pending_file_deletions`), escrita na mesma transação das
+linhas, porque banco e Storage não cabem numa transação só.
+
 ## Ownership + 404 uniforme
 **Decisão.** Tudo é filtrado por `user_id`; recurso de outro usuário responde 404 igual a inexistente.
 **Motivo.** Privacidade e anti-enumeração.

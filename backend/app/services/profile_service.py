@@ -53,6 +53,7 @@ def get_profile(db: Session, *, user: User) -> ProfileRead:
             # URL ASSINADA e temporária: o bucket é privado, o caminho nunca sai.
             avatar_url=storage.sign_url(user.avatar_path) if user.avatar_path else None,
             bio=user.bio,
+            has_password=user.password_hash is not None,
         ),
         stats=ProfileStats(
             memories=memory_counts["memories"],

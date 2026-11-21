@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, status
@@ -13,6 +15,31 @@ from app.core.error_handlers import register_error_handlers
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.core.pagination import NEXT_CURSOR_HEADER
 from app.db.session import SessionLocal
+from app.services import purge_service
+
+logger = logging.getLogger(__name__)
+
+
+# A primeira passada do expurgo espera a API assentar: o boot já roda as
+# migrations e atende o health check, e nada do que o expurgo apaga tem pressa.
+_PURGE_FIRST_RUN_SECONDS = 300
+
+
+async def _purge_loop() -> None:
+    """Roda o expurgo de tempos em tempos, enquanto a API estiver de pé.
+
+    É uma tarefa do próprio processo porque o plano grátis do Render não tem
+    cron. O trabalho de banco vai para uma thread — a sessão é síncrona e não
+    pode segurar o laço de eventos. Uma passada que falha é registrada (só o
+    tipo do erro) e a seguinte tenta de novo: o expurgo é idempotente.
+    """
+    await asyncio.sleep(_PURGE_FIRST_RUN_SECONDS)
+    while True:
+        try:
+            await asyncio.to_thread(purge_service.run_once)
+        except Exception as exc:  # noqa: BLE001 - o laço não pode morrer
+            logger.warning("Expurgo falhou: %s", type(exc).__name__)
+        await asyncio.sleep(settings.purge_interval_hours * 3600)
 
 
 @asynccontextmanager
@@ -20,7 +47,14 @@ async def lifespan(_app: FastAPI):
     # O schema é gerido por migrations versionadas (Alembic): rode
     # `alembic upgrade head` antes de subir a API. Não criamos tabelas no
     # startup — isso mascarava drift (create_all nunca altera tabelas existentes).
-    yield
+    expurgo = None
+    if settings.purge_interval_hours > 0:
+        expurgo = asyncio.create_task(_purge_loop())
+    try:
+        yield
+    finally:
+        if expurgo is not None:
+            expurgo.cancel()
 
 
 def create_app() -> FastAPI:

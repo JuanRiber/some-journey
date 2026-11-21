@@ -910,3 +910,62 @@ lugar melhor para ficar.
   outro site e imagem de fora da lista foram bloqueados.
 - **Não conferido:** o botão do Google (não há client id configurado) e uma foto de verdade
   vinda do Supabase — os dois estão na política pelo padrão do endereço, não por teste.
+
+## 2026-11-21 (2)
+
+### Excluir conta
+- Não havia como ir embora. A linha "Excluir conta" estava em Configurações marcada "em
+  breve", e do lado do servidor não existia rota: os dados de quem desistisse do app ficavam
+  conosco para sempre.
+- `POST /auth/delete-account` apaga a conta e tudo o que é dela, **na hora**: memórias,
+  fotos, músicas, jornadas, percursos, fases, perfil e tokens. É uma linha apagada em `users`;
+  o `ON DELETE CASCADE` que as chaves estrangeiras já tinham leva o resto. Não fica cópia, e o
+  e-mail volta a estar livre.
+- **Duas confirmações, e nenhuma é a sessão.** O e-mail da conta, digitado — a trava contra o
+  toque errado — e a senha atual, quando a conta tem uma. Um token de sessão copiado não
+  apaga a conta de ninguém. Conta que só entra pelo Google não tem senha a conferir: para ela
+  vale o e-mail e a sessão. O perfil passou a dizer se a conta tem senha
+  (`identity.has_password`), para o app saber o que pedir antes de pedir.
+- A senha errada responde 401 **sem** `WWW-Authenticate`, como na troca de senha: a sessão
+  está boa, e o app não deve renová-la para repetir a mesma senha.
+- No app, a tela diz o que some e que não tem volta, e não tenta convencer ninguém a ficar.
+  O botão em destaque é o que não destrói nada ("Manter minha conta"); o de excluir é o
+  discreto, e só acende com as confirmações preenchidas. Deu certo, o aparelho esquece a
+  sessão, as fases em memória e os pontos de GPS que esperavam envio.
+
+### Expurgo do que foi apagado
+- Apagar, aqui, é marcar `deleted_at`. Protege do toque errado — e, sozinho, significava que
+  nada jamais saía: a memória apagada há um ano seguia no banco, com as fotos no Storage.
+- O que está apagado há mais de **30 dias** (`PURGE_DELETED_AFTER_DAYS`) agora sai de vez:
+  memória (com fotos, músicas e vínculos), jornada (com capa, vínculos, trechos e pontos),
+  trecho de GPS, fase, e a foto ou a música tirada de uma memória que continua. De carona
+  saem os tokens vencidos. Expurgar uma jornada não toca nas memórias dela.
+- Roda dentro da própria API, a cada 6 h **em produção** — o plano grátis do Render não tem
+  cron. Fora de produção não roda sozinho: o `.env` de desenvolvimento alcança o bucket com
+  credenciais de verdade, e uma API de dev deixada de pé não deve apagar nada por conta
+  própria. À mão: `python -m scripts.purge_deleted`, com `--dry-run` para ver o que sairia.
+- É idempotente: duas passadas seguidas, ou dois processos ao mesmo tempo, apagam as mesmas
+  linhas uma vez só.
+
+### Os arquivos: nenhum fica sem registro
+- Banco e Storage não cabem numa transação só. A ordem ingênua — apaga a linha, depois o
+  arquivo — tem uma falha que não deixa rastro: se o Storage não responder, o arquivo fica lá
+  e ninguém mais sabe o caminho. Uma foto que a pessoa mandou apagar ficaria guardada para
+  sempre.
+- Nova tabela `pending_file_deletions` (migration 0019): o caminho entra na fila na **mesma**
+  transação que apaga a linha, e sai quando o Storage confirma a remoção. O que falhar é
+  tentado de novo na passada seguinte, do menos tentado para o mais tentado.
+- `storage.remove` diz se o arquivo saiu — o `storage.delete` que existia engole a falha, o
+  que serve para o melhor-esforço de uma foto trocada e não serve para quem precisa tentar
+  de novo. "Objeto não existe" conta como saiu.
+- A exclusão de conta alcança também os arquivos de memórias já apagadas, e os de fotos cuja
+  remoção em melhor-esforço possa ter falhado no passado.
+
+### Testes
+- Backend: 495 (eram 450). App: 597 (eram 585).
+- Um teste lista toda tabela como "de alguém" ou "sem dono" e para a suíte se uma tabela nova
+  nascer sem ser classificada: é o que impede a próxima tabela com dado de pessoa de ficar de
+  fora da exclusão de conta sem ninguém notar.
+- **Não conferido contra o Supabase de verdade:** a remoção de arquivos foi testada com um
+  Storage simulado. O formato da resposta de "objeto não existe" (400 com `not_found` no
+  corpo) vem da leitura da API, não de uma chamada real.

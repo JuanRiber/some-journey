@@ -100,6 +100,29 @@ def sign_urls(paths: list[str], ttl: int | None = None) -> dict[str, str]:
     return out
 
 
+def remove(path: str) -> bool:
+    """Remove um objeto e DIZ se ele saiu. Para quem precisa tentar de novo.
+
+    True quando o Storage confirma a remoção — ou responde que o objeto não
+    existe, que para quem queria apagá-lo é o mesmo resultado. False em
+    qualquer outra resposta, em falha de rede ou sem Storage configurado: o
+    arquivo pode continuar lá, e quem chamou deve guardar o caminho (ver
+    app/services/purge_service.py). Nunca levanta.
+    """
+    if not enabled() or not path:
+        return False
+    url = f"{_base()}/storage/v1/object/{settings.SUPABASE_BUCKET}/{path}"
+    try:
+        with httpx.Client(timeout=10) as client:
+            resp = client.request("DELETE", url, headers=_auth_headers())
+    except httpx.HTTPError:
+        return False
+    if resp.status_code < 300 or resp.status_code == 404:
+        return True
+    # O gateway devolve o "não existe" como 400 com o 404 no corpo.
+    return resp.status_code == 400 and "not_found" in resp.text.lower().replace(" ", "_")
+
+
 def delete(path: str) -> None:
     """Best-effort: remove um objeto. Silencioso em falha (não bloqueia o fluxo)."""
     if not enabled() or not path:

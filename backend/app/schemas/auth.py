@@ -147,6 +147,25 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=10, max_length=128)
 
 
+# --- POST /auth/delete-account ---------------------------------------------
+
+
+class DeleteAccountRequest(BaseModel):
+    """Pedido de exclusão da própria conta. Duas confirmações, e nenhuma delas
+    é o token da sessão — um token roubado não pode apagar a vida de ninguém:
+
+    - `email`: o da conta, DIGITADO. É a trava contra o toque errado, e vale
+      para toda conta.
+    - `password`: a senha atual, quando a conta tem uma. Conta que só entra
+      pelo Google não tem senha para conferir e manda este campo vazio.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: NormalizedEmail
+    password: str | None = Field(default=None, max_length=128)
+
+
 # --- POST /auth/forgot-password --------------------------------------------
 
 

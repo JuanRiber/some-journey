@@ -11,8 +11,8 @@ import pytest
 
 # Cabeçalhos com MAGIC BYTES reais (o backend valida pelos bytes, não pelo
 # Content-Type do multipart): JPEG começa com FF D8 FF; PNG com 89 50 4E 47...
-JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"0" * 64
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+from tests._images import JPEG as JPEG_BYTES  # noqa: E402
+from tests._images import PNG as PNG_BYTES  # noqa: E402
 
 
 def _memory(client, headers):

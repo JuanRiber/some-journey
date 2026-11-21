@@ -316,9 +316,11 @@ def set_cover(
     banco. Se o write falhar, o arquivo recém-subido ficaria órfão no bucket —
     então apagamos o NOVO path e repropagamos, tudo isso ANTES de tocar na capa
     antiga (que só é removida depois de o novo caminho estar persistido)."""
-    mime = images.sniff_image_type(data)
-    if mime is None:
+    preparada = images.prepare(data)
+    if preparada is None:
         raise InvalidCoverImageError()
+    # A capa também sobe sem metadados.
+    mime, data = preparada
     ext = _COVER_EXT[mime]
     journey = journey_repository.get_journey(db, user_id=user_id, journey_id=journey_id)
     if journey is None:

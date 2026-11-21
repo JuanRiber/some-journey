@@ -139,6 +139,14 @@
 - O banco guarda só a referência (`memory_images.image_path`); a API devolve uma
   `image_url` **assinada** e temporária. **(impl.)**
 - O tipo é decidido pelos **bytes** do arquivo (JPEG, PNG, WebP), não pelo cabeçalho; até 5 MB. **(impl.)**
+- **A foto é guardada sem os metadados.** O lugar da memória é o que a pessoa escolheu no
+  mapa; o que o celular anotou por conta própria dentro do arquivo — coordenadas, modelo e
+  número de série do aparelho, data, miniatura, XMP, comentário, o vídeo da "foto com
+  movimento" — não é guardado. Vale para foto de memória, capa de jornada e avatar. **(impl.)**
+- A limpeza **não muda a imagem**: nenhum pixel, nenhuma perda de qualidade. Ficam o perfil
+  de cor e a orientação (senão a foto tirada com o celular em pé apareceria deitada). **(impl.)**
+- Um arquivo cuja estrutura não dá para percorrer é **recusado**, e não guardado como veio:
+  é justamente o que não conseguiríamos limpar. **(impl.)**
 - Um usuário só anexa imagem às próprias memórias. **(impl.)**
 
 ## Mapa

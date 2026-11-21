@@ -141,9 +141,11 @@ def set_avatar(db: Session, *, user: User, data: bytes) -> ProfileRead:
     gravação no banco falhar depois do upload, o objeto recém-enviado é apagado —
     a mesma compensação usada nas fotos de memória, para não deixar lixo órfão no
     bucket."""
-    mime = images.sniff_image_type(data)
-    if mime is None or mime not in _AVATAR_EXT:
+    preparada = images.prepare(data)
+    if preparada is None or preparada[0] not in _AVATAR_EXT:
         raise InvalidAvatarError()
+    # A foto de perfil também sobe sem metadados.
+    mime, data = preparada
     old_path = user.avatar_path
     path = f"{user.id}/avatar/{uuid.uuid4().hex}.{_AVATAR_EXT[mime]}"
     storage.upload(path, data, mime)

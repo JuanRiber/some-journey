@@ -8,3 +8,7 @@ httpx==0.28.1
 # avisa que o uso está deprecado). Mantido pela organização do Pydantic, do
 # mesmo autor do httpx. O app em si continua no httpx (requirements.txt).
 httpx2==2.16.0
+# Gera e LÊ imagens de verdade nos testes de upload: é o que prova que tirar os
+# metadados não muda nenhum pixel. Só de teste — o servidor não decodifica
+# imagem (app/core/image_metadata.py trabalha nos bytes do arquivo).
+pillow==13.0.0

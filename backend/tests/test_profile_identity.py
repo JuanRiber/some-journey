@@ -6,7 +6,7 @@ from app.core import storage
 from app.domain.username import InvalidUsernameError, normalize, validate
 
 # JPEG real (magic bytes FF D8 FF) — o tipo vem dos BYTES, não do cabeçalho.
-JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 20
+from tests._images import JPEG  # noqa: E402
 
 
 class TestRegrasDoUsername:

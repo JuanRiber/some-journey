@@ -8,6 +8,8 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
+from tests import _images
+
 
 # --- 1. Limite de corpo: Content-Length acima do teto -> 413 ---------------
 def test_oversized_json_body_rejected_413(client):
@@ -80,7 +82,7 @@ def test_upload_over_limit_returns_413(client, auth_headers, monkeypatch):
         json={"title": "m", "text": "t", "latitude": 1.0, "longitude": 2.0, "occurred_at": "2026-01-01T00:00:00Z"},
         headers=h,
     ).json()["id"]
-    payload = b"\xff\xd8\xff\xe0" + b"0" * 500  # > 16 bytes
+    payload = _images.padded_jpeg(500)  # > 16 bytes
     r = client.post(
         f"/memories/{mid}/images",
         files={"file": ("x.jpg", payload, "image/jpeg")},
@@ -102,7 +104,7 @@ def test_valid_upload_still_works(client, auth_headers, monkeypatch):
         json={"title": "m", "text": "t", "latitude": 1.0, "longitude": 2.0, "occurred_at": "2026-01-01T00:00:00Z"},
         headers=h,
     ).json()["id"]
-    payload = b"\xff\xd8\xff\xe0" + b"0" * 64
+    payload = _images.JPEG
     r = client.post(
         f"/memories/{mid}/images",
         files={"file": ("x.jpg", payload, "image/jpeg")},
@@ -128,7 +130,7 @@ def test_upload_between_json_and_image_limits_not_rejected(client, auth_headers,
     )
     monkeypatch.setattr(storage, "sign_url", lambda path, ttl=None: "https://signed.example/x")
     h = auth_headers()
-    big = b"\xff\xd8\xff\xe0" + b"0" * (1_500_000)  # ~1.5MB: >1MB JSON, <5MB imagem
+    big = _images.padded_jpeg(1_500_000)  # ~1.5MB: >1MB JSON, <5MB imagem
 
     mid = client.post(
         "/memories",
@@ -394,7 +396,7 @@ def test_avatar_between_json_and_image_limits_not_rejected(client, auth_headers,
         storage, "sign_urls", lambda paths, ttl=None: {p: "https://signed.example/x" for p in paths}
     )
     monkeypatch.setattr(storage, "sign_url", lambda path, ttl=None: "https://signed.example/x")
-    big = b"\xff\xd8\xff\xe0" + b"0" * 1_500_000  # ~1.5MB: >1MB JSON, <5MB imagem
+    big = _images.padded_jpeg(1_500_000)  # ~1.5MB: >1MB JSON, <5MB imagem
 
     r = client.post(
         "/me/avatar", files={"file": ("a.jpg", big, "image/jpeg")}, headers=auth_headers()

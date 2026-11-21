@@ -6,7 +6,7 @@ import uuid
 import pytest
 from sqlalchemy import select
 
-JPEG = b"\xff\xd8\xff\xe0" + b"0" * 64
+from tests._images import JPEG  # noqa: E402
 
 
 def _storage_on(monkeypatch) -> list[str]:

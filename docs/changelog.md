@@ -969,3 +969,52 @@ lugar melhor para ficar.
 - **Não conferido contra o Supabase de verdade:** a remoção de arquivos foi testada com um
   Storage simulado. O formato da resposta de "objeto não existe" (400 com `not_found` no
   corpo) vem da leitura da API, não de uma chamada real.
+
+## 2026-11-21 (3)
+
+### As fotos sobem sem metadados
+- Uma foto de celular carrega muito além da imagem: as coordenadas de onde foi tirada, o
+  modelo e às vezes o número de série do aparelho, a data e a hora, uma miniatura (que pode
+  mostrar o enquadramento de **antes** de um corte) e, em alguns aparelhos, um vídeo inteiro
+  colado depois do fim do arquivo. Nada disso aparece na tela, e tudo isso ia para o Storage.
+- O lugar da memória é o que a pessoa escolheu no mapa, e está no banco. O que o sensor
+  anotou por conta própria não foi escolha de ninguém.
+- Toda imagem — foto de memória, capa de jornada, avatar — passa agora por `images.prepare`
+  antes de subir. **Sai:** EXIF (GPS, aparelho, data, miniatura), XMP, IPTC, comentários,
+  miniatura JFXX, imagens extras (MPF) e tudo o que vier depois do fim da imagem. **Fica:** o
+  perfil de cor e a orientação.
+- **A orientação é o detalhe que não pode se perder.** O celular grava a foto "deitada" e
+  anota "gire ao mostrar"; a anotação mora no EXIF, ao lado do GPS. O EXIF sai inteiro e
+  entra no lugar um EXIF mínimo com esse único número — senão toda foto em pé apareceria de
+  lado.
+
+### Sem recodificar
+- A imagem não é aberta nem regravada. JPEG, PNG e WebP são caixas com compartimentos; a
+  limpeza percorre a caixa e copia byte a byte os que desenham a imagem. **Nenhum pixel
+  muda**, não há perda de qualidade a cada envio, o servidor não ganha biblioteca de imagem
+  e não decodifica nada que um arquivo hostil pudesse explorar.
+- O app não era lugar para isso: ele redimensiona antes de enviar, e isso às vezes tira o
+  EXIF, às vezes o copia de volta, e na web depende do tamanho da foto. O servidor é a única
+  ponta que vê todos os clientes.
+- **Na dúvida, recusa.** Arquivo cuja estrutura não dá para percorrer responde 400 e não vai
+  para o Storage. Guardar "como veio" deixaria passar justamente o que não conseguimos
+  limpar. Efeito colateral honesto: os primeiros bytes de um JPEG seguidos de lixo deixaram
+  de ser aceitos como imagem — era o que os testes antigos enviavam.
+
+### As fotos que já estavam guardadas
+- `python -m scripts.strip_photo_metadata` passa pelos arquivos que o banco conhece, baixa,
+  limpa e grava de volta no mesmo caminho. **Por padrão só conta**; gravar pede `--apply`,
+  porque gravar por cima não tem volta — que é o objetivo.
+- Antes de gravar, o resultado é limpo de novo e tem de dar no mesmo arquivo, e não pode ser
+  maior que o original. Se falhar, o arquivo fica como está.
+
+### Como foi conferido
+- 77 testes novos com imagens de verdade (geradas pelo Pillow, que entrou **só** nas
+  dependências de teste): cada um decodifica o antes e o depois e compara os pixels, em JPEG
+  (progressivo, com marcadores de reinício, em cinza, em CMYK, com perfil de cor em vários
+  segmentos), PNG (com transparência e paleta) e WebP (com e sem perda, animado).
+- Fora da suíte, a limpeza passou por 505 imagens reais do sistema, de outros codificadores:
+  505 com os mesmos pixels, nenhuma recusada.
+- Backend: 573 testes (eram 496). O app não mudou.
+- **Não conferido contra o Supabase de verdade:** o download usado pela faxina das fotos
+  antigas (mesma URL do upload e do delete, com `GET`) foi testado com um Storage simulado.

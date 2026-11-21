@@ -316,9 +316,12 @@ def add_image(
     delete COMPENSATÓRIO do objeto já enviado (best-effort/silencioso) antes de
     repropagar — sem isso, uma falha no banco deixaria um órfão pagando storage e
     fora de qualquer registro."""
-    mime = images.sniff_image_type(data)
-    if mime is None:
+    # Tipo pelos bytes, e a foto já SEM metadados (GPS, aparelho, miniatura):
+    # o que sobe ao Storage é `data` depois de `images.prepare`, nunca antes.
+    preparada = images.prepare(data)
+    if preparada is None:
         raise InvalidImageError()
+    mime, data = preparada
     ext = _IMAGE_EXT[mime]
     memory = memory_repository.get_by_id(db, user_id=user_id, memory_id=memory_id)
     if memory is None:

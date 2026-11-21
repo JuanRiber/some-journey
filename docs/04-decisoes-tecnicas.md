@@ -65,6 +65,21 @@ grátis do Render não tem cron), e é idempotente. Fora de produção não roda
 arquivos passam por uma fila (`pending_file_deletions`), escrita na mesma transação das
 linhas, porque banco e Storage não cabem numa transação só.
 
+## Metadados da foto saem no servidor, sem recodificar
+**Decisão.** Toda imagem passa por `images.prepare` antes de ir para o Storage: o tipo é
+detectado pelos bytes e os metadados são retirados percorrendo a estrutura do arquivo
+(segmentos do JPEG, blocos do PNG e do WebP) e copiando só o que desenha a imagem. O servidor
+não decodifica nem recodifica nada, e não tem biblioteca de imagem.
+**Motivo.** O servidor é a única ponta que vê todos os clientes — o app redimensiona antes de
+enviar e isso às vezes tira o EXIF, às vezes o copia de volta, e na web depende do tamanho
+da foto. Recodificar resolveria, ao custo de perder qualidade a cada envio, gastar memória de
+um plano grátis decodificando 12 megapixels, e abrir o decodificador a arquivos hostis.
+Copiar os compartimentos de imagem byte a byte não muda nenhum pixel.
+**Consequência.** O EXIF sai inteiro e volta um EXIF mínimo só com a orientação, quando ela
+não é a normal. Arquivo que não tem a estrutura do formato é recusado. As fotos antigas são
+limpas por `scripts/strip_photo_metadata.py`, que grava por cima — por isso só conta, a
+menos que receba `--apply`.
+
 ## Ownership + 404 uniforme
 **Decisão.** Tudo é filtrado por `user_id`; recurso de outro usuário responde 404 igual a inexistente.
 **Motivo.** Privacidade e anti-enumeração.

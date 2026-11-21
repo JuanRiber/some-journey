@@ -50,8 +50,8 @@ some-journey/
 |   |   |-- schemas/           # contratos Pydantic
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0019)
-|   |-- scripts/               # seed_users, reset_password, backfill_geocoding, purge_deleted, start.sh
-|   |-- tests/                 # pytest (495 testes)
+|   |-- scripts/               # seed_users, reset_password, backfill_geocoding, purge_deleted, strip_photo_metadata, start.sh
+|   |-- tests/                 # pytest (573 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -409,6 +409,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Sessao que se renova sozinha — refresh token com rotacao, no cofre do sistema no celular
 - [x] Rate limit para auth (por conta, por IP e por e-mail), contado no banco
 - [x] Excluir conta (banco e arquivos) e expurgo do que foi apagado ha mais de 30 dias
+- [x] Fotos, capas e avatares guardados sem metadados (GPS, aparelho, miniatura)
 - [x] CRUD de memorias com ownership por usuario
 - [x] Jornadas com ciclo de vida (draft/active/paused/finished), pontos, reordenacao e desvinculo
 - [x] Edicao de jornada (`PATCH`), capa, `mood` e `is_private`
@@ -423,7 +424,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Migracoes versionadas (Alembic, 0001..0019)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 495 no backend (pytest) e 597 no app (flutter test)
+- [x] Testes automatizados — 573 no backend (pytest) e 597 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -487,6 +488,8 @@ seis meses.
 - Cada usuario acessa somente os proprios dados.
 - IDs inexistentes e IDs de outro usuario retornam o mesmo 404 nas rotas protegidas.
 - Bucket de imagens privado: a API devolve URL assinada e temporaria.
+- Toda imagem sobe sem metadados: GPS, modelo e numero de serie do aparelho, data, miniatura, XMP, comentarios e qualquer coisa colada depois do fim do arquivo (o video da "foto com movimento") ficam de fora. A limpeza nao recodifica — copia os dados da imagem byte a byte, entao nenhum pixel muda — e guarda so o que a foto precisa para aparecer certa: o perfil de cor e a orientacao. Um arquivo que nao da para percorrer e recusado, nao guardado como veio.
+- As fotos que subiram antes disso sao limpas por `python -m scripts.strip_photo_metadata` (sem `--apply` ele so conta).
 - Middleware rejeita corpos acima de `MAX_JSON_BODY_BYTES` com 413 (uploads de foto, capa e avatar tem o teto de imagem).
 - Login e recuperacao de senha tem um teto por e-mail (`AUTH_RATE_LIMIT_EMAIL_ATTEMPTS`), que nao depende de IP: um `X-Forwarded-For` forjado nao o contorna.
 - STARTTLS do SMTP confere o certificado e o nome do servidor.

@@ -100,6 +100,23 @@ def sign_urls(paths: list[str], ttl: int | None = None) -> dict[str, str]:
     return out
 
 
+def download(path: str) -> bytes | None:
+    """Os bytes de um objeto, ou None se ele não existe ou não deu para ler.
+
+    Só o backend baixa, com o service key — o cliente continua recebendo URL
+    assinada. Existe para a faxina das fotos já guardadas
+    (scripts/strip_photo_metadata.py). Nunca levanta."""
+    if not enabled() or not path:
+        return None
+    url = f"{_base()}/storage/v1/object/{settings.SUPABASE_BUCKET}/{path}"
+    try:
+        with httpx.Client(timeout=30) as client:
+            resp = client.get(url, headers=_auth_headers())
+    except httpx.HTTPError:
+        return None
+    return resp.content if resp.status_code == 200 else None
+
+
 def remove(path: str) -> bool:
     """Remove um objeto e DIZ se ele saiu. Para quem precisa tentar de novo.
 

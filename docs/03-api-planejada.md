@@ -56,7 +56,9 @@ reverso e persistido — ver [`10-localizacao.md`](10-localizacao.md). Memórias
 ## Fotos da memória  (privadas)
 - ✅ `POST /memories/{id}/images` — upload `multipart/form-data` (campo `file`). Vai para o
   Supabase Storage; o banco guarda só `image_path`; a resposta traz `image_url` assinada.
-  **Até 5 fotos por memória.**
+  **Até 5 fotos por memória.** O arquivo é guardado **sem metadados** (também em
+  `/journeys/{id}/cover` e `/me/avatar`); imagem que não dá para percorrer responde 400,
+  como o tipo não suportado.
 - ✅ `DELETE /memories/{id}/images/{image_id}` — remove uma foto.
 
 Foto é opcional; usuário só envia para memória própria. Sem Supabase configurado, o upload

@@ -18,7 +18,7 @@ from app.models.memory import Memory
 from app.repositories import memory_repository
 
 # O upload confere os magic bytes do PNG, não o Content-Type.
-_PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+from tests._images import PNG as _PNG  # noqa: E402
 
 
 def _memory(client, headers, *, title="M", when="2026-07-01"):

@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.core import storage
@@ -190,15 +191,30 @@ def preview(db: Session, *, older_than_days: int | None = None) -> PurgeReport:
             or 0
         )
 
-    return PurgeReport(
+    relatorio = PurgeReport(
         memories=contar(Memory),
         journeys=contar(Journey),
         tracks=contar(JourneyTrack),
         life_phases=contar(LifePhase),
         detached=contar(MemoryImage) + contar(MemoryMusic) + contar(JourneyMemory),
-        files_queued=int(
+    )
+    # A prévia serve justamente para olhar ANTES de publicar — e antes de
+    # publicar o banco ainda não tem a tabela da fila (migration 0019). Sem
+    # ela não há fila: a contagem é zero, e a prévia não pode quebrar por isso.
+    try:
+        na_fila = int(
             db.scalar(select(func.count()).select_from(PendingFileDeletion)) or 0
-        ),
+        )
+    except ProgrammingError:
+        db.rollback()
+        na_fila = 0
+    return PurgeReport(
+        memories=relatorio.memories,
+        journeys=relatorio.journeys,
+        tracks=relatorio.tracks,
+        life_phases=relatorio.life_phases,
+        detached=relatorio.detached,
+        files_queued=na_fila,
     )
 
 

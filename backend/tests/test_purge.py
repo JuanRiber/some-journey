@@ -391,6 +391,28 @@ def test_a_previa_conta_sem_apagar(client, auth_headers, db_session, cofre):
     assert _conta(db_session, Memory) == 1
 
 
+def test_a_previa_roda_num_banco_que_ainda_nao_tem_a_fila(
+    client, auth_headers, db_session, cofre
+):
+    """É o uso para que a prévia existe: olhar o que sairia ANTES de publicar,
+    quando o banco de produção ainda não recebeu a migration da fila."""
+    h = auth_headers()
+    client.delete(f"/memories/{_memoria(client, h)}", headers=h)
+    _envelhecer(db_session, "memories", 31)
+    db_session.execute(text("ALTER TABLE pending_file_deletions RENAME TO fila_fora"))
+    db_session.commit()
+    try:
+        previa = purge_service.preview(db_session)
+    finally:
+        db_session.rollback()
+        db_session.execute(
+            text("ALTER TABLE fila_fora RENAME TO pending_file_deletions")
+        )
+        db_session.commit()
+
+    assert (previa.memories, previa.files_queued) == (1, 0)
+
+
 def test_o_script_em_dry_run_nao_apaga(client, auth_headers, db_session, cofre, capsys):
     from scripts import purge_deleted
 

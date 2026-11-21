@@ -165,6 +165,23 @@ pasta pronta.
 Daqui em diante, todo push na `main` com CI verde republica o app. Enquanto os secrets não
 existem, o workflow termina verde com um aviso, em vez de falhar.
 
+O app sai com cabeçalhos de segurança próprios: `app_flutter/web/_headers`, que o build copia
+para a pasta publicada e o Pages aplica. A CSP dali nomeia a origem da API por um marcador
+(`__API_ORIGIN__`), que o workflow troca pelo valor de `API_URL` e confere antes de publicar.
+Duas consequências práticas:
+
+- **Trocar a API de endereço** é só mudar a variável `API_URL`: a CSP acompanha no próximo deploy.
+- **Publicar à mão** (`wrangler pages deploy` fora do workflow) exige fazer a mesma troca em
+  `build/web/_headers`. Com o marcador no lugar o app abre e **toda** chamada à API é bloqueada
+  pelo navegador.
+
+Um servidor local comum (`python3 -m http.server`) não aplica o `_headers`: o que se vê em
+localhost é o app sem CSP. Para conferir os cabeçalhos no ar:
+
+```bash
+curl -sI https://some-journey-atlas.pages.dev/ | grep -iE "content-security|strict-transport|x-frame"
+```
+
 > **Não ligue o repositório ao Pages pelo Git** ("Connect to Git", na criação do projeto). Quem
 > publica é o workflow, com a pasta já compilada. Um projeto ligado pelo Git tenta compilar por
 > conta própria a cada push, falha — o Pages não tem Flutter — e deixa em todo commit um check
@@ -224,6 +241,7 @@ graça; no iOS, o TestFlight exige a conta Apple Developer (US$ 99/ano).
 | Login "não faz nada"; no console do navegador, erro de CORS | `CORS_ALLOWED_ORIGINS` diferente da URL real do Pages (com `https://`, sem barra no fim). |
 | Resposta `400 Invalid host header` | `TRUSTED_HOSTS` sem o host do Render. Se o log mostrar o health check do próprio Render sendo recusado, acrescente o host que aparece no log. |
 | Push com CI verde, o app web atualiza e a API **não** muda | Outro check do commit está vermelho e o `checksPass` do Render espera por ele — em 11/2026, o "Cloudflare Pages" de um projeto ligado pelo Git. Confira os checks do commit (fim do passo 2), publique com *Manual Deploy* e desligue o check (passo 3). |
+| Uma tela funciona em localhost e falha só em produção (mapa cinza, busca que não volta, imagem que não carrega); no console do navegador, "violates the following Content Security Policy directive" | O app passou a chamar um host que não está na CSP. Acrescente-o em `app_flutter/web/_headers` (`connect-src`, e `img-src` se for imagem). |
 | Deploy falha em `alembic upgrade head` | `DATABASE_URL` errada (prefixo sem `+psycopg`, senha, ou *Direct connection* em vez do pooler), ou o projeto Supabase pausado — restaure no painel. O `scripts.check_database` (passo 1.5) diz qual dos dois. |
 | Erro `max clients reached` nos logs | Conexões demais no pooler: confira `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` no Render e se algum script local ficou aberto. |
 | Tudo funciona, mas cada tela demora | API e banco em regiões diferentes. Confira a região dos dois (Ohio / East US, `us-east-2`). |

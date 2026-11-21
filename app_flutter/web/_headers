@@ -1,0 +1,36 @@
+# Cabeçalhos de segurança do app web no Cloudflare Pages.
+#
+# O Pages lê este arquivo da raiz do que é publicado; o `flutter build web` o
+# copia de `web/` para `build/web/` junto com o resto. Um servidor local comum
+# (`python3 -m http.server`) NÃO o aplica — o que se vê em localhost é o app
+# sem estes cabeçalhos.
+#
+# `__API_ORIGIN__` é trocado pela origem da API no deploy
+# (.github/workflows/deploy-web.yml), a mesma do `--dart-define=API_URL`. O
+# workflow recusa publicar se a troca não acontecer: com o marcador no lugar, o
+# navegador bloquearia toda chamada à API.
+#
+# A CSP é uma lista do que o app REALMENTE carrega, e de onde. Serviço novo no
+# app (outro mapa, outro catálogo de música) precisa entrar aqui, ou funciona
+# em localhost e falha em produção, em silêncio. `test/web_headers_test.dart`
+# cobra isso para os hosts escritos no código.
+#
+#   script-src   o app, o CanvasKit em WebAssembly ('wasm-unsafe-eval') e o
+#                botão do Google. Sem 'unsafe-inline' e sem 'unsafe-eval': é o
+#                que impede um script injetado de rodar e ler a sessão, que na
+#                web mora no localStorage.
+#   style-src    o motor do Flutter escreve estilos inline; não há como evitar.
+#   img-src      telhas do mapa, fotos (links assinados do Supabase) e capas de
+#                música (mzstatic, do iTunes).
+#   connect-src  a API, a busca de lugar (Nominatim), a busca de música
+#                (iTunes), as fontes de reserva do Flutter (gstatic) e os mesmos
+#                hosts de imagem, que o motor também baixa por fetch.
+#   frame-ancestors 'none'  o app não abre dentro de página de ninguém.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://tile.openstreetmap.org https://*.supabase.co https://*.mzstatic.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' __API_ORIGIN__ https://tile.openstreetmap.org https://nominatim.openstreetmap.org https://itunes.apple.com https://*.supabase.co https://*.mzstatic.com https://fonts.gstatic.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(self), camera=(self), microphone=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin-allow-popups

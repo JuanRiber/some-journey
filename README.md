@@ -421,7 +421,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Migracoes versionadas (Alembic, 0001..0018)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 450 no backend (pytest) e 574 no app (flutter test)
+- [x] Testes automatizados — 450 no backend (pytest) e 585 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige dev build)
@@ -488,7 +488,8 @@ seis meses.
 - Middleware rejeita corpos acima de `MAX_JSON_BODY_BYTES` com 413 (uploads de foto, capa e avatar tem o teto de imagem).
 - Login e recuperacao de senha tem um teto por e-mail (`AUTH_RATE_LIMIT_EMAIL_ATTEMPTS`), que nao depende de IP: um `X-Forwarded-For` forjado nao o contorna.
 - STARTTLS do SMTP confere o certificado e o nome do servidor.
-- Toda resposta leva `nosniff`, `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`; em producao, tambem HSTS e uma CSP que nao carrega nada. O servidor nao se identifica.
+- Toda resposta da API leva `nosniff`, `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`; em producao, tambem HSTS e uma CSP que nao carrega nada. O servidor nao se identifica.
+- O app web sai com os proprios cabecalhos (`app_flutter/web/_headers`, lido pelo Cloudflare Pages): uma CSP que so deixa rodar script do proprio app — sem `unsafe-inline` nem `unsafe-eval` — e nomeia cada servico que ele chama, mais HSTS e `frame-ancestors 'none'`. E o que protege a sessao na web, que fica no `localStorage`. Servico novo no app precisa entrar nesse arquivo; um teste cobra isso para os hosts escritos no codigo.
 - O conteiner roda sem root. O limite de tentativas de login mora no banco (`auth_rate_limits`): sobrevive a reinicio e vale igual com qualquer numero de processos. A API ainda sobe com um processo so por causa do intervalo do Nominatim, que e por processo.
 - Um e-mail ja ligado a uma conta Google nao e religado a outra (`409`): e-mail de dominio que troca de dono nao herda as memorias de ninguem.
 - Senhas, tokens e dados sensiveis nao devem ir para logs.

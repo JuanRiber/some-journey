@@ -877,3 +877,36 @@ lugar melhor para ficar.
 - [`12-deploy.md`](12-deploy.md) ganhou o aviso nos dois lugares em que alguém tropeçaria — o
   fim do passo do Render e o passo do Pages —, os dois comandos que mostram os checks de um
   commit e o último deploy registrado, e a linha correspondente em "Problemas comuns".
+
+## 2026-11-21
+
+### App web: cabeçalhos de segurança
+- A API já respondia com CSP, HSTS e proteção contra ser embutida; o **app** no Cloudflare
+  Pages saía só com `nosniff` e `Referrer-Policy`. E é do lado do app que isso pesa: na web a
+  sessão mora no `localStorage`, que qualquer script rodando na página lê.
+- `app_flutter/web/_headers` passa a acompanhar o build. A CSP é uma lista fechada:
+  - **script** só do próprio app, mais o WebAssembly do CanvasKit (`wasm-unsafe-eval`) e o
+    botão do Google. Sem `unsafe-inline` e sem `unsafe-eval` — é o que impede um script
+    injetado de rodar;
+  - **conexões** só para a API, a busca de lugar (Nominatim), a busca de música (iTunes), as
+    fontes de reserva do Flutter e os hosts de imagem;
+  - **imagens** só das telhas do mapa, dos links assinados do Supabase e das capas de música;
+  - `frame-ancestors 'none'`: o app não abre dentro da página de ninguém.
+- Junto vão HSTS, `X-Frame-Options`, `Permissions-Policy` (localização só para o próprio app)
+  e `Cross-Origin-Opener-Policy`.
+- O estilo continua com `unsafe-inline`: o motor do Flutter escreve estilos inline e não há
+  como evitar.
+- **A origem da API não fica escrita no arquivo.** Ela entra por um marcador que o workflow de
+  deploy troca pelo valor de `API_URL` — a mesma variável do build — e confere antes de
+  publicar. Publicar com o marcador no lugar deixaria o app no ar e toda chamada bloqueada.
+- Lista fechada quebra de um jeito próprio: serviço novo no app funciona em localhost, onde o
+  arquivo não é aplicado, e falha em produção em silêncio. `test/web_headers_test.dart` cobra
+  que todo host escrito no código esteja na política, e que ela não seja afrouxada.
+
+### Como foi conferido
+- Com o build servido localmente por um servidor que aplica o `_headers` como o Pages faz: o
+  app abriu, entrou, desenhou o atlas com as telhas e falou com a API sem nenhuma violação.
+  Chamadas de dentro da página aos hosts permitidos passaram; `eval`, script inline, script de
+  outro site e imagem de fora da lista foram bloqueados.
+- **Não conferido:** o botão do Google (não há client id configurado) e uma foto de verdade
+  vinda do Supabase — os dois estão na política pelo padrão do endereço, não por teste.

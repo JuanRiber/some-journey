@@ -97,6 +97,27 @@ jobs:
             --dart-define=API_URL="$API_URL" \
             --dart-define=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID"
 
+      # O build copia web/_headers para build/web/_headers, com um marcador no
+      # lugar da origem da API: a CSP precisa nomear a API que ESTE build chama,
+      # e ela vem da mesma variável do --dart-define. Publicar com o marcador
+      # no lugar deixaria o app no ar e toda chamada à API bloqueada pelo
+      # navegador — por isso a conferência no fim.
+      - name: Cabeçalhos de segurança
+        if: steps.config.outputs.skip != 'true'
+        working-directory: app_flutter
+        run: |
+          origem=$(printf '%s' "$API_URL" | sed -E 's#^(https://[^/]+).*#\1#')
+          arquivo=build/web/_headers
+          if [ ! -f "$arquivo" ]; then
+            echo "::error::build/web/_headers não existe: o app seria publicado sem cabeçalhos de segurança."
+            exit 1
+          fi
+          sed -i "s#__API_ORIGIN__#$origem#g" "$arquivo"
+          if grep -q '__API_ORIGIN__' "$arquivo" || ! grep -q "connect-src 'self' $origem " "$arquivo"; then
+            echo "::error::A origem da API não entrou na CSP de build/web/_headers."
+            exit 1
+          fi
+
       # Na primeira vez o projeto não existe e o deploy em modo não interativo
       # não o cria sozinho. Nas seguintes este passo falha com "já existe" —
       # por isso o continue-on-error.

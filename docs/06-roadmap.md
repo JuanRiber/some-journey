@@ -12,7 +12,7 @@ Legenda: ✅ feito · 🟡 parcial · ⬜ a fazer. (Progresso detalhado no [`cha
 - ✅ Criar jornada simples (com ciclo `draft/active/paused/finished`).
 - ✅ Associar pontos a jornadas (existentes e novos) + reordenar.
 - ✅ Desenhar rastro no mapa (LineString).
-- ✅ **Percurso real por GPS** — `JourneyTrack`/`JourneyTrackPoint`, `GET /journeys/{id}/map` (GeoJSON), captura em **primeiro plano** no app e alternância "Percurso real ↔ Conectar memórias". Distinto da linha simbólica; o mapa global segue simbólico. Tracking em **segundo plano** é evolução (exige permissões próprias e um dev build).
+- ✅ **Percurso real por GPS** — `JourneyTrack`/`JourneyTrackPoint`, `GET /journeys/{id}/map` (GeoJSON), captura em **primeiro plano** no app, com o percurso real e a linha simbólica desenhados juntos no mapa da jornada. Distinto da linha simbólica; o mapa global segue simbólico. Tracking em **segundo plano** é evolução (exige permissão própria de localização em segundo plano).
 - ✅ Upload de fotos — **até 5 por memória** no Supabase Storage (upload, URL assinada e
   delete validados de ponta a ponta). Antecipou o item "múltiplas fotos" da V2.
 - ✅ Recuperação de senha real — token com validade e uso único, envio por SMTP opcional,

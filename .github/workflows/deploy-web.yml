@@ -29,6 +29,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# O token do GitHub só LÊ o repositório (o deploy usa o token do Cloudflare,
+# não este). Ver o mesmo bloco em ci.yml.
+permissions:
+  contents: read
+
 # Dois deploys ao mesmo tempo disputariam o mesmo projeto; o mais novo vence.
 concurrency:
   group: deploy-web

@@ -1,7 +1,7 @@
 # Design System — Some Journey
 
 > "Sua vida contada através dos lugares." Um caderno de viagens elegante, não um CRUD.
-> Fontes de verdade em CÓDIGO: `app_flutter/lib/design/tokens.dart` e
+> Fontes de verdade em CÓDIGO: `app_flutter/lib/design/tokens.dart` e `sj_theme.dart`,
 > do app Flutter. Este doc é a referência de
 > **papéis, anatomia e princípios** — nunca escreva cor/tamanho solto numa tela.
 
@@ -118,7 +118,7 @@ Duas composições na mesma tela, e o corte é **900pt**:
   barra fica compacta (só identidade).
 
 O que o desenho pede e o produto ainda não tem aparece **desenhado e desligado**,
-com "em breve" escrito (hoje: entrar com Google — o backend não tem OAuth). O
+com "em breve" escrito (hoje: entrar com Google num build sem `GOOGLE_CLIENT_ID`). O
 que não existe mesmo não aparece: link morto na primeira tela é promessa
 quebrada no primeiro toque.
 

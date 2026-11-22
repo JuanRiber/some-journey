@@ -1,0 +1,41 @@
+# Atualizações de dependência, propostas como pull request.
+#
+# As versões do backend e as actions do CI são fixadas à mão, e ficavam onde
+# estavam até alguém lembrar de olhar: em 21/11/2026 uma auditoria achou 27
+# vulnerabilidades conhecidas em duas bibliotecas (pyjwt e python-multipart)
+# cujas correções já existiam havia meses.
+#
+# Uma vez por semana, agrupado: um PR por ecossistema com as atualizações
+# menores, em vez de um PR por pacote. Correções de segurança vêm fora do
+# grupo, sozinhas e na hora. Nada é mesclado sozinho — o CI roda no PR e quem
+# decide é quem revisa.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      backend:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pub
+    directory: /app_flutter
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      app:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]

@@ -5,6 +5,8 @@ import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import 'atlas.dart';
+import 'journeys.dart' show aquecerEstante;
+import 'profile.dart';
 import 'timeline.dart';
 
 /// # Shell de abas: Tempo (álbum) · Criar · Atlas (mapa).
@@ -48,6 +50,19 @@ class _TabsScreenState extends State<TabsScreen>
     duration: SJMotion.base,
     value: 1,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    // As duas telas a um toque daqui — Perfil (o avatar) e a estante de
+    // jornadas — são buscadas já, por baixo, enquanto a pessoa olha o atlas.
+    // Quando ela tocar, abrem preenchidas em vez de começar pelo esqueleto.
+    // Depois do primeiro quadro: o atlas e a timeline saem na frente.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ProfileScreen.aquecer();
+      aquecerEstante();
+    });
+  }
 
   void _select(int i) {
     if (i == _index) return;

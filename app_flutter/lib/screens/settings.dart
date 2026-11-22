@@ -125,9 +125,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _Row(label: 'Aniversários de memórias', soon: true),
             ]),
 
-            const _Section(title: 'Privacidade', children: [
-              _Row(label: 'Visibilidade das jornadas', soon: true),
-              _Row(label: 'Dados de localização', soon: true),
+            _Section(title: 'Privacidade', children: [
+              // O que fica guardado, onde, quem mais participa e como apagar:
+              // dito em texto corrido, não escondido atrás de "em breve".
+              _Row(
+                label: 'O que guardamos sobre você',
+                onTap: () => Navigator.of(context).pushNamed('/your-data'),
+              ),
+              const _Row(label: 'Visibilidade das jornadas', soon: true),
             ]),
 
             const _Section(title: 'Backup e dados', children: [

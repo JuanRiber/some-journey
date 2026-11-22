@@ -17,6 +17,13 @@ on:
 
 # Um push novo no mesmo ramo cancela a execução anterior: só o último estado
 # interessa, e a fila do runner não é infinita.
+# O token que o GitHub entrega a cada execução só LÊ o repositório. O padrão,
+# sem isto, depende da configuração da conta e costuma incluir escrita — e um
+# passo comprometido (uma action de terceiro, uma dependência) herdaria o que o
+# token pode. Nenhum passo daqui precisa escrever no repositório.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -63,6 +70,12 @@ jobs:
 
       - name: Instalar dependências
         run: pip install -r requirements-dev.txt
+
+      # Só defeito, nunca estilo (backend/ruff.toml): erro de sintaxe, nome que
+      # não existe, import sem uso. É barato e vem primeiro — um nome errado
+      # num caminho que nenhum teste percorre só apareceria em produção.
+      - name: Lint (ruff)
+        run: ruff check .
 
       # Toda rota do backend precisa de alguém que a chame. Já aconteceu três
       # vezes de uma capacidade subir testada, documentada e sem cliente —

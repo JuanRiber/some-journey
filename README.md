@@ -50,8 +50,8 @@ some-journey/
 |   |   |-- schemas/           # contratos Pydantic
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0019)
-|   |-- scripts/               # seed_users, reset_password, backfill_geocoding, purge_deleted, strip_photo_metadata, start.sh
-|   |-- tests/                 # pytest (573 testes)
+|   |-- scripts/               # seed_users, reset_password, backfill_geocoding, purge_deleted, strip_photo_metadata, check_database, check_client_parity, with_production_env.sh, start.sh
+|   |-- tests/                 # pytest (587 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -59,7 +59,7 @@ some-journey/
 |   |-- lib/
 |   |   |-- api.dart           # cliente HTTP da API
 |   |   |-- design/            # tokens do design system
-|   |   |-- features/          # atlas, profile, music
+|   |   |-- features/          # atlas, auth, collection, hero, music, phases, photos, places, profile, signup, sync, tracks
 |   |   |-- screens/           # telas
 |   |   `-- widgets/           # UI compartilhada (atlas_map, location_picker)
 |   `-- test/
@@ -174,7 +174,7 @@ que as fotos estao indisponiveis. Todo o resto funciona. Para ligar:
 2. Em **Storage → New bucket**, crie um bucket chamado `memories` e deixe-o
    **privado** (nao marque Public). O backend gera URLs assinadas de curta
    duracao; bucket publico exporia a foto de todo mundo por URL adivinhavel.
-3. Em **Project Settings → API**, copie:
+3. Em **Project Settings → API Keys**, copie (a service_role fica na aba *Legacy API keys*):
    - **Project URL** (`https://<ref>.supabase.co`) para `SUPABASE_URL`;
    - a chave **service_role** para `SUPABASE_SERVICE_KEY`.
 4. Reinicie a API.
@@ -185,7 +185,7 @@ isolamento entre usuarios e feito pelo caminho do objeto
 (`{user_id}/{memory_id}/{uuid}.{ext}`), imposto no servidor — e por isso que o
 bucket precisa ser privado.
 
-Para conferir que ligou: anexar uma foto a uma memoria deve responder **201**
+Para conferir que ligou: anexar uma foto a uma memoria deve responder **200** (a memoria com a foto nova)
 em vez de 503.
 
 #### Entrar com o Google
@@ -282,6 +282,7 @@ exigem `Authorization: Bearer <token>`.
 
 - `POST /auth/register` — cadastro (fechado por padrao em producao)
 - `POST /auth/login` — devolve o access token (JWT, 60 min) e o refresh token
+- `POST /auth/google` — entra com o Google (`id_token`); cria ou vincula a conta; 503 sem `GOOGLE_CLIENT_ID`
 - `POST /auth/refresh` — troca o refresh token por um par novo; cada refresh token vale uma troca
 - `POST /auth/logout` — encerra a sessao daquele aparelho (revoga o refresh token)
 - `GET /auth/me`
@@ -295,7 +296,7 @@ exigem `Authorization: Bearer <token>`.
 Todas as rotas exigem Bearer token.
 
 - `POST /memories` — aceita `life_phase_id` opcional (uma fase ativa do proprio usuario)
-- `GET /memories` — paginacao keyset (`?limit=&cursor=`); `?life_phase_id=` recorta pela fase
+- `GET /memories` — paginacao keyset (`?limit=&cursor=`); `?life_phase_id=` recorta pela fase; `?city=`, `?country_code=`, `?has_images=true` e `?created_on=` recortam a colecao
 - `GET /memories/{memory_id}`
 - `PATCH /memories/{memory_id}` — em `life_phase_id`, e so nele, `null` solta a memoria da fase
 - `DELETE /memories/{memory_id}`
@@ -393,7 +394,9 @@ memoria ou jornada, **422**.
 Identidade do viajante. Um unico endpoint agregado, com as contagens feitas em
 SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 
-- `GET /me/profile` — identidade, estatisticas, passaporte, jornada atual e atividade
+- `GET /me/profile` — identidade, estatisticas, passaporte, ultima aventura e jornada atual
+- `GET /me/places` — cidades e paises da colecao, agrupados no banco
+- `GET /me/days` — os dias com registro
 - `PATCH /me/profile` — edita nome, `@username` e bio
 - `POST /me/avatar` — envia o avatar (Supabase Storage)
 - `DELETE /me/avatar` — remove o avatar
@@ -410,6 +413,9 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Rate limit para auth (por conta, por IP e por e-mail), contado no banco
 - [x] Excluir conta (banco e arquivos) e expurgo do que foi apagado ha mais de 30 dias
 - [x] Fotos, capas e avatares guardados sem metadados (GPS, aparelho, miniatura)
+- [x] Teto de uso por pessoa nas escritas e nos uploads
+- [x] Telas que abrem com o que ja foi visto, e fotos que sobem depois de a memoria estar salva
+- [x] Lint do backend, Dependabot e auditoria semanal de dependencias
 - [x] CRUD de memorias com ownership por usuario
 - [x] Jornadas com ciclo de vida (draft/active/paused/finished), pontos, reordenacao e desvinculo
 - [x] Edicao de jornada (`PATCH`), capa, `mood` e `is_private`
@@ -424,10 +430,10 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Migracoes versionadas (Alembic, 0001..0019)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 573 no backend (pytest) e 597 no app (flutter test)
+- [x] Testes automatizados — 587 no backend (pytest) e 627 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
-- [ ] Tracking em segundo plano (exige dev build)
+- [ ] Tracking em segundo plano (exige permissao de localizacao em segundo plano)
 - [ ] Mapa Mapbox ou provedor nativo
 
 ---
@@ -437,11 +443,14 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 O GitHub Actions roda a cada push na `main` e em todo pull request
 (`.github/workflows/ci.yml`), em dois trabalhos paralelos:
 
-- **Backend** — `pytest` contra um servico `postgis/postgis:16-3.4` na porta
-  5433, a mesma imagem e a mesma porta do `infra/docker-compose.yml`. Depois,
-  `alembic upgrade head`, `downgrade base` e `upgrade head` num banco limpo, que
-  e o unico jeito de pegar uma migration quebrada antes do deploy (o boot em
-  producao roda `upgrade head`).
+- **Backend** — primeiro `ruff check` (so defeito: erro de sintaxe, nome que
+  nao existe, import sem uso) e `python -m scripts.check_client_parity` (toda
+  rota precisa de um cliente que a chame). Depois `pytest` contra um servico
+  `postgis/postgis:16-3.4` na porta 5433, a mesma imagem e a mesma porta do
+  `infra/docker-compose.yml`. Por fim `alembic upgrade head`, `downgrade base`
+  e `upgrade head` num banco limpo, que e o unico jeito de pegar uma migration
+  quebrada antes do deploy (o boot em producao roda `upgrade head`), e
+  `alembic check`, que confere que os models dizem o mesmo que as migrations.
 - **App Flutter** — `flutter analyze --fatal-infos` e `flutter test`, na versao
   3.38.10 (Dart 3.10.9), a mesma do desenvolvimento.
 
@@ -491,6 +500,9 @@ seis meses.
 - Toda imagem sobe sem metadados: GPS, modelo e numero de serie do aparelho, data, miniatura, XMP, comentarios e qualquer coisa colada depois do fim do arquivo (o video da "foto com movimento") ficam de fora. A limpeza nao recodifica — copia os dados da imagem byte a byte, entao nenhum pixel muda — e guarda so o que a foto precisa para aparecer certa: o perfil de cor e a orientacao. Um arquivo que nao da para percorrer e recusado, nao guardado como veio.
 - As fotos que subiram antes disso sao limpas por `python -m scripts.strip_photo_metadata` (sem `--apply` ele so conta).
 - Middleware rejeita corpos acima de `MAX_JSON_BODY_BYTES` com 413 (uploads de foto, capa e avatar tem o teto de imagem).
+- Quem esta logado tambem tem teto: 600 escritas e 60 uploads a cada 5 minutos, por pessoa, contados no banco. Leitura nao conta.
+- As dependencias do backend sao auditadas toda semana contra vulnerabilidades conhecidas (`.github/workflows/audit.yml`), e o Dependabot propoe as atualizacoes. Os workflows rodam com o token do GitHub so de leitura.
+- Em Configuracoes › Privacidade o app diz, em texto corrido, o que guarda, quem mais participa (cada servico de terceiros que ele pode chamar) e como apagar. Um teste cobra que todo endereco liberado na CSP tenha o dono nomeado nessa tela.
 - Login e recuperacao de senha tem um teto por e-mail (`AUTH_RATE_LIMIT_EMAIL_ATTEMPTS`), que nao depende de IP: um `X-Forwarded-For` forjado nao o contorna.
 - STARTTLS do SMTP confere o certificado e o nome do servidor.
 - Toda resposta da API leva `nosniff`, `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`; em producao, tambem HSTS e uma CSP que nao carrega nada. O servidor nao se identifica.

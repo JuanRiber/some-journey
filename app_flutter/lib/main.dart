@@ -7,6 +7,7 @@ import 'design/theme.dart';
 import 'design/theme_controller.dart';
 import 'design/tokens.dart';
 import 'features/auth/startup_domain.dart';
+import 'features/photos/photo_uploads.dart';
 import 'screens/change_password.dart';
 import 'screens/delete_account.dart';
 import 'screens/forgot_password.dart';
@@ -23,6 +24,7 @@ import 'screens/profile.dart';
 import 'screens/register.dart';
 import 'screens/settings.dart';
 import 'screens/tabs.dart';
+import 'screens/your_data.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +52,7 @@ final _rotas = <String, WidgetBuilder>{
   '/forgot': (_) => const ForgotPasswordScreen(),
   '/change-password': (_) => const ChangePasswordScreen(),
   '/delete-account': (_) => const DeleteAccountScreen(),
+  '/your-data': (_) => const YourDataScreen(),
   '/tabs': (_) => const TabsScreen(),
   '/journeys': (_) => const JourneysScreen(),
   '/journey-new': (_) => const JourneyNewScreen(),
@@ -115,7 +118,15 @@ class SomeJourneyApp extends StatelessWidget {
       // atlas.
       builder: (context, child) => SJTheme(
         scheme: tema.schemeFor(context),
-        child: child ?? const SizedBox.shrink(),
+        // A faixa do envio de fotos fica POR CIMA do navegador: quem salvou uma
+        // memória já saiu da tela onde escolheu as fotos, e o andamento tem de
+        // acompanhá-la aonde for.
+        child: Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const PhotoUploadsBanner(),
+          ],
+        ),
       ),
       // Rotas com argumento (id) são resolvidas em onGenerateRoute; as sem
       // argumento ficam no mapa `_rotas`.

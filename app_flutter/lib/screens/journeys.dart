@@ -286,6 +286,16 @@ class JourneysScreen extends StatefulWidget {
 /// preenchida enquanto relê.
 final _estanteEmCache = SessionCache<Page<Journey>>();
 
+/// Busca a estante ANTES de alguém pedir, para ela abrir preenchida já na
+/// primeira vez. Chamado quando as abas sobem (ver tabs.dart). Em silêncio: se
+/// falhar, a tela busca de novo ao abrir, como sempre fez.
+Future<void> aquecerEstante() async {
+  if (_estanteEmCache.valor != null) return;
+  try {
+    _estanteEmCache.valor = await Api.instance.listJourneys();
+  } catch (_) {}
+}
+
 class _JourneysScreenState extends State<JourneysScreen>
     with AtualizaQuandoMuda<JourneysScreen> {
   List<Journey>? _journeys;

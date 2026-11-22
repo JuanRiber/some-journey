@@ -31,8 +31,55 @@
 
   <title>Some Journey</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    O motor do Flutter e o app somam uns 10 MB. Enquanto eles baixam, a pagina
+    ficava BRANCA e vazia: quem abria o link pela primeira vez via um nada por
+    alguns segundos, sem saber se tinha carregado.
+
+    O que vai aqui aparece no primeiro quadro, antes de qualquer download: o
+    papel creme do app e o nome dele. So CSS, nada de script: a politica de
+    seguranca (web/_headers) nao deixa script inline rodar, e nem precisa.
+    Quando o Flutter desenha o primeiro quadro, ele cobre isto por inteiro.
+
+    A cor e a do modo claro (o padrao do produto) de proposito: neste ponto
+    ainda nao da para saber o modo que a pessoa escolheu.
+  -->
+  <link rel="preload" href="main.dart.js" as="script">
+  <style>
+    html, body { height: 100%; margin: 0; background: #F8F2E4; }
+    #sj-espera {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 18px;
+      font-family: Georgia, 'Times New Roman', serif; color: #2A2420;
+    }
+    #sj-espera .nome { font-size: 28px; letter-spacing: .01em; }
+    #sj-espera .lema { font-size: 14px; font-style: italic; opacity: .6; }
+    #sj-espera .traco {
+      width: 132px; height: 2px; border-radius: 2px; overflow: hidden;
+      background: rgba(42, 36, 32, .12);
+    }
+    #sj-espera .traco::after {
+      content: ''; display: block; width: 40%; height: 100%;
+      background: #A3213F; border-radius: 2px;
+      animation: sj-anda 1.4s ease-in-out infinite;
+    }
+    @keyframes sj-anda {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(250%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #sj-espera .traco::after { animation: none; width: 100%; opacity: .35; }
+    }
+  </style>
 </head>
 <body>
+  <div id="sj-espera" aria-hidden="true">
+    <div class="nome">Some Journey</div>
+    <div class="lema">A vida deixa rastros.</div>
+    <div class="traco"></div>
+  </div>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

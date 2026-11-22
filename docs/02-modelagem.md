@@ -1,7 +1,7 @@
 # Modelagem
 
 Modelagem **atual** do domínio (PostgreSQL + PostGIS). IDs são `UUID` gerados pelo banco;
-timestamps são `TIMESTAMPTZ`. Gerida por migrations Alembic (`0001`..`0010`, ver
+timestamps são `TIMESTAMPTZ`. Gerida por migrations Alembic (`0001`..`0019`, ver
 [`04-decisoes-tecnicas.md`](04-decisoes-tecnicas.md)).
 
 ## Diagrama
@@ -15,6 +15,7 @@ User
  │      │      └── Memory
  │      └── JourneyTracks     (percurso real por GPS)
  │             └── JourneyTrackPoints
+ ├── LifePhases          (capítulos; memórias e jornadas apontam para eles, ON DELETE SET NULL)
  ├── PasswordResetTokens (recuperação de senha)
  └── RefreshTokens       (sessões: uma família por aparelho)
 
@@ -33,7 +34,8 @@ apagada: o banco leva o resto. Tabela nova com dado de pessoa precisa manter iss
 | id | UUID | PK |
 | name | varchar(120) | |
 | email | varchar(255) | único |
-| password_hash | text | nunca exposto pela API |
+| password_hash | text \| null | nunca exposto pela API; nulo em conta que só entra pelo Google |
+| google_sub | varchar(255) \| null | `sub` do id_token do Google; único. O vínculo é por ele, nunca pelo e-mail |
 | password_changed_at | timestamptz | JWTs emitidos antes desta data são recusados |
 | username | varchar(30) \| null | `@username` público, único; reservados são recusados |
 | avatar_path | text \| null | caminho no Storage (não URL pública) |

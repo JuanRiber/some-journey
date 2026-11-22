@@ -33,7 +33,7 @@ pontos. A timeline é a leitura temporal das mesmas memórias.
 - Timeline simples.
 - Jornadas simples (criar, iniciar, adicionar pontos, finalizar).
 - Conectar pontos soltos a uma jornada e desenhar o rastro.
-- Uma foto opcional por memória.
+- Fotos opcionais por memória (até 5).
 
 ## Visão futura
 Fases da vida, rastros automáticos (tracking), múltiplas fotos, música associada, exportação em

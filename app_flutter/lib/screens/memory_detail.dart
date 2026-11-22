@@ -9,6 +9,7 @@ import '../features/music/memory_music_section.dart';
 import '../features/photos/polaroid_pile.dart';
 import '../features/phases/phase_widgets.dart';
 import '../features/places/place_domain.dart';
+import '../features/sync/seen.dart';
 import '../widgets/photo_viewer.dart';
 
 const _mesesLong = [
@@ -48,7 +49,9 @@ class MemoryDetailScreen extends StatefulWidget {
 }
 
 class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
-  Memory? _memory;
+  /// Nasce com o que a lista já mostrou desta memória (ver
+  /// features/sync/seen.dart): a tela abre preenchida e relê por baixo.
+  late Memory? _memory = memoriasVistas[widget.memoryId];
   String _error = '';
   bool _confirmDelete = false;
   bool _deleting = false;
@@ -69,7 +72,18 @@ class _MemoryDetailScreenState extends State<MemoryDetailScreen> {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
-      setState(() => _error = e.isNotFound ? 'Memória não encontrada.' : e.message);
+      if (e.isNotFound) {
+        // Apagada noutro lugar: o que estava em mãos não vale mais.
+        memoriasVistas.remove(widget.memoryId);
+        setState(() {
+          _memory = null;
+          _error = 'Memória não encontrada.';
+        });
+        return;
+      }
+      // Com a memória já na tela, uma falha ao RELER não é notícia: a pessoa
+      // está lendo o que pediu. Só vira erro quando não há nada a mostrar.
+      if (_memory == null) setState(() => _error = e.message);
     }
   }
 

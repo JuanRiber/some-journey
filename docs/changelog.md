@@ -1018,3 +1018,102 @@ lugar melhor para ficar.
 - Backend: 573 testes (eram 496). O app não mudou.
 - **Não conferido contra o Supabase de verdade:** o download usado pela faxina das fotos
   antigas (mesma URL do upload e do delete, com `GET`) foi testado com um Storage simulado.
+
+## 2026-11-21 (5)
+
+### App: abrir sem esperar
+- **O detalhe abre com o que a lista já mostrou.** A timeline traz cada memória inteira;
+  tocar numa delas abria o detalhe em branco e buscava na rede exatamente o que a lista
+  acabara de mostrar. Agora o cliente da API guarda a última versão vista de cada memória e
+  de cada jornada (`features/sync/seen.dart`), a tela nasce com ela e relê por baixo. É
+  "mostre o que tem, confira depois": toda abertura ainda vai ao servidor, e o que mudou
+  chega à tela. Vale só para a sessão — sair, ou entrar com outra conta, não deixa nada.
+- O mesmo nas telas de **editar**. A releitura chega meio segundo depois de a tela abrir, e
+  por isso ela só atualiza o campo que a pessoa ainda não mexeu.
+- **Uma releitura que falha não tira da tela o que a pessoa está lendo.** Só vira erro
+  quando não há nada a mostrar — ou quando o servidor diz que aquilo foi apagado.
+- **A jornada busca tudo de uma vez.** A jornada, o mapa do percurso e a lista de trechos
+  eram três pedidos em fila, cada um esperando o anterior voltar dos EUA. Saem juntos.
+- **Perfil e estante são buscados antes de alguém pedir**, quando as abas sobem: o primeiro
+  toque no avatar já abre preenchido.
+- **Web: a página não nasce branca.** Enquanto o motor do Flutter e o app (uns 10 MB)
+  baixam, aparece o papel creme com o nome do app — só CSS, porque a política de segurança
+  não deixa script inline rodar, e nem precisa.
+
+### App: as fotos sobem depois de a memória estar salva
+- Salvar uma memória com cinco fotos deixava a pessoa parada no formulário enquanto as
+  cinco subiam em fila — por uma memória que já estava gravada desde o primeiro pedido.
+  Agora a tela fecha quando a **memória** está salva, e as fotos vão para uma fila
+  (`features/photos/photo_uploads.dart`): sobem uma de cada vez, na ordem em que foram
+  escolhidas (a primeira é a capa), e cada uma aparece nas listas ao chegar.
+- O envio nunca é silencioso: uma faixa por cima de qualquer tela diz "Enviando fotos… 2 de
+  5", e a foto que falha fica à vista, com "Tentar de novo", em vez de sumir.
+- **O que isto custa:** as fotos na fila existem só na memória do app. Se ele for fechado
+  antes de a fila esvaziar, as que faltavam não sobem — a memória fica salva sem elas, e dá
+  para anexá-las de novo editando. Sair da conta abandona a fila.
+
+### Dependências: 27 vulnerabilidades conhecidas, e ninguém avisava
+- Uma auditoria (`pip-audit`) achou 27 vulnerabilidades publicadas em duas bibliotecas do
+  backend: `pyjwt` 2.13.0 (15), que assina e confere as sessões, e `python-multipart` 0.0.20
+  (12), que lê os uploads. As correções existiam; as versões é que estavam fixadas à mão e
+  ficavam onde estavam. Subiram para `pyjwt` 2.15.1 e `python-multipart` 0.0.34, a auditoria
+  ficou limpa e a suíte inteira passou com elas.
+- Para não depender de alguém lembrar: o **Dependabot** propõe as atualizações toda semana
+  (backend, app e actions), e um workflow próprio (`audit.yml`) roda a auditoria toda
+  segunda-feira e a cada mudança no `requirements.txt`. Fica fora do CI de propósito — uma
+  vulnerabilidade nova aparece sem que nada mude no repositório, e não deve segurar o
+  deploy de um commit que não tem nada a ver com ela.
+
+### CI
+- **Lint do backend** (`ruff`, só o que acusa defeito: erro de sintaxe, nome que não existe,
+  import sem uso). Nenhuma regra de estilo — o projeto continua sem formatador. O código
+  passou sem nenhuma correção.
+- **Token do GitHub só de leitura** nos três workflows. O padrão depende da configuração da
+  conta e costuma incluir escrita; nenhum passo precisa dela.
+
+### Teto de uso para quem já está logado
+- O limite de tentativas cobria só a porta de entrada. Quem já estava dentro podia gravar
+  sem teto: um laço — por defeito num cliente, ou de propósito — encheria os 500 MB do banco
+  e o 1 GB do Storage do plano grátis, e o serviço pararia para todo mundo.
+- Agora cada pessoa tem dois baldes, contados no banco pelo limitador que já existia: **600
+  escritas** e **60 uploads** a cada 5 minutos. Muito acima de qualquer uso do app; leitura
+  nunca conta; a chave é o id da pessoa, não o IP. Entra como dependência dos routers, então
+  cobre também as rotas que nascerem depois.
+
+### "O que guardamos sobre você"
+- Configurações › Privacidade ganhou uma tela que diz, em texto corrido, o que fica
+  guardado, o que sai das fotos, quando a localização é usada, quem mais participa e como
+  apagar. Não é política de privacidade com valor jurídico: é a descrição do que o código
+  faz.
+- Tela de texto fica para trás do código. Por isso um teste confere a lista de serviços da
+  tela contra a política de segurança do site, que nomeia cada endereço que o app pode
+  chamar: endereço novo lá, sem o dono nomeado aqui, para a suíte.
+
+### Documentação: uma leitura de ponta a ponta contra o código
+- Todos os documentos foram conferidos com o código e 24 divergências foram corrigidas. As
+  que mais pesavam:
+  - `03-api-planejada.md` e o README não listavam `POST /auth/google`, `GET /me/places`,
+    `GET /me/days` nem os filtros de `GET /memories`, e diziam que o perfil traz "atividade
+    recente", que não existe;
+  - `02-modelagem.md` parava na migration 0010, dava `password_hash` como obrigatório e não
+    tinha `google_sub` nem as fases no diagrama;
+  - `11-convencoes.md` ainda descrevia a lista `_TABLES` escrita à mão e a suíte sem trava de
+    banco — as duas coisas mudaram em 14/11;
+  - o README mandava esperar **201** ao anexar uma foto (é 200), citava "dev build" (do
+    Expo) e descrevia o CI sem a paridade nem o `alembic check`;
+  - `08-design-system.md` dizia que "o backend não tem OAuth" e tinha uma frase cortada no
+    meio; `10-localizacao.md` ainda falava em "2 workers";
+  - `app_flutter/README.md` era o modelo do `flutter create`, que não dizia nada verdadeiro
+    sobre o app.
+
+### Testes e o que não foi conferido
+- Backend: 587 testes (eram 573). App: 627 (eram 597), sem contar os da cena do login, que
+  é trabalho de outra frente e ainda não entrou.
+- Um teste do gravador de percurso falhava de vez em quando: o encerramento em segundo
+  plano de um gravador descartado escapava para o servidor de mentira do teste seguinte. O
+  `tearDown` agora espera assentar.
+- **Não conferido no navegador:** a tela de espera da web, a abertura instantânea e a fila
+  de fotos foram verificadas só pelos testes. Um build web para conferir foi interrompido e
+  não foi refeito.
+- **Não conferido em uso real:** o envio de fotos em segundo plano num celular que suspende
+  o app.

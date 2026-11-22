@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.limits import limit_writes
 from app.models.user import User
 from app.schemas.track import (
     JourneyMapResponse,
@@ -27,7 +28,11 @@ from app.services.track_service import (
     TrackNotFoundError,
 )
 
-router = APIRouter(prefix="/journeys", tags=["tracks"])
+router = APIRouter(
+    prefix="/journeys", tags=["tracks"],
+    # Toda escrita deste router conta no teto de uso da pessoa (leitura não).
+    dependencies=[Depends(limit_writes)],
+)
 
 _not_found = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Jornada não encontrada.")
 _track_not_found = HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Percurso não encontrado.")

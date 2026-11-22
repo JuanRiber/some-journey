@@ -168,9 +168,9 @@ que ninguém perceba. Devolver um envelope em vez do array quebra o app inteiro
 de uma vez.
 
 **Estado real, para não prometer demais.** Só as duas coleções de topo paginam.
-`GET /journeys/{id}/memories` e `GET /journeys/{id}/tracks` devolvem a lista
-inteira, sem cursor — o docstring de `pagination.py` fala em "todas as rotas de
-lista", o que é a intenção, não o que está escrito hoje.
+`GET /journeys/{id}/memories`, `GET /journeys/{id}/tracks` e `GET /life-phases`
+devolvem a lista inteira, sem cursor — e o docstring de `pagination.py` já diz
+exatamente isso.
 
 ---
 
@@ -185,20 +185,22 @@ apontando para `some_journey_test`. Por isso todos os imports seguintes carregam
 `# noqa: E402`. Eles não estão fora de ordem por descuido; estão fora de ordem
 porque precisam estar.
 
-**Se errar.** Mover um import para o topo "para organizar" faz a suíte inteira
-rodar contra o banco de desenvolvimento — e o primeiro `TRUNCATE` apaga os dados
-reais. Não há aviso.
+**Se errar.** Mover um import para o topo "para organizar" faz o engine do app
+nascer apontando para o banco do `.env`: os testes passam a **gravar no banco de
+desenvolvimento**, enquanto o `TRUNCATE` da suíte continua indo para o banco de
+teste — o lixo fica e ninguém limpa. Não há aviso.
 
-**Segunda costura: `_TABLES` é uma lista mantida na mão.** Hoje ela nomeia sete
-tabelas (`journey_track_points`, `journey_tracks`, `journey_memories`,
-`memory_images`, `journeys`, `memories`, `users`) e o schema tem nove.
-`memory_music` e `password_reset_tokens` ficam de fora e só são limpas porque o
-`TRUNCATE ... CASCADE` alcança quem tem chave estrangeira para as listadas
-(`memory_music.memory_id → memories`, `password_reset_tokens.user_id → users`).
+**Segunda costura: a lista de tabelas sai do metadata, não da mão de ninguém.**
+`_tabelas_a_truncar` monta o `TRUNCATE` a partir de `Base.metadata.sorted_tables`,
+e `_assert_schema_coberto` interrompe a suíte — com o nome da tabela na mensagem
+— se o banco de teste e o metadata discordarem. Já foi uma lista escrita à mão
+(`_TABLES`), que nomeava sete de nove tabelas e só não vazava linha por sorte.
+A suíte também se recusa a derrubar tabelas num banco cujo nome não termine em
+`_test`.
 
-**Se errar.** Uma tabela nova que **não** tenha FK para esse conjunto não é
-truncada, e linhas vazam de um teste para o outro. O sintoma aparece longe da
-causa: um teste que passa sozinho e falha na suíte, ou pior, o contrário.
+**Se errar.** Um model novo que não seja registrado em `app/models/__init__.py`
+não entra no metadata: a tabela não é criada no banco de teste, e o erro aparece
+como "relação não existe" no primeiro teste que a usa.
 
 ---
 
@@ -220,7 +222,7 @@ funciona quando ela nunca foi exercitada.
 ## 10. O README não leva acento; `docs/` leva
 
 **Onde.** `README.md` — hoje o arquivo inteiro não tem **uma única letra
-acentuada**; os 48 caracteres não-ASCII dele são todos travessões (—). Os
+acentuada**; os caracteres não-ASCII dele são só travessões (—) e setas (→). Os
 documentos de `docs/`, incluindo este, usam acentuação normal.
 
 **Por quê.** É uma decisão antiga do arquivo, e manter é mais barato que
@@ -249,12 +251,15 @@ foram recuperados de lá.
 ## 12. Não existe formatador automático neste repositório
 
 **Onde (pela ausência).** O backend não tem `pyproject.toml`, nem configuração de
-ruff, flake8 ou black; `backend/requirements-dev.txt` traz só `pytest` e `httpx`.
-O app tem `analysis_options.yaml` com `flutter_lints`, e nada além disso. O
-`.github/workflows/ci.yml` roda `pytest`, o ciclo de migrations, `flutter analyze
---fatal-infos` e `flutter test` — **nenhum passo de formatação**.
+black ou flake8; o `backend/ruff.toml` liga só o que acusa DEFEITO (erro de
+sintaxe, nome que não existe, import sem uso), e nenhuma regra de estilo.
+`backend/requirements-dev.txt` traz `pytest`, `httpx`, `httpx2`, `pillow` (para os
+testes de imagem) e `ruff`. O app tem `analysis_options.yaml` com `flutter_lints`,
+e nada além disso. O `.github/workflows/ci.yml` roda o `ruff check`, a paridade
+com os clientes, `pytest`, o ciclo de migrations com `alembic check`, `flutter
+analyze --fatal-infos` e `flutter test` — **nenhum passo de formatação**.
 
-**Se errar.** Um `dart format` reescreve a maior parte dos 77 arquivos `.dart` do
+**Se errar.** Um `dart format` reescreve a maior parte dos arquivos `.dart` do
 app de uma vez. A mudança real desaparece dentro de um diff que ninguém
 consegue revisar, e o histórico perde a capacidade de responder "quando isto
 mudou?".

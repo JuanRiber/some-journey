@@ -15,12 +15,20 @@ header `Authorization: Bearer <token>`. ✅ = implementado · 🔜 = planejado.
   Em produção o cadastro é **fechado** por padrão (contas via `scripts/seed_users`).
 - ✅ `POST /auth/login` — `{email, password}` →
   `{access_token, token_type, expires_in, refresh_token}`
+- ✅ `POST /auth/google` — `{id_token}` → o mesmo corpo do login. Cria a conta na primeira
+  vez e vincula se o e-mail já existir. **503** sem `GOOGLE_CLIENT_ID` · **401** token
+  inválido, vencido, de outro cliente ou com e-mail não verificado · **403** conta inativa ·
+  **409** e-mail já ligado a outra conta Google.
 - ✅ `POST /auth/refresh` — `{refresh_token}` → o mesmo corpo do login, com um par novo. Não
   pede `Authorization`. O refresh token vale uma troca; qualquer falha é **401**.
 - ✅ `POST /auth/logout` — `{refresh_token}` → 204 sempre; encerra a sessão daquele aparelho.
 - ✅ `GET /auth/me` — usuário autenticado
 - ✅ `POST /auth/change-password` — troca a senha; os tokens emitidos antes deixam de valer e
   as sessões abertas são encerradas
+
+Toda rota que **grava** (POST, PATCH, PUT, DELETE fora de `/auth`) conta no teto de uso de
+quem está logado e pode responder **429** com `Retry-After`; os uploads (`/images`, `/cover`,
+`/avatar`) têm um teto próprio, menor. Leitura não conta.
 
 O **401 de sessão** (token ausente, vencido ou revogado) vem com `WWW-Authenticate: Bearer`,
 exposto no CORS. É por ele que o app distingue "renove e tente de novo" dos outros 401
@@ -36,7 +44,10 @@ exposto no CORS. É por ele que o app distingue "renove e tente de novo" dos out
 ## Memórias  (privadas)
 - ✅ `POST /memories` — cria ponto/memória solta; `life_phase_id` opcional
 - ✅ `GET /memories` — lista as do usuário (mais recentes primeiro), **paginação keyset**
-  (`?limit=&cursor=`); `?life_phase_id=` aplica a lente da fase (ver **Fases da vida**)
+  (`?limit=&cursor=`); `?life_phase_id=` aplica a lente da fase (ver **Fases da vida**).
+  `?city=`, `?country_code=`, `?has_images=true` e `?created_on=AAAA-MM-DD` recortam a
+  coleção (cada número do Perfil abre um); o cursor de uma página filtrada só vale com o
+  mesmo filtro.
 - ✅ `GET /memories/{id}` — busca uma
 - ✅ `PATCH /memories/{id}` — edição parcial (lat/long sempre juntas). Em `life_phase_id`,
   e só nele, `null` **solta** a memória da fase — um id não tem string vazia que o substitua
@@ -151,7 +162,9 @@ serve é um valor do corpo.
 Um **único** endpoint agregado, com as contagens em SQL — o cliente jamais baixa memórias
 para contá-las. Ver [`09-perfil.md`](09-perfil.md).
 
-- ✅ `GET /me/profile` — identidade, estatísticas, passaporte, jornada atual e atividade recente
+- ✅ `GET /me/profile` — identidade, estatísticas, passaporte, última aventura e jornada atual
+- ✅ `GET /me/places` — as cidades e os países da coleção, agrupados no banco
+- ✅ `GET /me/days` — os dias com registro, do mais recente ao mais antigo
 - ✅ `PATCH /me/profile` — edita `name`, `username` e `bio`
 - ✅ `POST /me/avatar` — envia o avatar (Supabase Storage)
 - ✅ `DELETE /me/avatar` — remove o avatar

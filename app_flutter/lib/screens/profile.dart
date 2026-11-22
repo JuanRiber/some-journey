@@ -48,6 +48,16 @@ const _meses = [
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
+  /// Busca o perfil ANTES de alguém pedir, para o primeiro toque no avatar já
+  /// abrir preenchido. Chamado quando as abas sobem (ver tabs.dart). Em
+  /// silêncio: se falhar, a tela busca de novo ao abrir, como sempre fez.
+  static Future<void> aquecer() async {
+    if (_perfilEmCache.valor != null) return;
+    try {
+      _perfilEmCache.valor = await Api.instance.getProfile();
+    } catch (_) {}
+  }
+
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }

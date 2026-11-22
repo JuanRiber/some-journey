@@ -7,6 +7,7 @@ import '../design/tokens.dart';
 import '../features/atlas/atlas_domain.dart';
 import '../features/phases/phase_widgets.dart';
 import '../features/places/place_domain.dart';
+import '../features/sync/seen.dart';
 import '../features/tracks/track_panel.dart';
 import '../features/tracks/track_recorder.dart';
 import '../models.dart';
@@ -41,18 +42,21 @@ String _diaCurto(String iso) {
 }
 
 class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
-  JourneyDetail? _journey;
+  /// Nasce com a última versão vista desta jornada nesta sessão (ver
+  /// features/sync/seen.dart): reabrir não passa pelo esqueleto.
+  late JourneyDetail? _journey = jornadasVistas[widget.journeyId];
   String _error = '';
   bool _busy = false;
 
   /// Mapa da jornada (percurso real + distância). Carregado à parte do detalhe
   /// porque só ele conhece os trechos de GPS.
-  JourneyMap? _map;
+  late JourneyMap? _map = percursosVistos[widget.journeyId]?.map;
 
   /// Trechos gravados. Vêm da listagem, não do mapa: o mapa traz a geometria
   /// para desenhar, a listagem traz a identidade de cada trecho — que é o que
   /// permite remover um sem tocar nos outros.
-  List<JourneyTrack> _tracks = const [];
+  late List<JourneyTrack> _tracks =
+      percursosVistos[widget.journeyId]?.tracks ?? const [];
   TrackRecorder? _recorder;
   bool _confirmDelete = false;
   List<JourneyPoint>? _loose; // pontos soltos para vincular (null = fechado)
@@ -65,10 +69,14 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
 
   /// Busca o percurso real. Falha aqui NÃO derruba a tela: a jornada continua
   /// legível sem o traço de GPS.
+  ///
+  /// As duas leituras saem JUNTAS: uma não depende da outra, e em fila a
+  /// segunda só começava quando a primeira voltava dos EUA.
   Future<void> _loadMap(String id) async {
     try {
-      final m = await Api.instance.journeyMap(id);
-      final t = await Api.instance.listTracks(id);
+      final (m, t) =
+          await (Api.instance.journeyMap(id), Api.instance.listTracks(id)).wait;
+      percursosVistos[id] = (map: m, tracks: t);
       if (mounted) {
         setState(() {
           _map = m;
@@ -116,6 +124,10 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
   }
 
   Future<void> _load() async {
+    // O percurso não espera a jornada: os três pedidos saem de uma vez, e a
+    // tela se completa na ordem em que eles voltam. Falha no percurso não é
+    // erro (ver _loadMap), então ele corre por fora deste try.
+    final percurso = _loadMap(widget.journeyId);
     try {
       final data = await Api.instance.getJourney(widget.journeyId);
       // Pausar ou finalizar a jornada PARA a gravação. Antes, o painel apenas
@@ -125,14 +137,24 @@ class _JourneyDetailScreenState extends State<JourneyDetailScreen> {
         await _recorder!.stop();
       }
       if (mounted) setState(() => _journey = data);
-      await _loadMap(widget.journeyId);
+      await percurso;
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
-      setState(() => _error = e.isNotFound ? 'Jornada não encontrada.' : e.message);
+      if (e.isNotFound) {
+        // Apagada noutro lugar: o que estava em mãos não vale mais.
+        jornadasVistas.remove(widget.journeyId);
+        percursosVistos.remove(widget.journeyId);
+        setState(() {
+          _journey = null;
+          _error = 'Jornada não encontrada.';
+        });
+        return;
+      }
+      setState(() => _error = e.message);
     }
   }
 

@@ -3,12 +3,14 @@ import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
 import '../features/photos/photo_picker.dart';
+import '../features/photos/photo_uploads.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../features/phases/phase_domain.dart';
 import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
+import '../features/sync/seen.dart';
 import '../models.dart';
 import '../widgets/common.dart';
 import '../widgets/date_field.dart';
@@ -60,30 +62,54 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
   void initState() {
     super.initState();
     PhaseStore.instance.refresh();
+    // Quem chega aqui acabou de ler esta memória no detalhe: o formulário
+    // abre com ela, e a releitura abaixo só confere.
+    final vista = memoriasVistas[widget.memoryId];
+    if (vista != null) _preencher(vista);
     _load();
+  }
+
+  /// O que o formulário mostrava quando foi preenchido pela última vez. É
+  /// contra isto que se decide o que a releitura pode atualizar.
+  Memory? _base;
+
+  /// Põe a memória no formulário SEM passar por cima do que a pessoa já
+  /// mexeu: cada campo só é atualizado se ainda estiver como veio. A
+  /// releitura chega meio segundo depois de a tela abrir — tempo de sobra
+  /// para alguém já ter começado a digitar.
+  void _preencher(Memory m) {
+    final b = _base;
+    if (b == null || _title.text == b.title) _title.text = m.title;
+    if (b == null || _text.text == b.text) _text.text = m.text;
+    if (b == null || _date == b.occurredAt.substring(0, 10)) {
+      _date = m.occurredAt.substring(0, 10);
+    }
+    if (b == null || (_lat == b.latitude && _lng == b.longitude)) {
+      _lat = m.latitude;
+      _lng = m.longitude;
+    }
+    if (b == null || _phaseId == b.lifePhaseId) _phaseId = m.lifePhaseId;
+    // As fotos gravadas e a fase gravada são fatos do servidor, não rascunho.
+    _saved = m.images;
+    _savedPhaseId = m.lifePhaseId;
+    _base = m;
+    _loaded = true;
   }
 
   Future<void> _load() async {
     try {
       final m = await Api.instance.getMemory(widget.memoryId);
       if (!mounted) return;
-      setState(() {
-        _title.text = m.title;
-        _text.text = m.text;
-        _date = m.occurredAt.substring(0, 10);
-        _lat = m.latitude;
-        _lng = m.longitude;
-        _saved = m.images;
-        _savedPhaseId = m.lifePhaseId;
-        _phaseId = m.lifePhaseId;
-        _loaded = true;
-      });
+      setState(() => _preencher(m));
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
+      // Com o formulário já aberto, não conseguir RELER não tira a tela de
+      // quem está editando — salvo se a memória deixou de existir.
+      if (_loaded && !e.isNotFound) return;
       setState(() => _loadError = e.isNotFound ? 'Memória não encontrada.' : e.message);
     }
   }
@@ -121,11 +147,18 @@ class _MemoryEditScreenState extends State<MemoryEditScreen> {
         'occurred_at': '${_date}T12:00:00Z',
         ...phaseLinkPatch(_savedPhaseId, _phaseId),
       });
+      // O texto já está salvo. As fotos novas sobem por fora, em fila, e a
+      // tela não espera por elas (ver features/photos/photo_uploads.dart).
+      final fotos = <FotoPendente>[];
       for (final p in _picks) {
-        final bytes = await p.readAsBytes();
-        await Api.instance
-            .addMemoryImage(widget.memoryId, bytes, p.name, p.mimeType ?? 'image/jpeg');
+        fotos.add(FotoPendente(
+          memoryId: widget.memoryId,
+          bytes: await p.readAsBytes(),
+          name: p.name,
+          mimeType: p.mimeType ?? 'image/jpeg',
+        ));
       }
+      PhotoUploads.instance.enqueue(fotos);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on ApiError catch (e) {

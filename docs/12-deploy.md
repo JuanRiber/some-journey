@@ -201,6 +201,19 @@ curl -sI https://some-journey-atlas.pages.dev/ | grep -iE "content-security|stri
 > recuperação de senha, com o token dentro — ele nunca pode apontar para um site que não é o seu.
 > Só o host muda; o `/#/reset-password` do fim é a rota do app que abre a tela de nova senha.
 
+## O que roda sozinho no GitHub
+
+Além do CI e do deploy web, há duas coisas semanais (segunda-feira):
+
+- **Dependabot** (`.github/dependabot.yml`) abre pull requests com atualizações do backend,
+  do app e das actions. Nada é mesclado sozinho: o CI roda no PR e quem decide é você.
+- **Auditoria de dependências** (`.github/workflows/audit.yml`) confere o
+  `backend/requirements.txt` contra as vulnerabilidades conhecidas. Fica fora do CI de
+  propósito: uma vulnerabilidade nova aparece sem que nada mude no repositório, e dentro do
+  CI ela seguraria o deploy de um commit que não tem nada a ver com ela. Ela também roda
+  quando o `requirements.txt` muda — e aí, sim, um vermelho dela segura o deploy da API
+  daquele commit (ver o aviso sobre `checksPass` no fim do passo 2).
+
 ## 4. UptimeRobot — manter acordado
 
 Em <https://uptimerobot.com> (plano free): **New monitor → HTTP(s)**, URL

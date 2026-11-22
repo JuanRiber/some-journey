@@ -3,6 +3,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../api.dart';
 import '../features/photos/photo_picker.dart';
+import '../features/photos/photo_uploads.dart';
 import '../design/components.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
@@ -100,13 +101,9 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
         final mem = await Api.instance.createMemory(payload);
         memId = mem.id;
       }
-      if (memId != null) {
-        for (final p in _picks) {
-          final bytes = await p.readAsBytes();
-          await Api.instance
-              .addMemoryImage(memId, bytes, p.name, p.mimeType ?? 'image/jpeg');
-        }
-      }
+      // A memória já está salva. As fotos sobem por fora, em fila, e a tela
+      // não espera por elas (ver features/photos/photo_uploads.dart).
+      if (memId != null) await _enfileirarFotos(memId);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on ApiError catch (e) {
@@ -120,6 +117,21 @@ class _MemoryNewScreenState extends State<MemoryNewScreen> {
         _loading = false;
       });
     }
+  }
+
+  /// Lê os bytes das fotos escolhidas (é rápido: já estão no aparelho) e as
+  /// entrega à fila de envio.
+  Future<void> _enfileirarFotos(String memoryId) async {
+    final fotos = <FotoPendente>[];
+    for (final p in _picks) {
+      fotos.add(FotoPendente(
+        memoryId: memoryId,
+        bytes: await p.readAsBytes(),
+        name: p.name,
+        mimeType: p.mimeType ?? 'image/jpeg',
+      ));
+    }
+    PhotoUploads.instance.enqueue(fotos);
   }
 
   @override

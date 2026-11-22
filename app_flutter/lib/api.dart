@@ -15,7 +15,9 @@ import 'package:http_parser/http_parser.dart' show MediaType;
 import 'features/auth/token_store.dart';
 import 'features/collection/collection_domain.dart';
 import 'features/phases/phase_domain.dart';
+import 'features/photos/photo_uploads.dart';
 import 'features/profile/profile_models.dart';
+import 'features/sync/seen.dart';
 import 'features/tracks/track_outbox.dart';
 import 'models.dart';
 
@@ -533,6 +535,7 @@ class Api {
     final refresh = _refreshToken;
     await _saveSession(null);
     await PrefsTrackOutbox.clearAll();
+    PhotoUploads.instance.clear();
     if (refresh != null) unawaited(_encerrarNoServidor(refresh));
   }
 
@@ -570,6 +573,7 @@ class Api {
     );
     await _saveSession(null);
     await PrefsTrackOutbox.clearAll();
+    PhotoUploads.instance.clear();
   }
 
   /// Pede o link de recuperação de senha. O backend responde SEMPRE 202 com a
@@ -644,20 +648,34 @@ class Api {
   /// [filter] é o recorte que um número do Perfil abre: a cidade, o país, só
   /// as que têm foto, as registradas num dia. Vale a mesma regra do cursor.
   Future<Page<Memory>> listMemories(
-          {int? limit, String? cursor, String? phaseId, MemoryFilter? filter}) =>
-      _page('/memories', Memory.fromJson,
-          limit: limit, cursor: cursor, phaseId: phaseId, filter: filter);
+      {int? limit, String? cursor, String? phaseId, MemoryFilter? filter}) async {
+    final pagina = await _page('/memories', Memory.fromJson,
+        limit: limit, cursor: cursor, phaseId: phaseId, filter: filter);
+    // A lista traz cada memória INTEIRA: o detalhe abre com ela, sem esperar.
+    pagina.items.forEach(_viu);
+    return pagina;
+  }
+
+  /// Guarda a memória como "já vista" (ver features/sync/seen.dart) e a
+  /// devolve — toda resposta que traz uma memória inteira passa por aqui.
+  Memory _viu(Memory m) {
+    memoriasVistas[m.id] = m;
+    return m;
+  }
 
   Future<Memory> getMemory(String id) async =>
-      Memory.fromJson(await _request('GET', '/memories/$id', authed: true));
+      _viu(Memory.fromJson(await _request('GET', '/memories/$id', authed: true)));
 
-  Future<Memory> createMemory(Map<String, dynamic> payload) async =>
-      Memory.fromJson(await _request('POST', '/memories', body: payload, authed: true));
+  Future<Memory> createMemory(Map<String, dynamic> payload) async => _viu(
+      Memory.fromJson(await _request('POST', '/memories', body: payload, authed: true)));
 
-  Future<Memory> updateMemory(String id, Map<String, dynamic> patch) async =>
-      Memory.fromJson(await _request('PATCH', '/memories/$id', body: patch, authed: true));
+  Future<Memory> updateMemory(String id, Map<String, dynamic> patch) async => _viu(
+      Memory.fromJson(await _request('PATCH', '/memories/$id', body: patch, authed: true)));
 
-  Future<void> deleteMemory(String id) => _request('DELETE', '/memories/$id', authed: true);
+  Future<void> deleteMemory(String id) async {
+    await _request('DELETE', '/memories/$id', authed: true);
+    memoriasVistas.remove(id);
+  }
 
   /// Anexa uma foto à memória. A rota devolve a memória inteira, mas o corpo é
   /// descartado de propósito: quem chama está num laço de várias fotos
@@ -731,12 +749,12 @@ class Api {
   /// O corpo é o snapshot que veio do catálogo — a API não consulta provedor
   /// nenhum. 409 quando a faixa já está na memória ou o teto de 5 foi atingido.
   Future<Memory> addMemoryMusic(String memoryId, Map<String, dynamic> track) async =>
-      Memory.fromJson(await _request('POST', '/memories/$memoryId/music',
-          body: track, authed: true));
+      _viu(Memory.fromJson(await _request('POST', '/memories/$memoryId/music',
+          body: track, authed: true)));
 
   Future<Memory> removeMemoryMusic(String memoryId, String musicId) async =>
-      Memory.fromJson(await _request(
-          'DELETE', '/memories/$memoryId/music/$musicId', authed: true));
+      _viu(Memory.fromJson(await _request(
+          'DELETE', '/memories/$memoryId/music/$musicId', authed: true)));
 
   // ---- Percurso real (GPS) ----
 
@@ -794,8 +812,14 @@ class Api {
       _page('/journeys', Journey.fromJson,
           limit: limit, cursor: cursor, phaseId: phaseId);
 
-  Future<JourneyDetail> getJourney(String id) async =>
-      JourneyDetail.fromJson(await _request('GET', '/journeys/$id', authed: true));
+  Future<JourneyDetail> getJourney(String id) async => _viuJornada(
+      JourneyDetail.fromJson(await _request('GET', '/journeys/$id', authed: true)));
+
+  /// Guarda a jornada completa como "já vista" e a devolve.
+  JourneyDetail _viuJornada(JourneyDetail j) {
+    jornadasVistas[j.id] = j;
+    return j;
+  }
 
   Future<Journey> createJourney(Map<String, dynamic> payload) async =>
       Journey.fromJson(await _request('POST', '/journeys', body: payload, authed: true));
@@ -827,7 +851,11 @@ class Api {
   Future<Journey> removeJourneyCover(String id) async =>
       Journey.fromJson(await _request('DELETE', '/journeys/$id/cover', authed: true));
 
-  Future<void> deleteJourney(String id) => _request('DELETE', '/journeys/$id', authed: true);
+  Future<void> deleteJourney(String id) async {
+    await _request('DELETE', '/journeys/$id', authed: true);
+    jornadasVistas.remove(id);
+    percursosVistos.remove(id);
+  }
 
   Future<Journey> _lifecycle(String id, String action) async =>
       Journey.fromJson(await _request('POST', '/journeys/$id/$action', authed: true));
@@ -837,19 +865,21 @@ class Api {
   Future<Journey> resumeJourney(String id) => _lifecycle(id, 'resume');
   Future<Journey> finishJourney(String id) => _lifecycle(id, 'finish');
 
-  Future<JourneyDetail> addJourneyPoint(String id, String memoryId) async => JourneyDetail.fromJson(
-      await _request('POST', '/journeys/$id/points', body: {'memory_id': memoryId}, authed: true));
+  Future<JourneyDetail> addJourneyPoint(String id, String memoryId) async =>
+      _viuJornada(JourneyDetail.fromJson(await _request(
+          'POST', '/journeys/$id/points', body: {'memory_id': memoryId}, authed: true)));
 
   Future<JourneyDetail> createMemoryInJourney(String id, Map<String, dynamic> payload) async =>
-      JourneyDetail.fromJson(
-          await _request('POST', '/journeys/$id/memories', body: payload, authed: true));
+      _viuJornada(JourneyDetail.fromJson(
+          await _request('POST', '/journeys/$id/memories', body: payload, authed: true)));
 
   Future<void> unlinkJourneyPoint(String id, String memoryId) =>
       _request('DELETE', '/journeys/$id/points/$memoryId', authed: true);
 
   Future<JourneyDetail> reorderJourneyPoints(String id, List<String> memoryIds) async =>
-      JourneyDetail.fromJson(await _request('PATCH', '/journeys/$id/points/reorder',
-          body: {'memory_ids': memoryIds}, authed: true));
+      _viuJornada(JourneyDetail.fromJson(await _request(
+          'PATCH', '/journeys/$id/points/reorder',
+          body: {'memory_ids': memoryIds}, authed: true)));
 
   // ---- Mapa ----
   /// O atlas inteiro ou, com [phaseId], a lente de uma fase: pins soltos

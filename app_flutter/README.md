@@ -1,17 +1,24 @@
-# some_journey
+# Some Journey — app Flutter
 
-A new Flutter project.
+O único cliente do Some Journey: o mesmo código para celular e web.
 
-## Getting Started
+- **Versões:** Dart `^3.10.9`; o CI usa Flutter `3.38.10`.
+- **Onde estão as coisas:** `lib/api.dart` é o único lugar que fala com a API;
+  `lib/screens/` tem as telas; `lib/features/*/` guarda a lógica de cada assunto
+  (o que é regra fica em Dart puro, sem Flutter, e é testado); `lib/design/` é o
+  design system — tokens, tema e componentes.
+- **Rodar:**
 
-This project is a starting point for a Flutter application.
+  ```bash
+  flutter pub get
+  flutter run --dart-define=API_URL=http://127.0.0.1:8000
+  ```
 
-A few resources to get you started if this is your first Flutter project:
+- **Antes de enviar:** `flutter analyze --fatal-infos` e `flutter test`. O
+  repositório **não** é formatado com `dart format` — não rode.
+- **Build web:** `flutter build web --no-web-resources-cdn` (o motivo do flag
+  está no README da raiz). Os cabeçalhos de segurança do site ficam em
+  `web/_headers`.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Setup completo, entrar com Google, deploy e convenções: no
+[README da raiz](../README.md) e em [`docs/`](../docs/).

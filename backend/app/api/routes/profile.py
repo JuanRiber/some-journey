@@ -13,12 +13,17 @@ from app.core import storage
 from app.core.config import settings
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.limits import limit_uploads, limit_writes
 from app.domain.username import InvalidUsernameError
 from app.models.user import User
 from app.schemas.profile import DayEntry, PlacesRead, ProfileRead, ProfileUpdate
 from app.services import profile_service
 
-router = APIRouter(prefix="/me", tags=["profile"])
+router = APIRouter(
+    prefix="/me", tags=["profile"],
+    # Toda escrita deste router conta no teto de uso da pessoa (leitura não).
+    dependencies=[Depends(limit_writes)],
+)
 
 
 @router.get("/profile", response_model=ProfileRead)
@@ -73,7 +78,9 @@ def update_profile(
         )
 
 
-@router.post("/avatar", response_model=ProfileRead)
+@router.post(
+    "/avatar", response_model=ProfileRead, dependencies=[Depends(limit_uploads)]
+)
 def set_avatar(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),

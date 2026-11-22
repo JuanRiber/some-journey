@@ -9,6 +9,7 @@ import '../design/tokens.dart';
 import '../features/phases/phase_domain.dart';
 import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
+import '../features/sync/seen.dart';
 import '../models.dart';
 import '../widgets/sj_image.dart';
 
@@ -102,10 +103,28 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
       c.addListener(_onChanged);
     }
     PhaseStore.instance.refresh();
+    // Quem chega aqui acabou de ler esta jornada no detalhe: o formulário
+    // abre com ela, e a releitura abaixo só confere.
+    final vista = jornadasVistas[widget.journeyId];
+    if (vista != null) _preencher(vista);
     _load();
   }
 
   void _onChanged() => setState(() {});
+
+  /// Põe a jornada no formulário SEM passar por cima do que a pessoa já
+  /// mexeu: cada campo só é atualizado se ainda estiver como veio.
+  void _preencher(Journey j) {
+    final o = _original;
+    if (o == null || _title.text == o.title) _title.text = j.title;
+    if (o == null || _description.text == (o.description ?? '')) {
+      _description.text = j.description ?? '';
+    }
+    if (o == null || _mood.text == (o.mood ?? '')) _mood.text = j.mood ?? '';
+    if (o == null || _isPrivate == o.isPrivate) _isPrivate = j.isPrivate;
+    if (o == null || _phaseId == o.lifePhaseId) _phaseId = j.lifePhaseId;
+    _original = j;
+  }
 
   /// O botão só acende quando há o que salvar — assim ele responde a uma
   /// pergunta ("mudei alguma coisa?") em vez de convidar a um toque inútil.
@@ -133,20 +152,16 @@ class _JourneyEditScreenState extends State<JourneyEditScreen> {
     try {
       final j = await Api.instance.getJourney(widget.journeyId);
       if (!mounted) return;
-      setState(() {
-        _original = j;
-        _title.text = j.title;
-        _description.text = j.description ?? '';
-        _mood.text = j.mood ?? '';
-        _isPrivate = j.isPrivate;
-        _phaseId = j.lifePhaseId;
-      });
+      setState(() => _preencher(j));
     } on ApiError catch (e) {
       if (!mounted) return;
       if (e.isUnauthorized) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
         return;
       }
+      // Com o formulário já aberto, não conseguir RELER não tira a tela de
+      // quem está editando — salvo se a jornada deixou de existir.
+      if (_original != null && !e.isNotFound) return;
       setState(() => _loadError =
           e.isNotFound ? 'Jornada não encontrada.' : e.message);
     }

@@ -12,3 +12,6 @@ httpx2==2.16.0
 # metadados não muda nenhum pixel. Só de teste — o servidor não decodifica
 # imagem (app/core/image_metadata.py trabalha nos bytes do arquivo).
 pillow==13.0.0
+# Lint: só defeito (erro de sintaxe, nome que não existe, import sem uso). A
+# configuração está em ruff.toml; não há regra de estilo nem formatador.
+ruff==0.17.6

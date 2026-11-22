@@ -1,0 +1,16 @@
+# Lint do backend — SÓ o que acusa defeito.
+#
+# Nenhuma regra de estilo de propósito: o projeto não tem formatador (ver
+# docs/11-convencoes.md), e ligar regras de forma aqui reescreveria o
+# repositório inteiro num diff que ninguém consegue revisar.
+#
+#   E9  erro de sintaxe e de indentação
+#   F   pyflakes: nome que não existe, import e variável sem uso, redefinição
+#
+# O bugbear (B) fica de fora: aqui ele só acusa dois padrões que são o jeito
+# certo de escrever em FastAPI — `Depends(...)` como valor padrão (B008) e
+# `raise HTTPException` dentro de `except` sem `from` (B904).
+target-version = "py312"
+
+[lint]
+select = ["E9", "F"]

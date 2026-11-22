@@ -32,6 +32,7 @@ from app.core.pagination import (
 )
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.limits import limit_uploads, limit_writes
 from app.models.user import User
 from app.repositories.memory_repository import MemoryFilter
 from app.schemas.memory import (
@@ -56,7 +57,11 @@ from app.services.memory_service import (
     TooManyTracksError,
 )
 
-router = APIRouter(prefix="/memories", tags=["memories"])
+router = APIRouter(
+    prefix="/memories", tags=["memories"],
+    # Toda escrita deste router conta no teto de uso da pessoa (leitura não).
+    dependencies=[Depends(limit_writes)],
+)
 
 _not_found = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND,
@@ -193,7 +198,11 @@ def delete_memory(
         raise _not_found
 
 
-@router.post("/{memory_id}/images", response_model=MemoryRead)
+@router.post(
+    "/{memory_id}/images",
+    response_model=MemoryRead,
+    dependencies=[Depends(limit_uploads)],
+)
 def add_memory_image(
     memory_id: uuid.UUID,
     file: UploadFile = File(...),

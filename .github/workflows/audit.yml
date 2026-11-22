@@ -1,0 +1,43 @@
+# Auditoria das dependências do backend contra os bancos de vulnerabilidades
+# conhecidas (PyPI Advisory / OSV).
+#
+# Fica FORA do CI de propósito. Uma vulnerabilidade nova é publicada sem que
+# nada mude no repositório: dentro do CI ela reprovaria um commit que não tem
+# nada a ver com ela e, pior, seguraria o deploy — inclusive o da correção de
+# outra coisa. Aqui ela aparece como um workflow vermelho próprio, uma vez por
+# semana e a cada mudança nas dependências, sem travar ninguém.
+#
+# Para rodar na máquina: `pip install pip-audit && pip-audit -r requirements.txt`
+# (a partir de backend/).
+name: Auditoria de dependências
+
+on:
+  schedule:
+    # Segunda-feira, 09:00 UTC — junto com os PRs do Dependabot.
+    - cron: '0 9 * * 1'
+  push:
+    branches: [main]
+    paths:
+      - backend/requirements.txt
+      - .github/workflows/audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pip-audit:
+    name: Backend (pip-audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Auditar requirements.txt
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt

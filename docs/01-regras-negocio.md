@@ -32,6 +32,10 @@
   Um e-mail já ligado a outra conta Google **não troca de dono** (409). **(impl.)**
 - Conta que só entra pelo Google não tem senha para trocar; o caminho é "Esqueci minha
   senha". **(impl.)**
+- **Quem está logado também tem teto**: no máximo 600 escritas e 60 uploads a cada 5
+  minutos, por pessoa. É muito acima de qualquer uso do app (uma gravação de percurso faz
+  umas 15 escritas nesse tempo) e existe para um laço não encher o banco e o Storage. Leitura
+  nunca conta. Passou do teto, **429** com o tempo de espera. **(impl.)**
 - **A pessoa pode excluir a própria conta**, e com ela tudo o que guardou: memórias, fotos,
   músicas, jornadas, percursos, fases, perfil. É na hora e não tem volta — não fica cópia. A
   confirmação é dupla e nenhuma das duas é a sessão: o e-mail digitado e, se a conta tem

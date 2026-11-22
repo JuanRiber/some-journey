@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     # estourá-lo trava a conta para todo mundo, inclusive para a dona.
     AUTH_RATE_LIMIT_EMAIL_ATTEMPTS: int = Field(default=20, gt=0, le=1000)
 
+    # --- Teto de uso por pessoa (quem já está logado) ---
+    # Escritas e uploads de CADA pessoa, na mesma janela, contados no banco
+    # (app/dependencies/limits.py). Existem para um laço — por defeito ou de
+    # propósito — não encher o banco e o Storage do plano grátis. São folgados:
+    # ninguém usando o app chega perto.
+    USAGE_RATE_LIMIT_WINDOW_SECONDS: int = Field(default=300, ge=30, le=3600)
+    WRITE_RATE_LIMIT_ATTEMPTS: int = Field(default=600, gt=0, le=100000)
+    UPLOAD_RATE_LIMIT_ATTEMPTS: int = Field(default=60, gt=0, le=10000)
+
     # --- Expurgo do que foi apagado ---
     # Memória, jornada, trecho e fase são apagados "de leve" (deleted_at): a
     # linha some das consultas e fica no banco, para um toque errado ter volta.

@@ -125,7 +125,14 @@ void main() {
     anterior = Api.instance.swapClient(server.client);
     Api.instance.debugSetToken('token-de-teste');
   });
-  tearDown(() => Api.instance.swapClient(anterior));
+  tearDown(() async {
+    // Um gravador descartado encerra o trecho em segundo plano (sobe o que
+    // faltava e fecha). Sem esperar isso assentar, a chamada escapava para o
+    // servidor de mentira do teste SEGUINTE e aparecia lá como um "finish" a
+    // mais — uma falha que ia e vinha conforme a ordem e a pressa da máquina.
+    await Future<void>.delayed(const Duration(milliseconds: 40));
+    Api.instance.swapClient(anterior);
+  });
 
   TrackRecorder criar(FakeLocation gps, {int flushEvery = 3}) => TrackRecorder(
         journeyId: 'j1',

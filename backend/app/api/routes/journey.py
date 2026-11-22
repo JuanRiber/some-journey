@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.core.pagination import NEXT_CURSOR_HEADER, CursorError
 from app.db.session import get_db
 from app.dependencies.auth import get_current_user
+from app.dependencies.limits import limit_uploads, limit_writes
 from app.models.user import User
 from app.schemas.journey import (
     JourneyCreate,
@@ -50,7 +51,11 @@ from app.services.journey_service import (
     MemoryAlreadyInJourneyError,
 )
 
-router = APIRouter(prefix="/journeys", tags=["journeys"])
+router = APIRouter(
+    prefix="/journeys", tags=["journeys"],
+    # Toda escrita deste router conta no teto de uso da pessoa (leitura não).
+    dependencies=[Depends(limit_writes)],
+)
 
 _not_found = HTTPException(
     status_code=status.HTTP_404_NOT_FOUND,
@@ -323,7 +328,11 @@ def reorder_journey_points(
         )
 
 
-@router.post("/{journey_id}/cover", response_model=JourneyRead)
+@router.post(
+    "/{journey_id}/cover",
+    response_model=JourneyRead,
+    dependencies=[Depends(limit_uploads)],
+)
 def set_journey_cover(
     journey_id: uuid.UUID,
     file: UploadFile = File(...),

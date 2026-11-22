@@ -13,15 +13,15 @@ dependencies:
 
   # Grafemas (iniciais do avatar sem cortar acento/emoji ao meio). Já vem na
   # árvore do Flutter; declarado por ser usado diretamente.
-  characters: ^1.4.0
+  characters: ^1.4.1
   cupertino_icons: ^1.0.8
   http: ^1.2.2
   http_parser: ^4.0.2
-  shared_preferences: ^2.3.2
-  flutter_map: ^7.0.2
-  latlong2: ^0.9.1
-  image_picker: ^1.1.2
-  geolocator: ^14.0.3
+  shared_preferences: ^2.5.6
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  image_picker: ^1.2.4
+  geolocator: ^14.1.2
   google_sign_in: ^7.2.0
   google_sign_in_web: ^1.1.3
   flutter_secure_storage: ^11.2.0

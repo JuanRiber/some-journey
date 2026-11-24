@@ -205,8 +205,10 @@ curl -sI https://some-journey-atlas.pages.dev/ | grep -iE "content-security|stri
 
 Além do CI e do deploy web, há duas coisas semanais (segunda-feira):
 
-- **Dependabot** (`.github/dependabot.yml`) abre pull requests com atualizações do backend,
-  do app e das actions. Nada é mesclado sozinho: o CI roda no PR e quem decide é você.
+- **Dependabot** (`.github/dependabot.yml`) abre pull requests com atualizações do backend
+  e das actions. As do **app estão pausadas**: o Flutter é fixado no CI, e o Dependabot
+  propõe pacotes que o Dart fixado não instala (o motivo e como religar estão no próprio
+  arquivo). Nada é mesclado sozinho: o CI roda no PR e quem decide é você.
 - **Auditoria de dependências** (`.github/workflows/audit.yml`) confere o
   `backend/requirements.txt` contra as vulnerabilidades conhecidas. Fica fora do CI de
   propósito: uma vulnerabilidade nova aparece sem que nada mude no repositório, e dentro do

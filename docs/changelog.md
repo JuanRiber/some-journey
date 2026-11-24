@@ -1169,6 +1169,10 @@ resposta inteira em dois deles.
   3.10.9. O Dependabot resolve as versões com o Dart mais novo e propõe o que o CI não
   instala — e um pacote assim dentro do grupo derruba as atualizações boas que vinham junto.
 - `.github/dependabot.yml` ganhou a lista do que fica de fora, com o motivo de cada linha.
+- A lista não bastou. Na rodada seguinte o grupo do app voltou com outro pacote que pede
+  Dart 3.11 (`shared_preferences` 2.5.6) e falhou de novo: excluir pacote por pacote é
+  correr atrás. As atualizações de versão do **app ficam pausadas** até o Flutter fixado
+  subir; as do backend e das actions seguem, e as correções de segurança também.
 
 ### Como foi conferido
 - As 14 bibliotecas do backend mais o `tzfpy` 2.1.2, juntas, num ambiente separado e com a

@@ -8,7 +8,7 @@ shapely==2.2.0
 tzfpy==2.1.2
 psycopg[binary]==3.3.9
 httpx==0.28.1
-pydantic==2.14.3
+pydantic==2.14.4
 pydantic-settings==2.16.3
 email-validator==2.4.0
 python-dotenv==1.2.4

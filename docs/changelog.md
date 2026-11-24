@@ -1146,3 +1146,37 @@ lugar melhor para ficar.
   não foi refeito.
 - **Não conferido em uso real:** o envio de fotos em segundo plano num celular que suspende
   o app.
+
+## 2026-11-24
+
+### Os primeiros pull requests do Dependabot, lidos um a um
+Seis PRs abertos na primeira rodada. O CI de quatro passou — e CI verde não era a
+resposta inteira em dois deles.
+
+- **Bibliotecas do backend (14, entre elas `pwdlib` 0.3 → 0.4.2).** A suíte passa, e ainda
+  assim a atualização mudaria o comportamento do login: até a 0.3 um hash argon2 truncado
+  devolvia `False`; a partir da 0.4.1 ele levanta uma exceção nova
+  (`HashVerificationError`). O nosso `verify_password` pegava só a antiga
+  (`UnknownHashError`), então uma conta com o hash corrompido passaria a responder **500**
+  no login em vez de "e-mail ou senha incorretos". Nenhum teste cobria. O `except` agora
+  pega a classe-base da biblioteca — qualquer recusa ao conferir é, para quem está
+  entrando, a mesma coisa — e 12 testes novos seguram os casos nas duas versões.
+- **`flutter_map` 7 → 8.** Passa no analyze e nos testes e **quebra o mapa**: visto no
+  navegador, o atlas desenha pinos e rastros sobre um fundo vazio, sem telha nenhuma, com um
+  erro não tratado no console. A versão 7, no mesmo ambiente, mostra o mapa. Fica de fora
+  até alguém fazer a migração de propósito.
+- **`image_picker` 1.2.4 e `cupertino_icons` 2.0** pedem Dart 3.11 e 3.12; o projeto fixa o
+  3.10.9. O Dependabot resolve as versões com o Dart mais novo e propõe o que o CI não
+  instala — e um pacote assim dentro do grupo derruba as atualizações boas que vinham junto.
+- `.github/dependabot.yml` ganhou a lista do que fica de fora, com o motivo de cada linha.
+
+### Como foi conferido
+- As 14 bibliotecas do backend mais o `tzfpy` 2.1.2, juntas, num ambiente separado e com a
+  correção do `verify_password`: a suíte inteira passou e a auditoria ficou limpa. O `tzfpy`
+  2 mantém a API e os resultados, e usa menos memória.
+- O `flutter_map` 8 foi construído a partir do próprio PR e aberto no navegador contra a API
+  local.
+- **Não conferido:** as actions novas no workflow de deploy web (`checkout` v7,
+  `wrangler-action` v4) — o CI do PR não exercita esse workflow. Pelas notas de versão, o
+  bloqueio novo do `checkout` v7 vale para PR de fork, que não é o nosso caso.
+- Backend: 599 testes (eram 587).

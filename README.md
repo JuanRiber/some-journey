@@ -51,7 +51,7 @@ some-journey/
 |   |   `-- services/          # regras de negocio (inclui geocoding)
 |   |-- alembic/               # migrations versionadas (0001..0019)
 |   |-- scripts/               # seed_users, reset_password, backfill_geocoding, purge_deleted, strip_photo_metadata, check_database, check_client_parity, with_production_env.sh, start.sh
-|   |-- tests/                 # pytest (587 testes)
+|   |-- tests/                 # pytest (599 testes)
 |   |-- Dockerfile
 |   |-- requirements.txt
 |   `-- requirements-dev.txt
@@ -430,7 +430,7 @@ SQL — o cliente nunca baixa memorias para conta-las. Bearer token.
 - [x] Migracoes versionadas (Alembic, 0001..0019)
 - [x] Musica da memoria de ponta a ponta — busca no iTunes, ate 5 faixas por memoria e contagem no Perfil
 - [x] Fases da vida de ponta a ponta — criar e editar no app, marcar memorias e jornadas, e reler a timeline e o atlas por fase
-- [x] Testes automatizados — 587 no backend (pytest) e 627 no app (flutter test)
+- [x] Testes automatizados — 599 no backend (pytest) e 627 no app (flutter test)
 - [x] Integracao continua no GitHub Actions (testes, analyze e migrations)
 - [x] Mapa interativo do atlas no app Flutter, consumindo `/map`
 - [ ] Tracking em segundo plano (exige permissao de localizacao em segundo plano)

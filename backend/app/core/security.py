@@ -33,7 +33,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt
 from pwdlib import PasswordHash
-from pwdlib.exceptions import UnknownHashError
+from pwdlib.exceptions import PwdlibError
 
 from app.core.config import settings
 
@@ -71,15 +71,23 @@ def verify_password(password: str, password_hash: str) -> bool:
     e-mail — a mensagem genérica de credencial inválida é decidida no
     auth_service (para não dar pistas a quem enumera contas).
 
-    UnknownHashError: se o hash gravado estiver corrompido/em formato
-    desconhecido (ex.: linha legada ou adulterada), a pwdlib levanta exceção.
+    Hash gravado que não dá para conferir (corrompido, truncado, em formato
+    desconhecido — uma linha legada ou adulterada): a pwdlib levanta exceção.
     Tratamos como falha de credencial (return False) em vez de deixar estourar
     um 500 no login — o resultado externo continua sendo "credencial inválida",
     sem revelar o motivo. Não logamos nada (senha e hash são sensíveis).
+
+    O `except` pega a classe-BASE da pwdlib, e não uma exceção específica, de
+    propósito. Até a 0.3 um hash argon2 truncado devolvia False e só o formato
+    desconhecido levantava `UnknownHashError`; a partir da 0.4.1 o truncado
+    passou a levantar `HashVerificationError`. Pegar só a primeira deixaria o
+    login de uma conta com hash corrompido responder 500 depois de uma simples
+    atualização de dependência. Qualquer recusa da biblioteca ao CONFERIR é,
+    para quem está entrando, a mesma coisa: não entrou.
     """
     try:
         return _password_hash.verify(password, password_hash)
-    except UnknownHashError:
+    except PwdlibError:
         return False
 
 

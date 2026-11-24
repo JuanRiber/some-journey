@@ -30,6 +30,27 @@ updates:
     groups:
       app:
         update-types: [minor, patch]
+    # O app é construído com o Flutter fixado no CI (3.38.10, Dart 3.10.9 — ver
+    # docs/11-convencoes.md). O Dependabot resolve as versões com o Dart mais
+    # novo e propõe pacotes que esse Dart não instala: o `pub get` do CI falha
+    # e o PR nunca passa. Pior quando o pacote está no GRUPO — um só derruba as
+    # atualizações boas que vinham junto (foi o que aconteceu no primeiro PR:
+    # image_picker 1.2.4 pede Dart 3.11).
+    #
+    # Cada linha daqui é um pacote que já pede Dart mais novo que o do projeto.
+    # Quando o Flutter fixado subir, esta lista sai inteira.
+    ignore:
+      - dependency-name: image_picker
+        versions: [">=1.2.4"]
+      - dependency-name: cupertino_icons
+        versions: [">=2.0.0"]
+      # flutter_map 8 passa no analyze e nos testes e QUEBRA o mapa: visto no
+      # navegador em 24/11/2026, o atlas desenha pinos e rastros sobre um fundo
+      # vazio, sem telha nenhuma, com um erro não tratado no console. A versão
+      # 7 no mesmo ambiente mostra o mapa. Fica de fora até alguém fazer a
+      # migração de propósito — e olhar o resultado, que é o que o CI não faz.
+      - dependency-name: flutter_map
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /

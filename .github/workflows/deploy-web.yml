@@ -77,7 +77,7 @@ jobs:
           esac
           echo "skip=false" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: steps.config.outputs.skip != 'true'
         with:
           # No workflow_run o checkout padrão é o topo da main AGORA; o que o CI
@@ -129,7 +129,7 @@ jobs:
       - name: Criar o projeto no Pages (só na primeira vez)
         if: steps.config.outputs.skip != 'true'
         continue-on-error: true
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -139,7 +139,7 @@ jobs:
       # index.html para qualquer caminho — o que o Flutter precisa.
       - name: Publicar
         if: steps.config.outputs.skip != 'true'
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

@@ -117,6 +117,42 @@ Duas composições na mesma tela, e o corte é **900pt**:
   formulário desce no papel da própria página — sem cartão dentro de cartão. A
   barra fica compacta (só identidade).
 
+O véu do pôster tem **largura fixa (800pt)**, e não uma fração da tela: o que
+ele protege é a coluna da promessa, e texto não cresce com a janela. Cheio
+sobre o texto (que acaba perto de 470pt), ele some antes do vidro do vagão — a
+paisagem que passa ali é a única parte da arte que ninguém lê por cima.
+
+**A arte anda.** A ilustração do vagão não é mais uma foto parada: é uma cena
+(`HeroScene`, em `features/hero/`) — a paisagem passa por trás do vidro, o trem
+atravessa um túnel, a luz do vagão acompanha (a trilha de `light_domain.dart`),
+o viajante respira e o cachimbo solta bolhas de sabão. Quatro regras a seguram:
+- **É tudo a mesma pintura.** O app carrega duas imagens, e as duas saem da
+  ilustração de marca: o interior, com o vidro recortado no alfa
+  (`first-class-interior.webp`, de `tool/hero_interior.py`), e o atlas da
+  paisagem (`first-class-landscape.webp`, de `tool/hero_landscape.py`) — serra,
+  vale, prado e nuvens recortados da arte e costurados em tiras sem fim, cada
+  plano na sua velocidade. Nada da paisagem é desenhado. Em código só existe o
+  que a pintura não tem: postes, o corte e o túnel, sol, lua, as luzes da vila
+  e as bolhas.
+- **Não há quadros nem vídeo.** Tudo é função de um relógio só
+  (`scene_domain.dart`): o laço de 72s fecha por construção, e "nada pula, nada
+  aparece do nada, a bolha não encosta no rosto" são testes, não impressão.
+- **A luz é uma só.** No campo aberto a janela é a ilustração original, sob luz
+  branca. O resto da viagem é a mesma pintura sob outra luz — fria na serra,
+  âmbar na saída do túnel, luar no atlas noturno —, e o interior muda junto.
+- **É ambiente, não cerimônia.** Anda devagar, não pede atenção e nunca bloqueia
+  o formulário. Quem pede menos movimento ao sistema recebe um quadro só.
+
+O **personagem só respira.** Ele é uma pintura numa peça só: não há braço para
+mexer nem cabeça para virar. O interior é desenhado numa malha, e o peito sobe
+pouco mais de dois pixels, com o livro atrás dele; a deformação é rasa demais
+(menos de 2%) para entortar uma linha. A boca do cachimbo fica fora dela — é de
+lá que as bolhas nascem.
+
+**Mudou a arte?** Rode os dois scripts de `tool/`. O da paisagem imprime os
+retângulos do atlas, que estão copiados em `HeroAtlas`; um teste confere a
+largura de cada tira contra a camada que a rola.
+
 O que o desenho pede e o produto ainda não tem aparece **desenhado e desligado**,
 com "em breve" escrito (hoje: entrar com Google num build sem `GOOGLE_CLIENT_ID`). O
 que não existe mesmo não aparece: link morto na primeira tela é promessa

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' show Icons;
 import 'package:flutter/widgets.dart';
 
+import '../features/hero/hero_scene.dart';
 import '../features/hero/light_domain.dart';
 import 'components.dart';
 import 'sj_theme.dart';
@@ -233,13 +234,14 @@ class _GalleryPanel extends StatelessWidget {
 
 /// # Portão de revisão da iluminação do herói.
 ///
-/// Existe para uma decisão ser tomada ANTES de encomendar arte: a trilha de
-/// luz é aplicada à ilustração que já existe, com um controle de posição, para
-/// o dono julgar quente/frio/túnel/entardecer sem custo de asset.
+/// Existe para a viagem ser julgada com a mão no controle: a cena do herói
+/// (`HeroScene`) parada na posição que o trilho abaixo escolher, para o dono
+/// conferir quente/frio/túnel/entardecer ponto a ponto, sem esperar o ciclo
+/// passar no login.
 ///
-/// O tinte aqui banha o cartaz inteiro, e não só o interior do vagão — na cena
-/// final ele atinge apenas o interior, porque a paisagem tem luz própria. Para
-/// aprovar a TRILHA, que é o que está em jogo, isto basta.
+/// O banho da trilha atinge só o interior do vagão; a paisagem tem as cores
+/// dela e escurece junto. A legenda diz em que zona o trem está e quanta luz
+/// a trilha manda entrar ali.
 class _LightGate extends StatefulWidget {
   const _LightGate();
 
@@ -275,13 +277,7 @@ class _LightGateState extends State<_LightGate> {
           borderRadius: BorderRadius.circular(2),
           child: AspectRatio(
             aspectRatio: 2.25,
-            child: ColorFiltered(
-              colorFilter: ColorFilter.matrix(luz.colorMatrix),
-              child: Image.asset(
-                'assets/images/first-class-art.jpg',
-                fit: BoxFit.cover,
-              ),
-            ),
+            child: HeroScene(phase: _fase),
           ),
         ),
         const SizedBox(height: SJSpace.x4),

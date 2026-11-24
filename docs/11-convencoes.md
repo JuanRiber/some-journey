@@ -269,9 +269,10 @@ mudou?".
 ## 13. Regra de domínio mora fora do Flutter
 
 **Onde.** `app_flutter/lib/features/atlas/atlas_domain.dart`,
-`features/tracks/track_domain.dart` e `features/hero/light_domain.dart` são Dart
-puro, sem um `import 'package:flutter/...'` sequer — os três dizem isso na
-primeira linha do docstring. O widget correspondente só desenha o que o módulo
+`features/tracks/track_domain.dart`, `features/hero/light_domain.dart` e
+`features/hero/scene_domain.dart` são Dart puro, sem um
+`import 'package:flutter/...'` sequer — todos dizem isso na primeira linha do
+docstring. O widget correspondente só desenha o que o módulo
 calcula.
 
 **Por quê.** Dá para testar sem renderizar, e dá para trocar o provedor de mapa

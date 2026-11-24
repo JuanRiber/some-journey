@@ -41,6 +41,14 @@ flutter:
 
   assets:
     - assets/images/first-class-art.jpg
+    # A mesma ilustração com o vidro da janela recortado no alfa e sem as
+    # bolhas pintadas, para a paisagem passar por trás e as bolhas subirem de
+    # verdade (`HeroScene`, no login). Sai de `tool/hero_interior.py`.
+    - assets/images/first-class-interior.webp
+    # A paisagem que passa na janela: tiras recortadas da MESMA ilustração
+    # (serra, vale, prado, nuvens), num atlas só. Sai de
+    # `tool/hero_landscape.py`.
+    - assets/images/first-class-landscape.webp
     # Licenças das fontes embutidas (todas SIL OFL 1.1): viajam junto delas,
     # como a própria licença exige de quem as redistribui.
     - assets/fonts/OFL-Fraunces.txt

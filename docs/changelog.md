@@ -1019,6 +1019,35 @@ lugar melhor para ficar.
 - **Não conferido contra o Supabase de verdade:** o download usado pela faxina das fotos
   antigas (mesma URL do upload e do delete, com `GET`) foi testado com um Storage simulado.
 
+## 2026-11-21 (4)
+
+### A arte do login passa a andar
+- `08-design-system.md` §7: a ilustração do vagão virou uma cena (`HeroScene`) —
+  paisagem passando atrás do vidro, túnel, a luz do vagão acompanhando a trilha
+  que já existia, o viajante respirando, bolhas de sabão saindo do cachimbo.
+  Ficam registradas as quatro regras que a seguram (é tudo a mesma pintura, não
+  há quadros, a luz é uma só, é ambiente e não cerimônia) e o limite do
+  personagem: ele só respira.
+- `11-convencoes.md` §13: `features/hero/scene_domain.dart` entra na lista dos
+  domínios em Dart puro.
+- **A paisagem não é desenhada: é recortada da ilustração.** Serra, vale, prado
+  e nuvens saem da arte de marca por `tool/hero_landscape.py` e viram um atlas
+  de tiras sem fim (334 kB). O céu teve de ser refeito — é nele que o logo está
+  pintado —, com o azul e o creme medidos na própria pintura e as nuvens
+  recortadas dos trechos limpos.
+- **O que foi inventado, e onde.** A ilustração tem uma janela só de paisagem;
+  para ela não acabar, a serra foi estendida para os dois lados (a encosta que
+  a moldura cortava continua, espelhada e inclinada) e o vale vai e volta. As
+  emendas foram disfarçadas, não eliminadas: quem procurar o mesmo rio duas
+  vezes por volta vai achar.
+- **O véu do pôster encolheu.** Ia até 70% da largura da tela e escurecia a
+  janela do vagão; agora tem largura fixa, a da coluna da promessa, e some antes
+  do vidro. Sobre o texto ele continua tão escuro quanto era.
+- **Não conferido:** desempenho e aparência fora do navegador de mesa. A malha
+  da respiração e o banho de cor usam operações que o motor do celular trata de
+  outro jeito, e a cena não foi vista num aparelho. Quadros por segundo também
+  não foram medidos: a cena foi vista rodando, não cronometrada.
+
 ## 2026-11-21 (5)
 
 ### App: abrir sem esperar

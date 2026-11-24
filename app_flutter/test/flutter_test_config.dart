@@ -16,8 +16,16 @@ import 'dart:async';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:some_journey/features/hero/hero_scene.dart';
 
 Future<void> testExecutable(FutureOr<void> Function() testMain) async {
-  setUp(() => FlutterSecureStorage.setMockInitialValues(<String, String>{}));
+  setUp(() {
+    FlutterSecureStorage.setMockInitialValues(<String, String>{});
+    // A cena do login anda para sempre. Com o relógio falso do `testWidgets`,
+    // um `pumpAndSettle` em qualquer tela que a tenha por baixo esperaria por
+    // um repouso que não vem. Aqui ela fica num quadro só; quem testa o
+    // movimento (`hero_scene_test.dart`) liga de volta.
+    HeroScene.autoplay = false;
+  });
   await testMain();
 }

@@ -6,6 +6,7 @@ import '../design/sj_theme.dart';
 import '../design/tokens.dart';
 import '../features/auth/google_button.dart';
 import '../features/auth/google_signin.dart';
+import '../features/hero/hero_scene.dart';
 
 /// # Entrar — a porta do próprio atlas.
 ///
@@ -37,6 +38,9 @@ class LoginScreen extends StatefulWidget {
   /// Largura do cartão no pôster. Fixa de propósito: um formulário que estica
   /// com a janela vira uma linha de 900pt, e ninguém lê um campo desses.
   static const double _larguraDoCartao = 430;
+
+  /// Largura do véu que escurece a arte atrás da promessa, no pôster.
+  static const double _larguraDoVeu = 800;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -168,18 +172,30 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         const _Foto(),
         // Véu que desce da esquerda: é o que deixa o texto claro legível sobre
-        // uma foto que tem céu, neve e vidro iluminado. Morre antes do cartão
-        // para não sujar o papel.
-        DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              stops: const [0.0, 0.70],
-              colors: [
-                s.shadow.withValues(alpha: 0.88),
-                s.shadow.withValues(alpha: 0.10),
-              ],
+        // uma arte que tem lâmpada acesa, rosto e cortina vermelha. Tem largura
+        // FIXA, a da coluna da promessa, e não a da tela: o que ele protege é
+        // o texto, e o texto não cresce com a janela. Antes ele ia até 70% da
+        // largura e escurecia a paisagem que passa atrás do vidro — a única
+        // parte da cena que ninguém precisa ler por cima.
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: LoginScreen._larguraDoVeu,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                // Cheio sobre a coluna do texto (que acaba perto de 470pt),
+                // e daí até zero.
+                stops: const [0.0, 0.58, 1.0],
+                colors: [
+                  s.shadow.withValues(alpha: 0.88),
+                  s.shadow.withValues(alpha: 0.62),
+                  s.shadow.withValues(alpha: 0.0),
+                ],
+              ),
             ),
           ),
         ),
@@ -393,17 +409,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/// A foto de marca, sangrando. Um só ponto de verdade para as duas composições.
+/// A arte de marca, sangrando. Um só ponto de verdade para as duas composições.
+///
+/// Não é mais uma foto parada: é o vagão com a viagem passando na janela
+/// (`HeroScene`). Para um leitor de tela continua sendo uma ilustração só —
+/// o que se move não muda o que ela é.
 class _Foto extends StatelessWidget {
   const _Foto();
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/images/first-class-art.jpg',
-      fit: BoxFit.cover,
+    return const HeroScene(
       semanticLabel:
-          'Ilustração: viajante lendo o atlas num vagão de primeira classe',
+          'Ilustração: viajante lendo o atlas num vagão de primeira classe, '
+          'com a paisagem passando pela janela',
     );
   }
 }

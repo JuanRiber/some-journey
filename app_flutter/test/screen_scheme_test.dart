@@ -65,7 +65,7 @@ http.Response _ok(http.Request r) {
   final caminho = r.url.path;
   final corpo = caminho.endsWith('/map')
       ? {'journey': _jornada(), 'tracks': <String, dynamic>{}, 'distance_m': 0}
-      : caminho.endsWith('/tracks')
+      : caminho.endsWith('/tracks') || caminho.endsWith('/memories')
           ? <dynamic>[]
           : caminho.contains('/journeys/')
               ? _jornada()
@@ -142,10 +142,25 @@ void main() {
     responder(_ok);
     await _montarNoEscuro(tester, const JourneyDetailScreen(journeyId: 'j1'));
 
-    expect(_corDoTexto(tester, '← Voltar'), sjDark.ink);
+    // Sem foto, a capa é de papel: o nome do capítulo vai na tinta do esquema.
     expect(_corDoTexto(tester, 'Litoral Leste'), sjDark.ink);
+
     // O estado do capítulo é o MESMO vocabulário da estante: concluída = musgo.
-    expect(_corDoTexto(tester, 'Jornada concluída.'),
+    final selo = tester.widget<Container>(
+      find.ancestor(of: find.text('CONCLUÍDA'), matching: find.byType(Container)).first,
+    );
+    expect((selo.decoration! as BoxDecoration).color,
         journeyStatusColor('finished', sjDark));
+
+    // O disco de voltar flutua na superfície do esquema, não num creme fixo.
+    final disco = tester.widget<Container>(
+      find
+          .ancestor(
+              of: find.byIcon(Icons.arrow_back), matching: find.byType(Container))
+          .first,
+    );
+    final decoracao = disco.decoration! as BoxDecoration;
+    expect(decoracao.color, sjDark.surface);
+    expect((decoracao.border! as Border).top.color, sjDark.line);
   });
 }

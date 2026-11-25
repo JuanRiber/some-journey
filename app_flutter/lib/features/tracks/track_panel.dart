@@ -95,10 +95,13 @@ class TrackPanel extends StatelessWidget {
                 Text(_aviso()!, style: SJText.caption(color: s.accent)),
               ],
               const SizedBox(height: SJSpace.x4),
+              // Sempre de apoio. Gravar o caminho é coisa que se faz DENTRO
+              // de uma jornada em curso, e a ação principal dessa tela é
+              // guardar uma memória: dois botões cheios disputariam o mesmo
+              // olhar.
               SJButton(
                 label: gravando ? 'Encerrar percurso' : 'Gravar percurso',
-                variant:
-                    gravando ? SJButtonVariant.secondary : SJButtonVariant.primary,
+                variant: SJButtonVariant.secondary,
                 onPressed: recorder.isBusy
                     ? null
                     : () async {

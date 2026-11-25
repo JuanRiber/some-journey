@@ -124,7 +124,7 @@ class SJPhotoCard extends StatelessWidget {
                     colors: [
                       Color(0x00000000),
                       Color(0x00000000),
-                      Color(0xCC000000),
+                      SJOnPhoto.scrim,
                     ],
                     stops: [0.0, 0.45, 1.0],
                   ),
@@ -147,20 +147,24 @@ class SJPhotoCard extends StatelessWidget {
                     if (overline != null) ...[
                       // Sobre foto, a overline fica em creme fixo (não no accent
                       // do tema) para legibilidade constante contra o scrim.
-                      SJOverline(overline!, color: const Color(0xFFF3ECDC)),
+                      SJOverline(overline!, color: SJOnPhoto.inkSoft),
                       const SizedBox(height: SJSpace.x2),
                     ],
-                    Text(
-                      title,
-                      style: SJText.h2(color: const Color(0xFFFDFBF6)),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    // Sem título a linha some: uma memória pode dispensar
+                    // rótulo, e um título vazio deixava 28pt de nada entre a
+                    // data e o lugar.
+                    if (title.trim().isNotEmpty)
+                      Text(
+                        title,
+                        style: SJText.h2(color: SJOnPhoto.ink),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     if (subtitle != null) ...[
                       const SizedBox(height: SJSpace.x1),
                       Text(
                         subtitle!,
-                        style: SJText.bodySm(color: const Color(0xCCF3ECDC)),
+                        style: SJText.bodySm(color: SJOnPhoto.inkFaint),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -177,7 +181,11 @@ class SJPhotoCard extends StatelessWidget {
     if (onTap == null) return card;
     return SJPressable(
       onTap: onTap,
-      semanticLabel: title,
+      // Sem título, o leitor de tela anuncia o que o cartão TEM (a data, o
+      // lugar) — nunca um botão mudo.
+      semanticLabel: title.trim().isNotEmpty
+          ? title
+          : [?overline, ?subtitle].join(', '),
       pressedScale: 0.99,
       child: card,
     );

@@ -14,10 +14,10 @@
 // tom mais bonito e menos legível deixou de ser possível em silêncio.
 //
 // O que NÃO está coberto aqui, para não prometer demais: composições. O texto
-// de `SJButton.secondary` é `primary` sobre um véu de `primary` a 10% — um
-// fundo que não é token nenhum, e que no modo escuro fica em 2,57:1 sobre
-// `surface`. Isso é contraste de COMPONENTE e pede um teste que monte a árvore;
-// este arquivo só responde pelo contrato dos tokens.
+// de `SJButton.secondary` pousa sobre um véu de `primary` — um fundo que não é
+// token nenhum. Isso é contraste de COMPONENTE e pede um teste que monte a
+// árvore: é `button_contrast_test.dart`, que nasceu quando esse véu estava em
+// 2,57:1 no modo escuro. Este arquivo só responde pelo contrato dos tokens.
 
 import 'dart:math' as math;
 

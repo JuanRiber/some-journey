@@ -808,9 +808,16 @@ class Api {
   // ---- Jornadas ----
   /// Uma página de jornadas, da mais recente para a mais antiga. Com
   /// [phaseId], só as da fase — marcadas nela ou com alguma memória dela.
-  Future<Page<Journey>> listJourneys({int? limit, String? cursor, String? phaseId}) =>
-      _page('/journeys', Journey.fromJson,
-          limit: limit, cursor: cursor, phaseId: phaseId);
+  Future<Page<Journey>> listJourneys({int? limit, String? cursor, String? phaseId}) async {
+    final pagina = await _page('/journeys', Journey.fromJson,
+        limit: limit, cursor: cursor, phaseId: phaseId);
+    // A estante traz a capa e o título de cada capítulo: a abertura dele nasce
+    // com isso na mão (ver `capitulosVistos`).
+    for (final j in pagina.items) {
+      capitulosVistos[j.id] = j;
+    }
+    return pagina;
+  }
 
   Future<JourneyDetail> getJourney(String id) async => _viuJornada(
       JourneyDetail.fromJson(await _request('GET', '/journeys/$id', authed: true)));
@@ -818,7 +825,28 @@ class Api {
   /// Guarda a jornada completa como "já vista" e a devolve.
   JourneyDetail _viuJornada(JourneyDetail j) {
     jornadasVistas[j.id] = j;
+    capitulosVistos[j.id] = j;
     return j;
+  }
+
+  /// As memórias de uma jornada, INTEIRAS — com fotos e texto.
+  ///
+  /// O detalhe da jornada traz os pontos do rastro (ordem, título, lugar), e
+  /// ponto não tem foto: era por isso que a abertura de um capítulo cheio de
+  /// fotografias não mostrava nenhuma. Esta rota existe no backend desde o
+  /// começo; só faltava alguém pedir. A ordem dela é cronológica, e a do
+  /// roteiro é a do rastro — quem casa as duas é `itineraryStops`.
+  ///
+  /// Cada memória passa por [_viu]: tocar numa parada abre a memória sem
+  /// esperar, como já acontece a partir da timeline.
+  Future<List<Memory>> journeyMemories(String id) async {
+    final data = await _request('GET', '/journeys/$id/memories', authed: true);
+    if (data is! List) return const [];
+    final memorias = [
+      for (final e in data) _viu(Memory.fromJson(e as Map<String, dynamic>)),
+    ];
+    roteirosVistos[id] = memorias;
+    return memorias;
   }
 
   Future<Journey> createJourney(Map<String, dynamic> payload) async =>
@@ -855,6 +883,8 @@ class Api {
     await _request('DELETE', '/journeys/$id', authed: true);
     jornadasVistas.remove(id);
     percursosVistos.remove(id);
+    capitulosVistos.remove(id);
+    roteirosVistos.remove(id);
   }
 
   Future<Journey> _lifecycle(String id, String action) async =>

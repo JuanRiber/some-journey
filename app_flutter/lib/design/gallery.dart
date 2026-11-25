@@ -225,6 +225,13 @@ class _GalleryPanel extends StatelessWidget {
               title: 'Carimbo e herbário',
               child: _Ornamentos(),
             ),
+
+            _Block(
+              numeral: '12',
+              overline: 'ABERTURA',
+              title: 'A capa',
+              child: _Capas(scheme: s),
+            ),
           ],
         ),
       ),
@@ -445,6 +452,23 @@ class _Buttons extends StatelessWidget {
         ),
         const SJButton(label: 'Desabilitado'),
         const SJButton(label: 'Carregando', loading: true),
+        // Botões de ícone: nu (sobre papel) e disco (sobre foto ou mapa).
+        SJIconButton(
+          icon: Icons.arrow_upward,
+          semanticLabel: 'Subir',
+          onTap: () {},
+        ),
+        SJIconButton(
+          icon: Icons.arrow_back,
+          semanticLabel: 'Voltar',
+          disc: true,
+          onTap: () {},
+        ),
+        const SJIconButton(
+          icon: Icons.edit_outlined,
+          semanticLabel: 'Editar (desligado)',
+          disc: true,
+        ),
       ],
     );
   }
@@ -514,6 +538,53 @@ class _Cards extends StatelessWidget {
                 colors: [scheme.frame, scheme.primary],
               ),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A capa de um capítulo nas duas formas: sobre foto (tinta de foto, véu no
+/// pé) e de papel (carimbo sangrando, tinta do tema).
+class _Capas extends StatelessWidget {
+  const _Capas({required this.scheme});
+  final SJScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget moldura(Widget capa) => ClipRRect(
+          borderRadius: BorderRadius.circular(SJRadius.lg),
+          child: capa,
+        );
+    return Column(
+      children: [
+        moldura(
+          SJCover(
+            title: 'Lisboa, um semestre',
+            overline: 'fevereiro — julho de 2019',
+            badge: SJBadge('Concluída', color: scheme.moss),
+            minHeight: 260,
+            // Placeholder de foto: um gradiente do frame ao primary do modo.
+            image: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [scheme.frame, scheme.primary],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: SJSpace.x5),
+        moldura(
+          SJCover(
+            title: 'Patagônia, um dia',
+            overline: 'novembro de 2026',
+            badge: SJBadge('Rascunho', color: scheme.inkSoft),
+            minHeight: 200,
+            sealLegend: 'RASCUNHO',
           ),
         ),
       ],

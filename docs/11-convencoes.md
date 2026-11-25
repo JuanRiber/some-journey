@@ -65,7 +65,8 @@ contrato.
 para UTC-aware (`AwareUtcDatetime`) antes de persistir — as colunas são
 `TIMESTAMPTZ`. Na saída, quem formata usa `.toUtc()` e monta a data pelas partes:
 `app_flutter/lib/screens/timeline.dart` (que também agrupa por ano assim),
-`memory_detail.dart`, `journeys.dart`, `journey_detail.dart`, e
+`memory_detail.dart`, `features/journeys/journey_domain.dart` (o período e a
+data de cada parada, para a estante e para a jornada aberta), e
 `memory_new.dart`, que inicializa o campo com `DateTime.now().toUtc()`.
 
 **Por quê.** A data de uma lembrança é o dia em que ela aconteceu, não um

@@ -1184,3 +1184,76 @@ resposta inteira em dois deles.
   `wrangler-action` v4) — o CI do PR não exercita esse workflow. Pelas notas de versão, o
   bloqueio novo do `checkout` v7 vale para PR de fork, que não é o nosso caso.
 - Backend: 599 testes (eram 587).
+
+## 2026-11-25
+
+### A jornada aberta e a estante sobem ao nível do login
+As telas de dentro foram abertas rodando — celular e desktop, claro e escuro, vazias,
+carregando e sem conexão — e comparadas com o login. A mais distante era a jornada aberta:
+fora do design system (botões e spinner crus do Material, tamanhos soltos), sem foto nenhuma
+e com três botões cheios na mesma página, o primeiro deles o que ENCERRA o capítulo. Ela e a
+estante foram refeitas; atlas, timeline e perfil ficam para as próximas rodadas.
+
+- **A jornada aberta virou a abertura de um capítulo.** A capa sangra no topo com o nome por
+  cima; abaixo vêm a frase do capítulo, o que a pessoa escreveu, a atmosfera e a fase; depois
+  o mapa e as memórias como um **roteiro ilustrado** — paradas numeradas com o pin do mapa,
+  ligadas por um fio tracejado, com foto quando a memória tem foto. A capa que a estante
+  mostrava sumia ao abrir, e as memórias eram linhas de administração com o título cortado.
+- **Tela larga tem composição própria.** O mapa sangra na janela inteira e o capítulo é uma
+  folha de papel de largura fixa pousada sobre ele — a gramática do pôster do login. Antes a
+  tela de celular só esticava: botões de 1390pt e, na estante, uma capa mais alta que a
+  janela. O mapa também deixou de prender a rolagem: a folha rola, ele fica.
+- **Uma ação principal por estado.** Rascunho: iniciar. Em curso: guardar uma memória (um "+"
+  flutuante, à vista sem rolar). Em pausa: retomar. Concluída: nenhuma. Pausar e finalizar
+  viraram links. A regra é `journeyStage`, testada sem tela.
+- **A gestão ficou recolhida.** Subir, descer e tirar uma memória do rastro só aparecem depois
+  de "Organizar".
+- **Abre com o que já está na mão.** A estante já tinha a capa e o nome de cada capítulo; a
+  abertura nasce com eles em vez de um esqueleto, e é isso que deixa a foto **crescer** da
+  estante até a capa. Sem jornada na tela, o erro é o `ApiErrorView` (com "Tentar de novo"),
+  não uma linha vermelha.
+- **A estante sabe o que vem primeiro.** O capítulo em curso abre a lista; os rascunhos vão
+  para o fim (a ordem era a de criação, e um rascunho em branco abria a estante como "01").
+  Na tela larga o capítulo em curso é uma faixa e os outros se arrumam em grade, sob um teto
+  de 1120pt. O numeral saiu: contava a posição na lista e mudava sozinho. Uma releitura que
+  falha não apaga mais a estante — avisa que ela pode estar velha.
+- **Design system:** `SJOnPhoto` (a tinta sobre foto, que eram três cremes escritos à mão),
+  `SJLayout` (o corte de tela larga, a folha, o teto de página), `SJCover` (a capa, com
+  variante de papel para capítulo sem foto) e `SJIconButton`. O botão tonal ficou legível no
+  atlas noturno — estava em 2,6:1, e agora há um teste que monta o botão e faz a conta.
+- **Regra fora da tela:** `features/journeys/journey_domain.dart` reúne o que estante e
+  abertura dividem (período, frase, estado, ordem, paradas). Estava dentro de
+  `screens/journeys.dart`, sem teste.
+
+### O que mudou além do desenho
+- O app passa a pedir `GET /journeys/{id}/memories` ao abrir uma jornada — a rota já existia
+  e ninguém chamava. É o quarto pedido, e sai junto com os outros três. **A API não mudou.**
+- O estado da jornada tem um nome só: a abertura dizia "Ativa" e "Pausada", a estante "Em
+  curso" e "Em pausa". Ficou o da estante.
+- Período dentro do mesmo ano escreve o ano uma vez ("fevereiro — julho de 2019"). O
+  comentário do código já prometia "entre março e junho de 2026"; o código escrevia os dois
+  anos, e a overline quebrava em duas linhas no celular.
+- Na confirmação de excluir, a ação em destaque passou a ser "Manter jornada".
+- "Finalizar" continua valendo com um toque só, como antes — agora num link, não no botão
+  mais vistoso da página.
+
+### Testes e o que não foi conferido
+- App: **760 testes** (eram 676), no fuso local e em UTC. Os 84 novos: as regras da jornada
+  sem tela (período, ação principal por estado, ordem da estante, paradas do roteiro); a
+  jornada aberta (uma ação cheia por estado, roteiro, arrumação, erros, as duas composições,
+  nenhum widget cru do Material); a estante (ordem, rede caindo, grade larga); e o contraste
+  do botão tonal nos dois modos.
+- Quatro testes antigos mudaram porque afirmavam o desenho anterior: os três de
+  `instant_open_test` sobre a jornada (são quatro pedidos em paralelo, não três) e o de
+  `screen_scheme_test` (o estado "concluída" virou selo na capa, e voltar virou um disco).
+- **Conferido em imagem:** cada composição foi renderizada para PNG — celular e tela larga,
+  claro e escuro, concluída, em curso, rascunho e arrumando — por um teste descartável que
+  monta a tela com as respostas gravadas da API local e as fotos de verdade.
+- **Conferido no navegador:** o build web contra a API local, no celular e na tela larga — a
+  estante, a jornada em curso e a arrumação (subir uma memória e devolvê-la ao lugar, com a
+  API respondendo 200 nas duas vezes).
+- **Não conferido:** o voo da capa da estante até a abertura (o painel do navegador não roda
+  animação quando está oculto — o que os testes seguram é que os dois lados usam a mesma
+  peça e a mesma tag); a tela num celular de verdade; iniciar, pausar, finalizar, excluir e
+  gravar percurso pelo navegador (estão cobertos por teste de widget, não foram tocados à
+  mão); e o modo escuro no navegador (visto só nas imagens renderizadas).

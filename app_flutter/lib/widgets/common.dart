@@ -140,30 +140,3 @@ class DottedTile extends StatelessWidget {
     );
   }
 }
-
-/// Selo de status da jornada — delega ao SJBadge, com a cor do papel semântico:
-/// rascunho = tinta suave, ativa = ação (vinho), pausada = mostarda, concluída =
-/// musgo (o capítulo virou parte permanente do atlas).
-class StatusBadge extends StatelessWidget {
-  final String status;
-  const StatusBadge(this.status, {super.key});
-
-  static const _labels = {
-    'draft': 'Rascunho',
-    'active': 'Ativa',
-    'paused': 'Pausada',
-    'finished': 'Concluída',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final s = SJTheme.of(context);
-    final color = switch (status) {
-      'active' => s.primary,
-      'paused' => s.highlight,
-      'finished' => s.moss,
-      _ => s.inkSoft,
-    };
-    return SJBadge(_labels[status] ?? status, color: color);
-  }
-}

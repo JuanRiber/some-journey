@@ -218,8 +218,14 @@ class SJButton extends StatelessWidget {
         border = null;
       case SJButtonVariant.secondary:
         // Tonal: leve véu do vinho + hairline; texto na cor de ação.
-        bg = s.primary.withValues(alpha: 0.10);
-        fg = s.primary;
+        //
+        // No atlas noturno o texto vai na TINTA, e o véu engrossa. Vinho
+        // sobre um véu de vinho em cima de navy dava 2,6:1 — o botão existia e
+        // não se lia ("Escolher a música", "Gravar percurso"). O que diz "sou
+        // da família da ação" no escuro é o fundo avinhado, não a letra.
+        final escuro = s.brightness == Brightness.dark;
+        bg = s.primary.withValues(alpha: escuro ? 0.24 : 0.10);
+        fg = escuro ? s.ink : s.primary;
         border = Border.all(color: s.line);
       case SJButtonVariant.text:
         bg = const Color(0x00000000);

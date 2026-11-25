@@ -202,20 +202,23 @@ void main() {
   });
 
   group('detalhe da jornada', () {
-    testWidgets('os três pedidos saem JUNTOS, sem um esperar o outro',
+    testWidgets('os quatro pedidos saem JUNTOS, sem um esperar o outro',
         (tester) async {
       await abrir(tester, const JourneyDetailScreen(journeyId: 'j1'));
 
-      // Nenhum foi respondido ainda, e os três já saíram.
+      // Nenhum foi respondido ainda, e os quatro já saíram: a jornada, o
+      // percurso (mapa e trechos) e as memórias que ilustram o roteiro.
       expect(pedidos.toSet(), {
         'GET /journeys/j1',
         'GET /journeys/j1/map',
         'GET /journeys/j1/tracks',
+        'GET /journeys/j1/memories',
       });
       expect(presos.values.every((c) => !c.isCompleted), isTrue);
 
       presos['GET /journeys/j1/map']!.complete(_json(<String, dynamic>{}));
       presos['GET /journeys/j1/tracks']!.complete(_json(<dynamic>[]));
+      presos['GET /journeys/j1/memories']!.complete(_json(<dynamic>[]));
       await responder(tester, 'GET /journeys/j1', _json(_jornada('j1')));
       expect(find.text('Litoral'), findsOneWidget);
     });
@@ -237,19 +240,53 @@ void main() {
       // Fecha os pedidos que ficaram no ar, para o teste terminar limpo.
       presos['GET /journeys/j1/map']!.complete(_json(<String, dynamic>{}));
       presos['GET /journeys/j1/tracks']!.complete(_json(<dynamic>[]));
+      presos['GET /journeys/j1/memories']!.complete(_json(<dynamic>[]));
       await responder(tester, 'GET /journeys/j1',
           _json(_jornada('j1', titulo: 'Litoral leste')));
       expect(find.text('Litoral leste'), findsOneWidget);
     });
 
-    testWidgets('percurso que falha não segura a jornada', (tester) async {
+    testWidgets('vinda da estante: o nome do capítulo já está na tela',
+        (tester) async {
+      // A estante mostrou a capa e o título; a abertura nasce com eles, em vez
+      // de um esqueleto — é o que dá à foto um lugar para onde crescer.
+      // (Um id só deste teste: o que os outros leram fica na mão a sessão
+      // inteira, e aqui a jornada precisa ser conhecida SÓ pela estante.)
+      final estante = Api.instance.listJourneys();
+      await tester.pump();
+      presos['GET /journeys']!.complete(_json([_jornada('j-da-estante')]));
+      await estante;
+      pedidos.clear();
+      presos.clear();
+
+      await abrir(tester, const JourneyDetailScreen(journeyId: 'j-da-estante'));
+
+      expect(presos['GET /journeys/j-da-estante']!.isCompleted, isFalse,
+          reason: 'o servidor ainda não respondeu');
+      expect(find.text('Litoral'), findsOneWidget);
+      expect(find.text('RASCUNHO'), findsOneWidget);
+      // O que só o detalhe sabe ainda espera: nada de ação antes da hora.
+      expect(find.text('INICIAR JORNADA'), findsNothing);
+
+      presos['GET /journeys/j-da-estante/map']!.complete(_json(<String, dynamic>{}));
+      presos['GET /journeys/j-da-estante/tracks']!.complete(_json(<dynamic>[]));
+      presos['GET /journeys/j-da-estante/memories']!.complete(_json(<dynamic>[]));
+      await responder(tester, 'GET /journeys/j-da-estante', _json(_jornada('j-da-estante')));
+      expect(find.text('INICIAR JORNADA'), findsOneWidget);
+    });
+
+    testWidgets('percurso e memórias que falham não seguram a jornada',
+        (tester) async {
       await abrir(tester, const JourneyDetailScreen(journeyId: 'j1'));
 
       presos['GET /journeys/j1/map']!.complete(_json({'detail': 'x'}, 503));
       presos['GET /journeys/j1/tracks']!.complete(_json({'detail': 'x'}, 503));
+      presos['GET /journeys/j1/memories']!
+          .complete(_json({'detail': 'x'}, 503));
       await responder(tester, 'GET /journeys/j1', _json(_jornada('j1')));
 
       expect(find.text('Litoral'), findsOneWidget);
+      expect(find.textContaining('fora do ar'), findsNothing);
     });
   });
 }

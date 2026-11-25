@@ -18,7 +18,10 @@ import '../models.dart';
 class AtlasMap extends StatefulWidget {
   final MapResponse? data;
   final void Function(String memoryId)? onSelect;
-  final double height;
+
+  /// Altura da prancha. Nula, o mapa ocupa o espaço que o pai der — é como ele
+  /// vira o FUNDO da tela larga, sangrando até as bordas.
+  final double? height;
 
   /// Percurso REAL de GPS, uma lista de coordenadas `[lng, lat]` por trecho.
   ///
@@ -27,12 +30,24 @@ class AtlasMap extends StatefulWidget {
   /// que a pessoa percorreu de fato.
   final List<List<List<double>>>? trackLines;
 
+  /// A moldura de couro. É o que faz o mapa parecer uma prancha montada no
+  /// caderno — e é o que NÃO pode existir quando ele sangra na tela inteira:
+  /// moldura encostada na borda da janela lê como uma borda de erro.
+  final bool framed;
+
+  /// Quanto do mapa está COBERTO por outra coisa (a folha de papel, na tela
+  /// larga). A câmera enquadra os pontos no que sobra: sem isto, metade do
+  /// rastro nasceria escondida atrás do papel.
+  final EdgeInsets covered;
+
   const AtlasMap({
     super.key,
     required this.data,
     this.onSelect,
     this.height = 380,
     this.trackLines,
+    this.framed = true,
+    this.covered = EdgeInsets.zero,
   });
 
   @override
@@ -73,7 +88,7 @@ class _AtlasMapState extends State<AtlasMap>
 
   CameraFit _fit(GeoBounds b) => CameraFit.bounds(
         bounds: LatLngBounds(LatLng(b.minLat, b.minLng), LatLng(b.maxLat, b.maxLng)),
-        padding: _respiro,
+        padding: _respiro + widget.covered,
         maxZoom: AtlasDomain.frameMaxZoom,
       );
 
@@ -200,8 +215,10 @@ class _AtlasMapState extends State<AtlasMap>
     return Container(
       height: widget.height,
       decoration: BoxDecoration(
-        border: Border.all(color: esquema.frame, width: 3),
-        borderRadius: BorderRadius.circular(3),
+        border: widget.framed
+            ? Border.all(color: esquema.frame, width: 3)
+            : null,
+        borderRadius: widget.framed ? BorderRadius.circular(3) : null,
         color: esquema.bgDeep,
       ),
       clipBehavior: Clip.antiAlias,

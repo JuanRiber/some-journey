@@ -129,6 +129,48 @@ const SJScheme sjDark = SJScheme(
   shadow: Color(0xFF000000),
 );
 
+/// Tinta sobre FOTOGRAFIA — a única que não troca com o modo.
+///
+/// PORQUÊ fica fora do [SJScheme]: uma foto não é papel nem atlas noturno. Ela
+/// tem a luz que tinha no dia, e quem a protege é o véu escuro que desce sobre
+/// o pé dela — então o texto por cima é sempre o claro, no modo claro e no
+/// escuro. Eram três cremes escritos à mão dentro do `SJPhotoCard`; com a capa
+/// da jornada (`SJCover`) escrevendo sobre foto também, viraram nome.
+abstract final class SJOnPhoto {
+  /// Título sobre a foto.
+  static const Color ink = Color(0xFFFDFBF6);
+
+  /// Overline e selos de texto.
+  static const Color inkSoft = Color(0xFFF3ECDC);
+
+  /// Linha de apoio (lugar, contagem).
+  static const Color inkFaint = Color(0xCCF3ECDC);
+
+  /// O pé do véu: preto a 80%. O topo é transparente — a foto fica inteira
+  /// onde ninguém escreve.
+  static const Color scrim = Color(0xCC000000);
+}
+
+/// Composição: onde a tela muda de desenho, e quanto o papel pode alargar.
+///
+/// PORQUÊ existe: sem um corte, a tela de celular só ESTICA numa janela larga —
+/// um botão de 1390pt, uma foto com tela e meia de altura. O login já tinha os
+/// seus números (pôster a partir de 900, cartão de 430); estes são os das
+/// telas de dentro, e o corte é o mesmo.
+abstract final class SJLayout {
+  /// A partir daqui a tela tem composição própria de janela larga.
+  static const double wide = 900;
+
+  /// Largura da folha de papel que pousa sobre a imagem na tela larga. Mais
+  /// larga que o cartão do login (430) porque aqui se LÊ: cabe uma foto 3:2 de
+  /// tamanho decente e uma linha de texto de ~60 caracteres.
+  static const double sheet = 520;
+
+  /// Teto de uma página em colunas (estante, grades). Passou disso, sobra
+  /// margem — nunca uma coluna a mais só porque cabe.
+  static const double page = 1120;
+}
+
 /// Famílias tipográficas. Serifa editorial para títulos/afeto; sans para
 /// interface; mono para overlines/selos (o "01 / OS MOMENTOS" da landing).
 /// As três são embutidas (`pubspec.yaml`): Fraunces, Inter e IBM Plex Mono.

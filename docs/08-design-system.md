@@ -33,6 +33,12 @@ Navigator, então toda rota nasce certa, inclusive as translúcidas), com o
 importados direto numa tela: a única exceção do app é texto sobre a foto de
 marca no login.
 
+**Tinta sobre foto** (`SJOnPhoto`). Sobre as fotografias da pessoa a tinta
+também é sempre a clara — e tem nome próprio, fora do esquema de propósito:
+uma foto tem a luz que tinha no dia, não a do modo. São três cremes (título,
+overline, apoio) e o véu escuro que desce sobre o pé da imagem. Quem escreve
+sobre foto (`SJPhotoCard`, `SJCover`) usa esses quatro, e mais nenhum.
+
 ## 2. Tipografia
 As três famílias são embutidas em `app_flutter/assets/fonts/` (SIL OFL 1.1, com
 as licenças ao lado). Fonte de sistema não existe em todo lugar: na web, sem
@@ -53,11 +59,21 @@ antes do primeiro quadro na web.
 - Espaçamento base **4pt** (`space.x1..x16`); margem de tela `space.screenX = 24`.
 - Raios: sm 6 · md 10 · lg 14 (cards) · xl 20 (sheets) · pill.
 - Elevação: **sombras extremamente suaves** (`e1` card, `e2` flutuante). O app respira.
+- Composição (`SJLayout`): a tela larga começa em **900** (o mesmo corte do
+  login); a folha de papel que pousa sobre a imagem tem **520**; uma página em
+  colunas tem teto de **1120** e fica no meio da janela. Sem um corte, a tela
+  de celular só ESTICA: um botão de 1390pt, uma foto com tela e meia de altura.
 
 ## 4. Movimento (com propósito)
 Durações 120/220/360/420ms; curva padrão `cubic(.2,0,0,1)`. Cada animação
 explica uma transição: foto que cresce, pin que cai (mola), linha que conecta,
 hero na abertura da memória. Nunca enfeite. Sem confete.
+
+A **foto que cresce** já existe num lugar: a capa de uma jornada, tocada na
+estante, voa até virar a capa do capítulo aberto (`JourneyCoverImage`). Os dois
+lados são a mesma peça, com a mesma tag e o mesmo tamanho de decodificação — é
+o que impede a foto de piscar no meio do voo. Quem pede menos movimento ao
+sistema recebe a capa já no lugar.
 
 **Cerimônia (900ms)** é o único degrau acima dessa escala, e tem regra própria:
 as outras durações são de TRANSIÇÃO — o tempo é custo e o alvo é não ser
@@ -68,11 +84,25 @@ abertura do livro de cadastro. Não use para navegar.
 ## 5. Componentes (anatomia)
 Todos derivam dos tokens; nenhum usa Material/genérico "cru".
 - **Botões**: `primary` (preenchido vinho, texto `onPrimary`, label mono caixa
-  alta), `secondary` (tonal/contorno), `text` (link). Toque ≥ 44pt.
+  alta), `secondary` (tonal/contorno), `text` (link). Toque ≥ 44pt. No atlas
+  noturno o tonal escreve na TINTA sobre um véu mais denso do vinho: vinho
+  sobre véu de vinho em cima de navy dava 2,6:1, e o botão existia sem se ler.
+  Quem cobra é `test/button_contrast_test.dart`, que monta o botão e compõe o
+  véu sobre a superfície.
+- **Botão de ícone** (`SJIconButton`): voltar, editar, subir, descer. **Nu**
+  sobre papel; em **disco** (papel, hairline, `e1`) quando flutua sobre foto ou
+  mapa — opaco de propósito, porque sobre imagem não se sabe que cor vem por
+  baixo. Alvo de 44pt e rótulo de leitor de tela obrigatório.
 - **Input**: preenchido `surfaceAlt`, hairline `line`, foco = `secondary` 1.5px,
   label overline mono `accent`. Sem borda dura.
 - **Card = página de diário**: `surface`, raio lg, `e1`, muito respiro. Variante
   foto-protagonista: imagem sangra no topo, texto só complementa embaixo.
+- **Capa** (`SJCover`): a abertura de um capítulo. A imagem sangra até as
+  bordas, o véu desce sobre o pé dela e o nome é escrito por cima, na tinta de
+  foto. Sem imagem a capa é de PAPEL — faixa em `bgDeep`, carimbo sangrando no
+  canto, título na tinta do tema: capítulo sem foto é uma página que ainda não
+  ganhou gravura, não um retângulo cinza. A altura é um piso: um título de
+  três linhas faz a capa crescer em vez de ser cortado.
 - **Chip**: fundo tonal do acento (16%), label sans/mono; selecionado, o tom
   cheio com a tinta de maior contraste por cima. **Badge**: fundo do
   acento + texto contrastante, mono caixa alta.
@@ -158,7 +188,53 @@ com "em breve" escrito (hoje: entrar com Google num build sem `GOOGLE_CLIENT_ID`
 que não existe mesmo não aparece: link morto na primeira tela é promessa
 quebrada no primeiro toque.
 
-## 8. Checklist por tela (herda das regras de negócio)
+## 8. O capítulo aberto (jornada) — composição de referência das telas de dentro
+A jornada aberta é lida de cima para baixo como a abertura de um capítulo, e
+tem duas composições, com o mesmo corte do login (**900pt**):
+- **Coluna** (<900): a capa sangra no topo, com dois quintos da tela; abaixo, a
+  frase do capítulo, o que a pessoa escreveu sobre ele, a atmosfera e a fase;
+  depois o mapa em prancha (moldura de couro, 300pt) e o roteiro.
+- **Folha sobre o mapa** (≥900): o MAPA sangra na janela inteira, sem moldura —
+  é a arte desta tela, como a ilustração é a do login — e o capítulo é uma
+  folha de papel de largura fixa (520) pousada à esquerda. A folha é do papel
+  da página (`bg`), não de `surface`: dentro dela moram cartões, e cartão sobre
+  cartão da mesma cor não levanta. A câmera enquadra o rastro no que a folha
+  deixa à vista, e o mapa deixa de prender a rolagem: a folha rola, ele fica.
+
+**Uma ação principal, e ela depende de onde a jornada está** (a regra é
+`journeyStage`, em `features/journeys/journey_domain.dart`):
+
+| Estado | Lidera | Fica discreto |
+| --- | --- | --- |
+| Rascunho | Iniciar jornada (botão) | — |
+| Em curso | Nova memória (o "+" flutuante) | Pausar · Finalizar jornada (links) |
+| Em pausa | Retomar jornada (botão) | Finalizar jornada (link) |
+| Concluída | nada | — |
+
+Finalizar encerra o capítulo, e era o botão mais vistoso da tela. "Nova memória
+nesta jornada" e "Gravar percurso" continuam onde o conteúdo pede, sempre em
+tom de apoio.
+
+**O roteiro.** As memórias são paradas numeradas — o mesmo pin do mapa, ligado
+à próxima por um fio tracejado. Com foto, a parada é um cartão foto-protagonista
+3:2 (data, título e lugar sobre o véu, e um aviso quando a memória guarda mais
+fotos); sem foto, uma nota tipográfica. Subir, descer e tirar do rastro são
+coisa de arrumar, não de ler: só aparecem depois de "Organizar".
+
+**Estados.** A tela abre com o que já está na mão — a capa e o nome que a
+estante mostrou — e relê por baixo; sem nada na mão, o esqueleto tem o ritmo
+da página; se não abre, a notícia vem da natureza da falha (`ApiErrorView`),
+abaixo do que já se sabe; capítulo sem memória convida ao primeiro passo.
+
+**A estante.** O capítulo em curso abre a lista, depois o que está em pausa, os
+guardados e, por último, os rascunhos (`shelfOrder`). No celular é uma coluna
+de capas, com a do capítulo em curso mais alta; na tela larga, ele vira uma
+faixa (capa de um lado, abertura do outro) e o resto se arruma em grade de três
+ou duas por fileira, sob o teto de 1120. As capas não levam numeral: o "01 /"
+contava a posição numa lista por data de criação, e mudava sozinho. Uma
+releitura que falha não apaga a estante — avisa que ela pode estar velha.
+
+## 9. Checklist por tela (herda das regras de negócio)
 Por que existe? · o que o usuário sente? · ação principal (máx 2–3)? · reduz
 atrito? · surpreende? · foto protagonista? · estado vazio/erro/loading? ·
 acessível (contraste, toque, leitor de tela, haptics)? · 60 FPS? · consistente

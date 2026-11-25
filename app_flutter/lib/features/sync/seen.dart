@@ -66,4 +66,13 @@ typedef PercursoVisto = ({JourneyMap? map, List<JourneyTrack> tracks});
 
 final memoriasVistas = SeenCache<Memory>();
 final jornadasVistas = SeenCache<JourneyDetail>(capacidade: 60);
+
+/// O que a ESTANTE mostrou de cada jornada: título, estado, período e capa —
+/// sem os pontos. É pouco, e é o bastante para a abertura do capítulo nascer
+/// com a capa no lugar: sem isto a foto da estante não tem para onde crescer,
+/// e a primeira coisa que a pessoa vê ao tocar numa capa é um esqueleto cinza.
+final capitulosVistos = SeenCache<Journey>(capacidade: 120);
+
+/// As memórias de uma jornada, com foto e texto — o que ilustra o roteiro.
+final roteirosVistos = SeenCache<List<Memory>>(capacidade: 30);
 final percursosVistos = SeenCache<PercursoVisto>(capacidade: 30);

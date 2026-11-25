@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart' hide Page;
 
 import '../api.dart';
@@ -5,6 +7,7 @@ import '../design/components.dart';
 import '../design/illustrations.dart';
 import '../design/sj_theme.dart';
 import '../design/tokens.dart';
+import '../features/journeys/journey_domain.dart';
 import '../features/phases/phase_domain.dart';
 import '../features/phases/phase_store.dart';
 import '../features/phases/phase_widgets.dart';
@@ -17,91 +20,14 @@ import '../widgets/surge.dart';
 import 'journey_new.dart';
 
 // ---------------------------------------------------------------------------
-// Vocabulário compartilhado da lane de jornadas
+// As peças visuais da lane de jornadas
 //
 // PORQUÊ ficam aqui e não em cada tela: uma jornada é um CAPÍTULO de uma vida,
-// e o capítulo tem de ser nomeado, datado e selado do MESMO jeito na lista e na
-// abertura (`journey_detail.dart`) — se cada tela escrevesse seu próprio rótulo
-// de status ou sua própria frase de período, o app perderia a voz. Estas
-// funções são a "voz editorial" da lane.
+// e o capítulo tem de ser selado e ilustrado do MESMO jeito na estante e na
+// abertura (`journey_detail.dart`). O que o capítulo DIZ — período, estado,
+// frase — é regra, e mora em `features/journeys/journey_domain.dart`; aqui
+// fica só o que precisa de cor e de widget.
 // ---------------------------------------------------------------------------
-
-const List<String> _meses = [
-  'janeiro',
-  'fevereiro',
-  'março',
-  'abril',
-  'maio',
-  'junho',
-  'julho',
-  'agosto',
-  'setembro',
-  'outubro',
-  'novembro',
-  'dezembro',
-];
-
-String _monthYear(String iso) {
-  final d = DateTime.parse(iso).toUtc();
-  return '${_meses[d.month - 1]} de ${d.year}';
-}
-
-/// Esquema ativo da lane. O app ainda não envolve a árvore com [SJTheme]
-/// (`main.dart` só alterna o `ThemeData`), então derivamos o esquema do brilho
-/// do tema Material e reprovemos por dentro de cada tela — assim os componentes
-/// do design system pintam no modo certo e o dia em que o modo escuro for
-/// ligado no `MaterialApp` estas telas acompanham sem tocar em nada.
-SJScheme journeyScheme(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark ? sjDark : sjLight;
-
-/// Período compacto para overline/selo ("MARÇO DE 2026 — JUNHO DE 2026").
-String journeyPeriodLabel(Journey j) {
-  if (j.startedAt != null && j.endedAt != null) {
-    final a = _monthYear(j.startedAt!);
-    final b = _monthYear(j.endedAt!);
-    return a == b ? a : '$a — $b';
-  }
-  if (j.startedAt != null) return 'desde ${_monthYear(j.startedAt!)}';
-  return _monthYear(j.createdAt);
-}
-
-/// O mesmo período, mas dito em voz de narrativa ("entre março e junho de
-/// 2026") — para caber dentro de uma frase, não de um selo.
-String journeyPeriodPhrase(Journey j) {
-  if (j.startedAt != null && j.endedAt != null) {
-    final a = _monthYear(j.startedAt!);
-    final b = _monthYear(j.endedAt!);
-    return a == b ? 'em $a' : 'entre $a e $b';
-  }
-  if (j.startedAt != null) return 'desde ${_monthYear(j.startedAt!)}';
-  return 'aberto em ${_monthYear(j.createdAt)}';
-}
-
-/// Linha curta de apoio no card (uma linha, sem ponto final).
-String journeyMomentsLine(Journey j) => switch (j.pointsCount) {
-  0 => 'Ainda sem momentos — este capítulo está em branco',
-  1 => 'Um momento guardado',
-  final n => '$n momentos guardados',
-};
-
-/// Frase inteira do capítulo (momentos + período) para a abertura da jornada.
-String journeyChapterStory(Journey j) {
-  final periodo = journeyPeriodPhrase(j);
-  return switch (j.pointsCount) {
-    0 => 'Um capítulo em branco, $periodo — esperando o primeiro momento.',
-    1 => 'Um momento registrado, $periodo.',
-    final n => '$n momentos registrados, $periodo.',
-  };
-}
-
-/// Rótulo humano do estado do capítulo (nunca o enum cru da API).
-String journeyStatusLabel(String status) => switch (status) {
-  'draft' => 'Rascunho',
-  'active' => 'Em curso',
-  'paused' => 'Em pausa',
-  'finished' => 'Concluída',
-  _ => status,
-};
 
 /// Cor do selo de estado: vinho para o que está vivo, mostarda para o que
 /// espera, musgo para o que se fechou em paz, tinta suave para o rascunho.
@@ -123,6 +49,75 @@ TextStyle journeyMoodStyle(SJScheme s) => TextStyle(
   fontStyle: FontStyle.italic,
   color: s.highlight,
 );
+
+/// A tag do Hero que liga a capa na estante à capa na abertura do capítulo. A
+/// mesma função nos dois lados — senão a foto não "cresce", só aparece.
+String journeyCoverTag(String journeyId) => 'capa-jornada:$journeyId';
+
+/// A capa de uma jornada, do jeito que a estante e a abertura a desenham.
+///
+/// É UMA peça para os dois lugares por causa do movimento: tocar numa capa da
+/// estante faz a foto CRESCER até virar a capa do capítulo (o "foto que
+/// cresce" do design system, §4) — e isso só acontece se os dois lados forem a
+/// mesma imagem, com a mesma tag.
+///
+/// PORQUÊ o tamanho de decodificação é fixo ([_side]) e não o do espaço que a
+/// foto ocupa, como no resto do app (`SJNetworkImage`): durante o voo a caixa
+/// muda de tamanho a cada quadro, e decodificar "no tamanho do espaço" pediria
+/// uma decodificação nova por quadro — a foto piscaria justamente na hora em
+/// que tem de parecer uma coisa só. Com o lado fixo, a estante e a abertura
+/// pedem exatamente a mesma imagem ao cache.
+class JourneyCoverImage extends StatelessWidget {
+  const JourneyCoverImage({
+    super.key,
+    required this.journeyId,
+    required this.url,
+  });
+
+  final String journeyId;
+  final String url;
+
+  /// Lado de decodificação, em pontos. Cobre a capa do celular e a da folha na
+  /// tela larga sem perder nitidez, e ainda é uma fração da foto original.
+  static const double _side = 420;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
+    final foto = ColoredBox(
+      color: s.surfaceAlt,
+      child: Image(
+        image: sjFoto(context, url, lado: _side),
+        fit: BoxFit.cover,
+        // Uma releitura troca o token da URL, não a foto: a que está na tela
+        // fica até a nova estar pronta.
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const _CoverFallback(),
+      ),
+    );
+    // Quem pede menos movimento não recebe o voo: a capa nova já nasce no
+    // lugar, com a transição comum da página.
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return foto;
+    return Hero(tag: journeyCoverTag(journeyId), child: foto);
+  }
+}
+
+/// Capa que falhou ao carregar: areia com o selo de itinerário — nunca um
+/// retângulo cinza de erro.
+class _CoverFallback extends StatelessWidget {
+  const _CoverFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = SJTheme.of(context);
+    return Container(
+      color: s.surfaceAlt,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: SJSpace.x10),
+      child: JourneyRouteMotif(stops: 4, color: s.frame),
+    );
+  }
+}
 
 /// Volta discreta em sans, com alvo de toque ≥44pt (o "← Voltar" do diário).
 class JourneyBackLink extends StatelessWidget {
@@ -275,6 +270,21 @@ class _RouteMotifPainter extends CustomPainter {
 /// Estante de capítulos: cada jornada é uma entrada do diário — capa dominante
 /// quando existe foto, selo de estado, título em serifa e uma linha que conta a
 /// história (nunca "156 memórias"). Ação primária única: começar um capítulo.
+///
+/// **O que vem primeiro:** o capítulo que a pessoa está VIVENDO abre a estante,
+/// em destaque; os rascunhos fecham (a regra é `shelfOrder`, no domínio). A
+/// lista vinha por data de criação, e um rascunho em branco ficava na frente
+/// de tudo só por ter sido o último a nascer.
+///
+/// **Duas composições**, com o corte do login ([SJLayout.wide]): no celular,
+/// uma coluna de capas; na tela larga, a estante tem um teto
+/// ([SJLayout.page]), o capítulo em curso vira uma faixa e os outros se
+/// arrumam em grade. Sem isso a capa crescia com a janela até passar da altura
+/// dela.
+///
+/// **Quando a rede cai** numa releitura, a estante que já estava na tela fica,
+/// com um aviso de que pode estar velha. O erro só toma a página quando não há
+/// nada para mostrar no lugar — e aí o "+" de criar não aparece.
 class JourneysScreen extends StatefulWidget {
   const JourneysScreen({super.key});
 
@@ -398,6 +408,10 @@ class _JourneysScreenState extends State<JourneysScreen>
       }
       setState(() {
         _error = e;
+        // A estante que ficou na tela é a da lente ANTERIOR: deixá-la sob o
+        // nome da fase nova mostraria capítulos que não são dela. Sem lente
+        // trocando, o que está na tela é o que a pessoa pediu — e fica.
+        if (_trocandoLente) _journeys = null;
         _trocandoLente = false;
       });
     }
@@ -454,85 +468,98 @@ class _JourneysScreenState extends State<JourneysScreen>
 
   @override
   Widget build(BuildContext context) {
-    final s = journeyScheme(context);
+    final s = SJTheme.of(context);
     final journeys = _journeys;
 
-    return SJTheme(
-      scheme: s,
-      child: Scaffold(
-        backgroundColor: s.bg,
-        floatingActionButton: (journeys != null && journeys.isNotEmpty)
-            ? Padding(
-                padding: const EdgeInsets.only(bottom: SJSpace.x2),
-                child: SJFab(
-                  icon: Icons.add,
-                  semanticLabel: 'Começar um novo capítulo',
-                  onTap: _openNew,
-                ),
-              )
-            : null,
-        body: SafeArea(
-          child: RefreshIndicator(
-            onRefresh: _load,
-            color: s.primary,
-            backgroundColor: s.surface,
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (n) {
-                if (n.metrics.axis == Axis.vertical &&
-                    n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
-                  _loadMore();
-                }
-                return false;
-              },
-              child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(
-                SJSpace.screenX,
-                SJSpace.x5,
-                SJSpace.screenX,
-                SJSpace.x16,
+    return Scaffold(
+      backgroundColor: s.bg,
+      // O "+" só existe com a estante na tela: sem conexão, um botão de criar
+      // flutuando sobre o aviso seria um convite a falhar de novo.
+      floatingActionButton: (journeys != null && journeys.isNotEmpty)
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: SJSpace.x2),
+              child: SJFab(
+                icon: Icons.add,
+                semanticLabel: 'Começar um novo capítulo',
+                onTap: _openNew,
               ),
-              children: [
-                const JourneyBackLink(),
-                const SizedBox(height: SJSpace.x4),
-                const SJOverline('seus capítulos'),
-                const SizedBox(height: SJSpace.x2),
-                Text('Jornadas', style: SJText.display(color: s.ink)),
-                const SizedBox(height: SJSpace.x2),
-                Text(_headline(journeys), style: journeyMoodStyle(s)),
-                if (_phases.value.isNotEmpty) ...[
-                  const SizedBox(height: SJSpace.x5),
-                  PhaseLens(
-                    phases: _phases.value,
-                    selected: _phaseId,
-                    onChanged: _setLens,
+            )
+          : null,
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _load,
+          color: s.primary,
+          backgroundColor: s.surface,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n.metrics.axis == Axis.vertical &&
+                  n.metrics.pixels >= n.metrics.maxScrollExtent - 600) {
+                _loadMore();
+              }
+              return false;
+            },
+            child: LayoutBuilder(
+              builder: (context, box) {
+                final largo = box.maxWidth >= SJLayout.wide;
+                // Na tela larga a estante tem um teto e fica no meio da
+                // janela. Passou dele, sobra margem — nunca uma capa do
+                // tamanho da tela.
+                final margem = largo
+                    ? math.max(SJSpace.x8, (box.maxWidth - SJLayout.page) / 2)
+                    : SJSpace.screenX;
+                return ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    margem,
+                    SJSpace.x5,
+                    margem,
+                    SJSpace.x16,
                   ),
-                ],
-                const SizedBox(height: SJSpace.x8),
-                if (_error != null)
-                  _errorState(s)
-                else if (journeys == null)
-                  _loadingState()
-                else if (journeys.isEmpty)
-                  _emptyState()
-                else
-                  for (var i = 0; i < journeys.length; i++)
-                    SJSurge(
-                      key: ValueKey(journeys[i].id),
-                      ativo: _vistas.add(journeys[i].id),
-                      child: AnimatedOpacity(
-                        // Trocando de lente, a estante anterior esmaece.
-                        opacity: _trocandoLente ? 0.4 : 1,
-                        duration: SJMotion.fast,
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: SJSpace.x6),
-                          child: _chapterCard(journeys[i], i, s),
-                        ),
+                  children: [
+                    const JourneyBackLink(),
+                    const SizedBox(height: SJSpace.x4),
+                    const SJOverline('seus capítulos'),
+                    const SizedBox(height: SJSpace.x2),
+                    Text('Jornadas', style: SJText.display(color: s.ink)),
+                    const SizedBox(height: SJSpace.x2),
+                    Text(_headline(journeys), style: journeyMoodStyle(s)),
+                    if (_phases.value.isNotEmpty) ...[
+                      const SizedBox(height: SJSpace.x5),
+                      PhaseLens(
+                        phases: _phases.value,
+                        selected: _phaseId,
+                        onChanged: _setLens,
                       ),
-                    ),
-                if (_nextCursor != null) _more(s),
-              ],
-            ),
+                    ],
+                    // Uma releitura que falha NÃO apaga a estante que já
+                    // estava na tela: a pessoa continua lendo, e fica sabendo
+                    // que o que vê pode estar velho.
+                    if (journeys != null && _error != null) ...[
+                      const SizedBox(height: SJSpace.x4),
+                      Text(
+                        'Não deu para atualizar agora — você está vendo a '
+                        'estante como estava.',
+                        style: SJText.caption(color: s.inkSoft),
+                      ),
+                    ],
+                    const SizedBox(height: SJSpace.x8),
+                    if (journeys == null && _error != null)
+                      _errorState(s)
+                    else if (journeys == null)
+                      _loadingState()
+                    else if (journeys.isEmpty)
+                      _emptyState()
+                    else
+                      _shelf(
+                        s,
+                        shelfOrder(journeys),
+                        largo: largo,
+                        width: box.maxWidth - 2 * margem,
+                      ),
+                    if (_nextCursor != null) _more(s),
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -643,18 +670,105 @@ class _JourneysScreenState extends State<JourneysScreen>
     onRetry: _load,
   );
 
+  // As medidas da grade larga, num lugar só.
+
+  /// A partir desta largura de estante cabem três capas por fileira com folga
+  /// para o título; abaixo, duas.
+  static const double _threeColumnsFrom = 1000;
+
+  /// Na faixa do capítulo em curso: quanto dela é a foto, e o piso de altura.
+  static const double _bandPhoto = 0.6;
+  static const double _bandMinHeight = 340;
+
+  /// A estante. O capítulo que está sendo vivido abre em destaque; os outros
+  /// vêm depois, na ordem de `shelfOrder`.
+  ///
+  /// No celular é uma coluna de capas. Na tela larga, o destaque vira uma
+  /// faixa (a capa de um lado, a abertura do capítulo do outro) e o resto se
+  /// arruma em grade — três capas por fileira quando cabem, duas quando não.
+  Widget _shelf(
+    SJScheme s,
+    List<Journey> ordered, {
+    required bool largo,
+    required double width,
+  }) {
+    final lead = shelfLead(ordered);
+
+    Widget surgir(Journey j, Widget card) => SJSurge(
+          key: ValueKey(j.id),
+          ativo: _vistas.add(j.id),
+          child: AnimatedOpacity(
+            // Trocando de lente, a estante anterior esmaece.
+            opacity: _trocandoLente ? 0.4 : 1,
+            duration: SJMotion.fast,
+            child: card,
+          ),
+        );
+
+    if (!largo) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final j in ordered)
+            Padding(
+              padding: const EdgeInsets.only(bottom: SJSpace.x6),
+              child: surgir(j, _chapterCard(j, s, lead: identical(j, lead))),
+            ),
+        ],
+      );
+    }
+
+    const gap = SJSpace.x6;
+    final rest = lead == null ? ordered : ordered.sublist(1);
+    final colunas = width >= _threeColumnsFrom ? 3 : 2;
+    // Arredonda para baixo: um resto de ponto flutuante na soma empurraria a
+    // última capa da fileira para a linha seguinte.
+    final lado = ((width - gap * (colunas - 1)) / colunas).floorToDouble();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (lead != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: gap),
+            child: surgir(lead, _leadBand(lead, s, width: width)),
+          ),
+        Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final j in rest)
+              SizedBox(
+                width: lado,
+                child: surgir(j, _chapterCard(j, s, lead: false)),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _semantica(Journey j) => '${j.title}. ${journeyStatusLabel(j.status)}. '
+      '${journeyMomentsLine(j)}, ${journeyPeriodLabel(j)}.';
+
+  Widget _selo(Journey j, SJScheme s) => SJBadge(
+        journeyStatusLabel(j.status),
+        color: journeyStatusColor(j.status, s),
+      );
+
   /// Um capítulo. Com capa, a FOTO manda (o texto só complementa dentro do
   /// scrim); sem capa, um card silencioso com o selo de itinerário.
-  Widget _chapterCard(Journey j, int index, SJScheme s) {
-    final numeral = (index + 1).toString().padLeft(2, '0');
+  ///
+  /// [lead]: o capítulo em curso ganha uma capa mais alta — é a única
+  /// diferença de tamanho da estante, e ela diz "é aqui que você está".
+  ///
+  /// Sem numeral de propósito. O "01 /" contava a posição na lista, e a lista
+  /// é por data de criação: o capítulo 03 virava 04 no dia em que nascia uma
+  /// jornada nova. Número que muda sozinho não numera nada.
+  Widget _chapterCard(Journey j, SJScheme s, {required bool lead}) {
     final periodo = journeyPeriodLabel(j);
     final linha = journeyMomentsLine(j);
-    final selo = SJBadge(
-      journeyStatusLabel(j.status),
-      color: journeyStatusColor(j.status, s),
-    );
-    final semantica =
-        '${j.title}. ${journeyStatusLabel(j.status)}. $linha, $periodo.';
+    final selo = _selo(j, s);
+    final semantica = _semantica(j);
 
     if (j.coverImageUrl != null) {
       return Semantics(
@@ -663,18 +777,12 @@ class _JourneysScreenState extends State<JourneysScreen>
         excludeSemantics: true,
         child: SJPhotoCard(
           title: j.title,
-          overline: '$numeral  /  $periodo',
+          overline: periodo,
           subtitle: linha,
-          aspectRatio: 4 / 3,
+          aspectRatio: lead ? 1 : 4 / 3,
           trailing: selo,
           onTap: () => _open(j),
-          imageChild: SJNetworkImage(
-            j.coverImageUrl!,
-            fit: BoxFit.cover,
-            loadingBuilder: (_, child, progress) =>
-                progress == null ? child : _coverFallback(s),
-            errorBuilder: (_, _, _) => _coverFallback(s),
-          ),
+          imageChild: JourneyCoverImage(journeyId: j.id, url: j.coverImageUrl!),
         ),
       );
     }
@@ -689,7 +797,7 @@ class _JourneysScreenState extends State<JourneysScreen>
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: SJOverline(periodo, numeral: numeral)),
+              Expanded(child: SJOverline(periodo)),
               const SizedBox(width: SJSpace.x3),
               selo,
             ],
@@ -742,12 +850,85 @@ class _JourneysScreenState extends State<JourneysScreen>
     );
   }
 
-  /// Capa ausente ou que falhou: areia com o selo de itinerário — nunca um
-  /// retângulo cinza de erro.
-  Widget _coverFallback(SJScheme s) => Container(
-    color: s.surfaceAlt,
-    alignment: Alignment.center,
-    padding: const EdgeInsets.symmetric(horizontal: SJSpace.x10),
-    child: JourneyRouteMotif(stops: 4, color: s.frame),
-  );
+  /// O capítulo em curso, na tela larga: uma faixa com a capa de um lado e a
+  /// abertura do capítulo do outro. É a única peça da estante que diz mais do
+  /// que o nome — a frase, a atmosfera e a porta para continuar.
+  ///
+  /// A altura é um PISO: quem manda é o texto. A capa é que se estica para
+  /// acompanhá-lo (posicionada, do topo ao pé) — com altura fixa, um título de
+  /// três linhas empurrava o botão para fora da faixa.
+  Widget _leadBand(Journey j, SJScheme s, {required double width}) {
+    final capa = j.coverImageUrl;
+    final atmosfera = (j.mood ?? '').trim();
+    // Três quintos para a foto: ela é a protagonista, e a coluna de texto
+    // ainda fica com uma linha confortável de ler.
+    final fotoW = capa == null ? 0.0 : (width * _bandPhoto).floorToDouble();
+    return Semantics(
+      label: _semantica(j),
+      button: true,
+      excludeSemantics: true,
+      child: SJPressable(
+        onTap: () => _open(j),
+        pressedScale: 0.995,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: s.surface,
+            borderRadius: BorderRadius.circular(SJRadius.lg),
+            boxShadow: SJElevation.e1(s),
+          ),
+          child: Stack(
+            children: [
+              if (capa != null)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: fotoW,
+                  child: JourneyCoverImage(journeyId: j.id, url: capa),
+                ),
+              Container(
+                constraints: const BoxConstraints(minHeight: _bandMinHeight),
+                alignment: Alignment.centerLeft,
+                padding: EdgeInsets.fromLTRB(
+                  fotoW + SJSpace.x8,
+                  SJSpace.x8,
+                  SJSpace.x8,
+                  SJSpace.x8,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _selo(j, s),
+                    const SizedBox(height: SJSpace.x4),
+                    SJOverline(journeyPeriodLabel(j)),
+                    const SizedBox(height: SJSpace.x2),
+                    Text(j.title, style: SJText.h1(color: s.ink)),
+                    const SizedBox(height: SJSpace.x3),
+                    Text(
+                      journeyChapterStory(j),
+                      style: SJText.bodySm(color: s.inkSoft),
+                    ),
+                    if (atmosfera.isNotEmpty) ...[
+                      const SizedBox(height: SJSpace.x2),
+                      Text(atmosfera, style: journeyMoodStyle(s)),
+                    ],
+                    const SizedBox(height: SJSpace.x5),
+                    SJButton(
+                      label: 'Continuar jornada',
+                      variant: SJButtonVariant.secondary,
+                      trailingIcon: Icons.arrow_forward,
+                      expand: true,
+                      onPressed: () => _open(j),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
